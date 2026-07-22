@@ -5,6 +5,7 @@ import br.com.mkfinance.application.transaction.TransferInput;
 import br.com.mkfinance.application.transaction.TransferPair;
 import br.com.mkfinance.domain.model.ContributionPillar;
 import br.com.mkfinance.domain.model.Transaction;
+import br.com.mkfinance.domain.model.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,25 @@ public class TransactionMapper {
                 request.accountId(),
                 request.categoryId(),
                 request.type(),
+                request.amountCents(),
+                request.date(),
+                request.description(),
+                request.note(),
+                request.status());
+    }
+
+    /**
+     * A transfer edit reuses {@code TransactionInput} because that is what the mirrored-pair engine
+     * takes. {@code categoryId} is null and {@code type} is TRANSFER purely to state the obvious —
+     * {@code TransferService.update} reads neither, since a transfer has no category and its type
+     * cannot change. The contribution pillar is not carried here: it belongs to the incoming leg
+     * alone, and {@code TransferUpdateHandler} applies it there.
+     */
+    public TransactionInput toInput(TransferUpdateRequest request) {
+        return new TransactionInput(
+                request.accountId(),
+                null,
+                TransactionType.TRANSFER,
                 request.amountCents(),
                 request.date(),
                 request.description(),
@@ -55,6 +75,7 @@ public class TransactionMapper {
                 transaction.getNote(),
                 transaction.getStatus(),
                 transaction.getTransferPairId(),
+                transaction.getTransferDirection(),
                 contributionPillar);
     }
 

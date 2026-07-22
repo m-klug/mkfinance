@@ -14,7 +14,9 @@ import br.com.mkfinance.domain.model.ContributionPillar;
 import br.com.mkfinance.support.ApiSession;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -49,8 +51,9 @@ class AccountIntegrationTest extends AbstractIntegrationTest {
                 AccountResponse.class);
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         AccountResponse account = created.getBody();
-        assertThat(account.balanceCents()).isNull();
-        assertThat(account.projectedBalanceCents()).isNull();
+        // A brand-new account has no movements, so both balances are its initial balance.
+        assertThat(account.balanceCents()).isEqualTo(10_000L);
+        assertThat(account.projectedBalanceCents()).isEqualTo(10_000L);
         assertThat(account.archived()).isFalse();
 
         ResponseEntity<AccountResponse[]> list = session.get(base, AccountResponse[].class);
@@ -125,6 +128,83 @@ class AccountIntegrationTest extends AbstractIntegrationTest {
         // archive still works as the alternative
         ResponseEntity<AccountResponse> archived = session.post(base + "/" + account.id() + "/archive", null, AccountResponse.class);
         assertThat(archived.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("the accounts endpoint reports current and projected balances (R5)")
+    void listReportsCurrentAndProjectedBalances() {
+        UUID[] workspaceId = new UUID[1];
+        ApiSession session = newRegisteredSession(workspaceId);
+        String base = "/workspaces/" + workspaceId[0] + "/accounts";
+
+        AccountResponse account = session
+                .post(base, new AccountRequest("Conta Corrente", AccountType.CHECKING, 100_000L, null, null, null),
+                        AccountResponse.class)
+                .getBody();
+
+        UUID expenseCategory = someCategory(session, workspaceId[0], "EXPENSE");
+        UUID incomeCategory = someCategory(session, workspaceId[0], "INCOME");
+        String transactions = "/workspaces/" + workspaceId[0] + "/transactions";
+        LocalDate date = LocalDate.of(2026, 5, 10);
+
+        post(session, transactions, account.id(), incomeCategory, "INCOME", 20_000L, date, "Salário", "SETTLED");
+        post(session, transactions, account.id(), expenseCategory, "EXPENSE", 30_000L, date, "Mercado", "SETTLED");
+        // Scheduled, not yet paid: it moves the projection but not the current balance.
+        post(session, transactions, account.id(), expenseCategory, "EXPENSE", 5_000L, date, "Agendado", "PENDING");
+
+        AccountResponse listed = Arrays.stream(session.get(base, AccountResponse[].class).getBody())
+                .filter(a -> a.id().equals(account.id()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(listed.balanceCents())
+                .as("100.000 + 20.000 − 30.000, pending excluded")
+                .isEqualTo(90_000L);
+        assertThat(listed.projectedBalanceCents())
+                .as("current − the 5.000 still pending")
+                .isEqualTo(85_000L);
+
+        // Archiving does not change the arithmetic, and the response carries it too.
+        AccountResponse archived = session
+                .post(base + "/" + account.id() + "/archive", null, AccountResponse.class)
+                .getBody();
+        assertThat(archived.balanceCents()).isEqualTo(90_000L);
+        assertThat(archived.projectedBalanceCents()).isEqualTo(85_000L);
+    }
+
+    private void post(
+            ApiSession session,
+            String path,
+            UUID accountId,
+            UUID categoryId,
+            String type,
+            long amountCents,
+            LocalDate date,
+            String description,
+            String status) {
+        session.post(
+                path,
+                Map.of(
+                        "accountId", accountId,
+                        "categoryId", categoryId,
+                        "type", type,
+                        "amountCents", amountCents,
+                        "date", date.toString(),
+                        "description", description,
+                        "status", status),
+                String.class);
+    }
+
+    /** Any seeded, non-system category of the given type — the seed always provides several. */
+    private UUID someCategory(ApiSession session, UUID workspaceId, String type) {
+        CategoryResponse[] categories = session
+                .get("/workspaces/" + workspaceId + "/categories?type=" + type, CategoryResponse[].class)
+                .getBody();
+        return Arrays.stream(categories)
+                .filter(category -> !category.system())
+                .findFirst()
+                .orElseThrow()
+                .id();
     }
 
     @Test

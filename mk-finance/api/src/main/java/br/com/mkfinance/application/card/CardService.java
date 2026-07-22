@@ -83,6 +83,20 @@ public class CardService {
     }
 
     /**
+     * Archives the card — idempotent, exactly like {@code AccountService.archive}.
+     *
+     * <p>Archiving is the counterpart of deletion for something with history: the card keeps its
+     * purchases, installments and statements, stays reachable through
+     * {@code listCards?includeArchived=true}, and its open bills can still be paid — only new
+     * charges are refused, by {@link #getActive} answering CARD_ARCHIVED.
+     */
+    public Card archive(UUID workspaceId, UUID cardId) {
+        Card card = get(workspaceId, cardId);
+        card.setArchived(true);
+        return cardRepository.save(card);
+    }
+
+    /**
      * Available limit = limit − everything still owed on statements that are not fully paid.
      *
      * <p>"Still owed" spans <em>future</em> statements too, because installments are all created

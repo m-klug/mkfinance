@@ -3,6 +3,7 @@ package br.com.mkfinance.card;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.com.mkfinance.api.account.AccountResponse;
+import br.com.mkfinance.api.card.CardPurchaseRequest;
 import br.com.mkfinance.api.card.CardRequest;
 import br.com.mkfinance.api.card.CardResponse;
 import br.com.mkfinance.api.card.StatementPaymentRequest;
@@ -86,6 +87,64 @@ class CardIntegrationTest extends AbstractCardIntegrationTest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
             assertThat(response.getBody().code()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+        }
+
+        @Test
+        @DisplayName("archiving hides the card from the default listing but keeps its history")
+        void archivesACard() {
+            CardResponse card = createCard("Nubank", 1_000_000L, 20, 5);
+
+            ResponseEntity<CardResponse> archived =
+                    session.post(path("/cards/" + card.id() + "/archive"), null, CardResponse.class);
+            assertThat(archived.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(archived.getBody().archived()).isTrue();
+
+            // Idempotent, exactly like archiving an account.
+            assertThat(session.post(path("/cards/" + card.id() + "/archive"), null, CardResponse.class)
+                            .getBody()
+                            .archived())
+                    .isTrue();
+
+            assertThat(session.get(path("/cards"), CardResponse[].class).getBody())
+                    .as("gone from the default listing")
+                    .isEmpty();
+            assertThat(session.get(path("/cards?includeArchived=true"), CardResponse[].class)
+                            .getBody())
+                    .as("still there as history")
+                    .extracting(CardResponse::id)
+                    .containsExactly(card.id());
+        }
+
+        @Test
+        @DisplayName("an archived card refuses new purchases but its statements stay readable")
+        void archivedCardIsReadOnlyHistory() {
+            CardResponse card = createCard("Nubank", 1_000_000L, 20, 5);
+            createPurchase(card.id(), "Compra anterior", 30_000L, LocalDate.of(2026, 7, 10), 1);
+            session.post(path("/cards/" + card.id() + "/archive"), null, CardResponse.class);
+
+            ResponseEntity<ErrorResponse> refused = session.post(
+                    path("/cards/" + card.id() + "/purchases"),
+                    new CardPurchaseRequest(
+                            someExpenseCategory().id(), "Nova compra", 1_000L, LocalDate.of(2026, 7, 15), (short) 1),
+                    ErrorResponse.class);
+            assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+            assertThat(refused.getBody().code()).isEqualTo(ErrorCode.CARD_ARCHIVED);
+
+            assertThat(statementOfMonth(card.id(), "2026-07").totalCents())
+                    .as("the bill it already ran up is still owed and still visible")
+                    .isEqualTo(30_000L);
+        }
+
+        @Test
+        void archivingACardOfAnotherWorkspaceIsNotFound() {
+            CardResponse card = createCard("Nubank", 1_000_000L, 20, 5);
+            register();
+
+            ResponseEntity<ErrorResponse> response =
+                    session.post(path("/cards/" + card.id() + "/archive"), null, ErrorResponse.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(response.getBody().code()).isEqualTo(ErrorCode.CARD_NOT_FOUND);
         }
 
         @Test
