@@ -8,7 +8,21 @@
 
 App de controle financeiro pessoal, **self-hosted** (Proxmox + LXC, acesso via WireGuard e DNS interno). Uso pessoal, mas modelado como **multiusuário por espaço (`Workspace`)** desde o início. Organiza despesas pelo **método dos 6 pilares** com alvos fixos no MVP: Custos Fixos 30, Conforto 10, Metas 20, Prazeres 10, Liberdade Financeira 25, Conhecimento 5.
 
-Stack e layout do repositório: inalterados desde a E2 — ver `CONTEXTO-E2.md` §2.
+## 1.1 Repositório e stack
+
+Monorepo (decisão consciente: o contrato OpenAPI é o ponto de sincronização entre back e front). Branch `main`, remote `git@github.com:m-klug/mkfinance.git`.
+
+| Caminho | Stack |
+|---|---|
+| `mk-finance/api/` | Java 21 + Spring Boot 3.5 + Maven (`./mvnw`), Flyway, pacote `br.com.mkfinance` |
+| `mk-finance/web/` | Vite 6 + React 19 + TS estrito, Tailwind 4, shadcn/ui, TanStack Query, i18n pt-BR, orval + MSW |
+| `mk-finance/contracts/openapi.yaml` | **O contrato** — fonte única entre back e front |
+| `mk-finance/docker/` | compose (caddy, api, web, postgres, backup) |
+| `.claude/agents/` | personas: `java-architect`, `spring-boot-engineer`, `react-specialist` |
+
+Ambiente verificado nesta máquina: Java 21.0.5, Node 24.14.1, Docker rodando. Não há Postgres local — os testes de backend usam Testcontainers (Postgres real) e o dev do front roda contra MSW.
+
+Rodar o app hoje: `cd mk-finance/web && npm run dev` (http://localhost:5173, contra mocks, sem backend/banco).
 
 ## 2. Estado atual: E0, E1 e E2 concluídas (gate verde)
 
