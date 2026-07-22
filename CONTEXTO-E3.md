@@ -2,7 +2,7 @@
 
 > **Leia este arquivo primeiro.** Handoff completo para iniciar a Etapa E3 num chat novo.
 > Detalhamento: `PLANEJAMENTO.md` (fonte da verdade de negócio) e `DESENVOLVIMENTO-MVP.md` (fichas e convenções).
-> Atualizado em 22/07/2026, após a E2 concluída. Substitui o `CONTEXTO-E2.md`.
+> Atualizado em 22/07/2026, após a E2 concluída. Substituiu o `CONTEXTO-E2.md`, removido do repositório (recuperável no histórico do git, commit `ed7297d`).
 
 ## 1. O projeto
 
