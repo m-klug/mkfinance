@@ -79,4 +79,28 @@ public class AppException extends RuntimeException {
     public static AppException systemCategoryReadOnly() {
         return of(ErrorCode.SYSTEM_CATEGORY_READONLY, HttpStatus.CONFLICT);
     }
+
+    public static AppException transactionNotFound() {
+        return of(ErrorCode.TRANSACTION_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException transactionAlreadySettled() {
+        return of(ErrorCode.TRANSACTION_ALREADY_SETTLED, HttpStatus.CONFLICT);
+    }
+
+    public static AppException transactionTypeImmutable() {
+        return of(ErrorCode.TRANSACTION_TYPE_IMMUTABLE, HttpStatus.CONFLICT);
+    }
+
+    public static AppException categoryTypeMismatch() {
+        return of(ErrorCode.CATEGORY_TYPE_MISMATCH, HttpStatus.BAD_REQUEST);
+    }
+
+    public static AppException insufficientTransferAccounts() {
+        return of(ErrorCode.INSUFFICIENT_TRANSFER_ACCOUNTS, HttpStatus.BAD_REQUEST);
+    }
+
+    public static AppException contributionPillarRequired() {
+        return of(ErrorCode.CONTRIBUTION_PILLAR_REQUIRED, HttpStatus.BAD_REQUEST);
+    }
 }

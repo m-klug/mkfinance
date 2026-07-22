@@ -35,6 +35,18 @@ public final class ErrorCode {
     public static final String CATEGORY_PILLAR_FORBIDDEN = "CATEGORY_PILLAR_FORBIDDEN";
     public static final String SYSTEM_CATEGORY_READONLY = "SYSTEM_CATEGORY_READONLY";
 
+    // transactions & transfers (BE-3)
+    public static final String TRANSACTION_NOT_FOUND = "TRANSACTION_NOT_FOUND";
+    public static final String TRANSACTION_ALREADY_SETTLED = "TRANSACTION_ALREADY_SETTLED";
+    /** A transfer leg cannot be turned into an INCOME/EXPENSE row, nor the other way around. */
+    public static final String TRANSACTION_TYPE_IMMUTABLE = "TRANSACTION_TYPE_IMMUTABLE";
+    /** The category's type must match the transaction's (an EXPENSE cannot use an INCOME category). */
+    public static final String CATEGORY_TYPE_MISMATCH = "CATEGORY_TYPE_MISMATCH";
+    /** A transfer needs two distinct accounts. */
+    public static final String INSUFFICIENT_TRANSFER_ACCOUNTS = "INSUFFICIENT_TRANSFER_ACCOUNTS";
+    /** Contribution (R9) into an INVESTMENT/SAVINGS account with no pillar given and no account default. */
+    public static final String CONTRIBUTION_PILLAR_REQUIRED = "CONTRIBUTION_PILLAR_REQUIRED";
+
     // generic
     public static final String VALIDATION_ERROR = "VALIDATION_ERROR";
     public static final String DATA_INTEGRITY_VIOLATION = "DATA_INTEGRITY_VIOLATION";
