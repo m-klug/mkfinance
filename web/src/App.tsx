@@ -6,6 +6,9 @@ import { RequireAuth } from "@/components/auth/RequireAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import LoginPage from "@/features/auth/LoginPage";
 import RegisterPage from "@/features/auth/RegisterPage";
+import AccountsPage from "@/features/accounts/AccountsPage";
+import CategoriesPage from "@/features/categories/CategoriesPage";
+import TransactionsPage from "@/features/transactions/TransactionsPage";
 
 // Feature screens land in FE-2/3/4; kept as translated placeholders here so
 // the shell and routing are fully navigable from E1 onward.
@@ -32,10 +35,10 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route path="/" element={<Placeholder titleKey="nav.dashboard" />} />
-            <Route path="/transactions" element={<Placeholder titleKey="nav.transactions" />} />
-            <Route path="/accounts" element={<Placeholder titleKey="nav.accounts" />} />
+            <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/accounts" element={<AccountsPage />} />
             <Route path="/cards" element={<Placeholder titleKey="nav.cards" />} />
-            <Route path="/categories" element={<Placeholder titleKey="nav.categories" />} />
+            <Route path="/categories" element={<CategoriesPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

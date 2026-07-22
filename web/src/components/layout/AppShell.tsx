@@ -17,6 +17,9 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { getGetCurrentUserQueryKey, useLogout } from "@/lib/api/generated/auth/auth";
+// Quick entry has to be one tap away from every screen (PLANEJAMENTO §6.3),
+// so the shell reserves this single slot for the FE-2 component.
+import { QuickTransactionButton } from "@/features/transactions/QuickTransactionButton";
 
 interface NavItem {
   to: string;
@@ -133,6 +136,7 @@ export function AppShell() {
           </Button>
           <span className="text-sm font-medium md:hidden">{t("app.name")}</span>
           <div className="ml-auto flex items-center gap-2">
+            <QuickTransactionButton />
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="size-4" />
