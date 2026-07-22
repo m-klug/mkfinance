@@ -10,6 +10,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -62,5 +63,17 @@ public class StatementController {
         StatementView view =
                 statementService.pay(workspaceContext.getWorkspaceId(), statementId, mapper.toInput(request));
         return mapper.toResponse(view);
+    }
+
+    /**
+     * Reverses one payment, removing the debit it made on the account along with it. Works on a PAID
+     * statement too — that is the point: the status falls back to PARTIAL or OPEN on its own, since
+     * it is derived from the payments that remain.
+     */
+    @DeleteMapping("/statements/{statementId}/payments/{paymentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void reversePayment(
+            @PathVariable UUID workspaceId, @PathVariable UUID statementId, @PathVariable UUID paymentId) {
+        statementService.reversePayment(workspaceContext.getWorkspaceId(), statementId, paymentId);
     }
 }

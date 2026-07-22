@@ -20,7 +20,16 @@ public record StatementDetailResponse(
         StatementStatus status,
         long totalCents,
         long paidCents,
-        List<StatementItemResponse> items) {
+        List<StatementItemResponse> items,
+        List<StatementPaymentResponse> payments) {
+
+    /**
+     * One payment made against the statement. {@code id} is what the reversal endpoint takes, and
+     * {@code transactionId} lets the client link the bill to the debit row in the extrato.
+     */
+    public record StatementPaymentResponse(
+            UUID id, UUID accountId, long amountCents, LocalDate paymentDate, UUID transactionId) {
+    }
 
     /** One installment as billed, with the purchase context needed to recognize it. */
     public record StatementItemResponse(

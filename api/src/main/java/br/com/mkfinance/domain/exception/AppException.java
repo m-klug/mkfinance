@@ -100,6 +100,15 @@ public class AppException extends RuntimeException {
         return of(ErrorCode.INSUFFICIENT_TRANSFER_ACCOUNTS, HttpStatus.BAD_REQUEST);
     }
 
+    /**
+     * The extrato tried to delete the debit side of a statement payment. Not a data-integrity
+     * accident (the FK would have raised one anyway) but a rule with a way out: the client points the
+     * user at the statement, where reversing removes payment and debit together.
+     */
+    public static AppException transactionLockedByPayment() {
+        return of(ErrorCode.TRANSACTION_LOCKED_BY_PAYMENT, HttpStatus.CONFLICT);
+    }
+
     public static AppException contributionPillarRequired() {
         return of(ErrorCode.CONTRIBUTION_PILLAR_REQUIRED, HttpStatus.BAD_REQUEST);
     }
@@ -118,6 +127,10 @@ public class AppException extends RuntimeException {
 
     public static AppException statementNotFound() {
         return of(ErrorCode.STATEMENT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException statementPaymentNotFound() {
+        return of(ErrorCode.STATEMENT_PAYMENT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
     /**

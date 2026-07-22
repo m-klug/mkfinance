@@ -23,6 +23,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
     List<Transaction> findByTransferPairId(UUID transferPairId);
 
     /**
+     * Whether this transaction is the debit side of a credit-card statement payment (R2), in which
+     * case the extrato must refuse to delete it and send the user to reverse it on the statement.
+     *
+     * <p>{@code statement_payment} belongs to BE-4, so this is a bare existence check written as
+     * native SQL — the same cross-feature guard pattern as
+     * {@code CategoryRepository#existsCardPurchaseForCategory}. Asking here, rather than letting the
+     * foreign key raise, is what turns a generic DATA_INTEGRITY_VIOLATION into an error the client
+     * can act on.
+     */
+    @Query(
+            value = "select exists(select 1 from statement_payment where transaction_id = :transactionId)",
+            nativeQuery = true)
+    boolean existsStatementPaymentForTransaction(@Param("transactionId") UUID transactionId);
+
+    /**
      * Pre-aggregated input for {@code BalanceCalculator}: one row per
      * {@code (account, type, status, direction)} bucket in the workspace, so every account's
      * balance (R5) costs a single query regardless of how long the history is.
