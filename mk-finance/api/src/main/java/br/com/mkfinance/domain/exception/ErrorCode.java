@@ -47,6 +47,20 @@ public final class ErrorCode {
     /** Contribution (R9) into an INVESTMENT/SAVINGS account with no pillar given and no account default. */
     public static final String CONTRIBUTION_PILLAR_REQUIRED = "CONTRIBUTION_PILLAR_REQUIRED";
 
+    // credit card & statements (BE-4)
+    public static final String CARD_NOT_FOUND = "CARD_NOT_FOUND";
+    /** An archived card is history: it can be read, but nothing new may be charged to it. */
+    public static final String CARD_ARCHIVED = "CARD_ARCHIVED";
+    public static final String PURCHASE_NOT_FOUND = "PURCHASE_NOT_FOUND";
+    public static final String STATEMENT_NOT_FOUND = "STATEMENT_NOT_FOUND";
+    /** R6: a PAID statement is frozen — its installments cannot be edited, moved or deleted. */
+    public static final String STATEMENT_IMMUTABLE = "STATEMENT_IMMUTABLE";
+    public static final String STATEMENT_ALREADY_PAID = "STATEMENT_ALREADY_PAID";
+    /** Paying more than what is still owed on the statement; the MVP has no credit balance. */
+    public static final String PAYMENT_EXCEEDS_REMAINING = "PAYMENT_EXCEEDS_REMAINING";
+    /** Nothing to pay: the statement has no installments allocated to it yet. */
+    public static final String STATEMENT_EMPTY = "STATEMENT_EMPTY";
+
     // generic
     public static final String VALIDATION_ERROR = "VALIDATION_ERROR";
     public static final String DATA_INTEGRITY_VIOLATION = "DATA_INTEGRITY_VIOLATION";
