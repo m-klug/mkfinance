@@ -1,0 +1,79 @@
+# MK Finance self-host stack (Proxmox LXC — PLANEJAMENTO §3.4).
+# Nothing is exposed to the public internet; access via WireGuard + internal DNS.
+# Only Caddy publishes ports; api/web/postgres stay on the internal network.
+
+name: mk-finance
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - web
+
+  api:
+    build:
+      context: ../api
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: mkfinance
+      POSTGRES_USER: mkfinance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../web
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mkfinance
+      POSTGRES_USER: mkfinance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mkfinance -d mkfinance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Daily pg_dump with retention. Second backup layer is the Proxmox vzdump of
+  # the whole LXC (PLANEJAMENTO §3.4) — ideally to storage outside the main HDD.
+  backup:
+    image: prodrigestivill/postgres-backup-local:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: mkfinance
+      POSTGRES_USER: mkfinance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: "14"
+      BACKUP_KEEP_WEEKS: "8"
+      BACKUP_KEEP_MONTHS: "12"
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

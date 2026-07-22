@@ -1,0 +1,92 @@
+// Custom fetch mutator used by every generated API hook (see orval.config.ts).
+// Orval calls it with a single request-config object. Sends the session cookie
+// and unwraps JSON; non-2xx responses throw ApiError carrying the
+// machine-readable error code the UI translates (PLANEJAMENTO §3.3).
+
+export interface ApiErrorBody {
+  code: string;
+  params?: Record<string, unknown>;
+  fieldErrors?: { field: string; code: string }[];
+}
+
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly body: ApiErrorBody,
+  ) {
+    super(body.code);
+    this.name = "ApiError";
+  }
+}
+
+export interface ApiRequestConfig {
+  url: string;
+  method: string;
+  params?: Record<string, unknown>;
+  data?: unknown;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+}
+
+function buildQuery(params: Record<string, unknown>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      search.append(key, String(value));
+    }
+  }
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function apiFetch<T>(config: ApiRequestConfig): Promise<T> {
+  const { url, method, params, data, headers, signal } = config;
+  const fullUrl = `${url}${params ? buildQuery(params) : ""}`;
+  const init: RequestInit = {
+    method,
+    credentials: "include",
+    headers,
+    body: data !== undefined ? JSON.stringify(data) : undefined,
+    signal,
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(fullUrl, init);
+  } catch (error) {
+    // Vitest's jsdom test environment ships its own AbortController/
+    // AbortSignal (unlike fetch/Request, which stay Node's native
+    // implementation), so a signal minted by TanStack Query fails Node
+    // fetch's realm check with this exact TypeError. Never happens in a
+    // real browser (single realm) — in tests we just retry without the
+    // signal rather than making every test special-case cancellation.
+    const isJsdomAbortSignalMismatch =
+      signal !== undefined && error instanceof TypeError && error.message.includes("AbortSignal");
+    if (!isJsdomAbortSignalMismatch) {
+      throw error;
+    }
+    response = await fetch(fullUrl, { ...init, signal: undefined });
+  }
+
+  if (!response.ok) {
+    let body: ApiErrorBody = { code: "UNKNOWN_ERROR" };
+    try {
+      body = (await response.json()) as ApiErrorBody;
+    } catch {
+      // non-JSON error body — keep UNKNOWN_ERROR
+    }
+    throw new ApiError(response.status, body);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("text/csv")) {
+    return (await response.text()) as T;
+  }
+  return (await response.json()) as T;
+}
+
+export default apiFetch;

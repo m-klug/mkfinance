@@ -1,0 +1,64 @@
+{
+  "app": {
+    "name": "MK Finance"
+  },
+  "common": {
+    "loading": "Carregando…"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "transactions": "Lançamentos",
+    "accounts": "Contas",
+    "cards": "Cartões",
+    "categories": "Categorias",
+    "openMenu": "Abrir menu",
+    "closeMenu": "Fechar menu"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Escuro",
+    "toggle": "Alternar tema"
+  },
+  "auth": {
+    "login": "Entrar",
+    "register": "Criar conta",
+    "logout": "Sair",
+    "email": "E-mail",
+    "password": "Senha",
+    "name": "Nome",
+    "loginSubtitle": "Acesse sua conta para continuar.",
+    "registerSubtitle": "Comece a organizar suas finanças em poucos minutos.",
+    "noAccountPrompt": "Ainda não tem conta?",
+    "hasAccountPrompt": "Já tem uma conta?",
+    "submitting": "Enviando…"
+  },
+  "pillar": {
+    "FIXED_COSTS": "Custos Fixos",
+    "COMFORT": "Conforto",
+    "GOALS": "Metas",
+    "PLEASURES": "Prazeres",
+    "FINANCIAL_FREEDOM": "Liberdade Financeira",
+    "KNOWLEDGE": "Conhecimento"
+  },
+  "error": {
+    "UNKNOWN_ERROR": "Algo deu errado. Tente novamente.",
+    "EMAIL_ALREADY_USED": "Este e-mail já está em uso.",
+    "INVALID_CREDENTIALS": "E-mail ou senha inválidos.",
+    "NOT_A_MEMBER": "Você não tem acesso a este espaço.",
+    "ACCOUNT_HAS_TRANSACTIONS": "Esta conta possui lançamentos — arquive em vez de excluir.",
+    "CATEGORY_IN_USE": "Esta categoria está em uso e não pode ser excluída.",
+    "CATEGORY_PILLAR_REQUIRED": "Selecione um pilar para esta categoria de despesa.",
+    "CATEGORY_PILLAR_FORBIDDEN": "Categorias de receita não têm pilar.",
+    "INSUFFICIENT_TRANSFER_ACCOUNTS": "É preciso ter ao menos duas contas para transferir.",
+    "CONTRIBUTION_PILLAR_REQUIRED": "Selecione o pilar deste aporte.",
+    "TRANSACTION_ALREADY_SETTLED": "Este lançamento já foi efetivado.",
+    "STATEMENT_ALREADY_PAID": "Esta fatura já foi paga.",
+    "STATEMENT_IMMUTABLE": "Faturas pagas não podem ser alteradas.",
+    "PAYMENT_EXCEEDS_REMAINING": "O valor excede o restante da fatura.",
+    "INVITE_EXPIRED": "Este convite expirou ou já foi usado.",
+    "VALIDATION_ERROR": "Verifique os campos destacados."
+  },
+  "placeholder": {
+    "underConstruction": "Em construção — esta tela chega nas próximas etapas."
+  }
+}
