@@ -103,4 +103,45 @@ public class AppException extends RuntimeException {
     public static AppException contributionPillarRequired() {
         return of(ErrorCode.CONTRIBUTION_PILLAR_REQUIRED, HttpStatus.BAD_REQUEST);
     }
+
+    public static AppException cardNotFound() {
+        return of(ErrorCode.CARD_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException cardArchived() {
+        return of(ErrorCode.CARD_ARCHIVED, HttpStatus.CONFLICT);
+    }
+
+    public static AppException purchaseNotFound() {
+        return of(ErrorCode.PURCHASE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException statementNotFound() {
+        return of(ErrorCode.STATEMENT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * R6 — the edit would touch an installment sitting on a statement already paid in full.
+     *
+     * @param statementMonth reference month (YYYY-MM) of the offending statement, so the client can
+     *     tell the user <em>which</em> bill is blocking the change
+     */
+    public static AppException statementImmutable(String statementMonth) {
+        return of(ErrorCode.STATEMENT_IMMUTABLE, HttpStatus.CONFLICT, Map.of("statementMonth", statementMonth));
+    }
+
+    public static AppException statementAlreadyPaid() {
+        return of(ErrorCode.STATEMENT_ALREADY_PAID, HttpStatus.CONFLICT);
+    }
+
+    public static AppException paymentExceedsRemaining(long remainingCents) {
+        return of(
+                ErrorCode.PAYMENT_EXCEEDS_REMAINING,
+                HttpStatus.CONFLICT,
+                Map.of("remainingCents", remainingCents));
+    }
+
+    public static AppException statementEmpty() {
+        return of(ErrorCode.STATEMENT_EMPTY, HttpStatus.CONFLICT);
+    }
 }
