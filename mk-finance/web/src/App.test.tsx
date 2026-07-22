@@ -16,11 +16,20 @@ describe("App routes", () => {
     expect(screen.getAllByText("Categorias").length).toBeGreaterThan(0);
   });
 
-  it("renders the transactions placeholder inside the shell", async () => {
+  // FE-2 replaced the transactions placeholder with the real screen; /cards is
+  // still a placeholder until FE-3 lands.
+  it("renders the transactions screen inside the shell", async () => {
     seedAuthenticatedSession();
     renderWithProviders(<App />, { route: "/transactions" });
 
     expect(await screen.findByRole("heading", { name: "Lançamentos" })).toBeInTheDocument();
+  });
+
+  it("renders the cards placeholder inside the shell", async () => {
+    seedAuthenticatedSession();
+    renderWithProviders(<App />, { route: "/cards" });
+
+    expect(await screen.findByRole("heading", { name: "Cartões" })).toBeInTheDocument();
     expect(screen.getByText("Em construção — esta tela chega nas próximas etapas.")).toBeInTheDocument();
   });
 
