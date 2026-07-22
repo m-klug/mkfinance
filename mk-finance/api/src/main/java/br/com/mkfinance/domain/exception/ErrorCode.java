@@ -46,6 +46,12 @@ public final class ErrorCode {
     public static final String INSUFFICIENT_TRANSFER_ACCOUNTS = "INSUFFICIENT_TRANSFER_ACCOUNTS";
     /** Contribution (R9) into an INVESTMENT/SAVINGS account with no pillar given and no account default. */
     public static final String CONTRIBUTION_PILLAR_REQUIRED = "CONTRIBUTION_PILLAR_REQUIRED";
+    /**
+     * The transaction is the debit side of a credit-card statement payment, so the extrato cannot
+     * delete it on its own — undoing it would leave the statement claiming to be paid with no money
+     * having moved. The client sends the user to the statement screen, which reverses both together.
+     */
+    public static final String TRANSACTION_LOCKED_BY_PAYMENT = "TRANSACTION_LOCKED_BY_PAYMENT";
 
     // credit card & statements (BE-4)
     public static final String CARD_NOT_FOUND = "CARD_NOT_FOUND";
@@ -53,6 +59,8 @@ public final class ErrorCode {
     public static final String CARD_ARCHIVED = "CARD_ARCHIVED";
     public static final String PURCHASE_NOT_FOUND = "PURCHASE_NOT_FOUND";
     public static final String STATEMENT_NOT_FOUND = "STATEMENT_NOT_FOUND";
+    /** No such payment on this statement — unknown id, another workspace's, or another bill's. */
+    public static final String STATEMENT_PAYMENT_NOT_FOUND = "STATEMENT_PAYMENT_NOT_FOUND";
     /** R6: a PAID statement is frozen — its installments cannot be edited, moved or deleted. */
     public static final String STATEMENT_IMMUTABLE = "STATEMENT_IMMUTABLE";
     public static final String STATEMENT_ALREADY_PAID = "STATEMENT_ALREADY_PAID";

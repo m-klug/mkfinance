@@ -123,9 +123,21 @@ public class TransactionService {
         return transactionRepository.save(transaction);
     }
 
-    /** Deleting one leg of a transfer deletes its pair too (contract), never leaving a half-transfer. */
+    /**
+     * Deleting one leg of a transfer deletes its pair too (contract), never leaving a half-transfer.
+     *
+     * <p>A statement payment's debit is refused instead: the row is still referenced by
+     * {@code statement_payment}, and dropping it would leave a bill claiming to be paid with no money
+     * having moved. The guard is asked before the delete so the client gets
+     * TRANSACTION_LOCKED_BY_PAYMENT — which names the way out (reverse it on the statement) — rather
+     * than the foreign key's opaque DATA_INTEGRITY_VIOLATION. The statement reversal itself deletes
+     * the payment row first, so by the time it calls this the guard no longer matches.
+     */
     public void delete(UUID workspaceId, UUID transactionId) {
         Transaction transaction = get(workspaceId, transactionId);
+        if (transactionRepository.existsStatementPaymentForTransaction(transaction.getId())) {
+            throw AppException.transactionLockedByPayment();
+        }
         if (transaction.isTransfer()) {
             transferService.delete(transaction);
             return;

@@ -167,7 +167,7 @@ public class CardPurchaseService {
     /** R6: a fully paid statement is frozen; corrections there go through an adjusting entry. */
     private void requireAllMutable(Collection<Statement> statements) {
         for (Statement statement : statements) {
-            if (statement.isImmutable()) {
+            if (statement.chargesFrozen()) {
                 throw AppException.statementImmutable(statement.referenceYearMonth().toString());
             }
         }
