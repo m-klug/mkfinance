@@ -22,14 +22,17 @@ import type {
 import {
   ContributionPillar,
   TransactionStatus,
-  TransactionType
+  TransactionType,
+  TransferDirection
 } from '../mKFinanceAPI.schemas';
 import type {
   Transaction
 } from '../mKFinanceAPI.schemas';
 
 
-export const getCreateTransferResponseMock = (overrideResponse: Partial< Transaction > = {}): Transaction => ({id: faker.string.uuid(), accountId: faker.string.uuid(), categoryId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), type: faker.helpers.arrayElement(Object.values(TransactionType)), amountCents: faker.number.int({min: 1, max: undefined}), date: faker.date.past().toISOString().split('T')[0], description: faker.string.alpha({length: {min: 10, max: 20}}), note: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), status: faker.helpers.arrayElement(Object.values(TransactionStatus)), transferPairId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), contributionPillar: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(ContributionPillar)), undefined]), ...overrideResponse})
+export const getCreateTransferResponseMock = (overrideResponse: Partial< Transaction > = {}): Transaction => ({id: faker.string.uuid(), accountId: faker.string.uuid(), categoryId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), type: faker.helpers.arrayElement(Object.values(TransactionType)), amountCents: faker.number.int({min: 1, max: undefined}), date: faker.date.past().toISOString().split('T')[0], description: faker.string.alpha({length: {min: 10, max: 20}}), note: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), status: faker.helpers.arrayElement(Object.values(TransactionStatus)), transferPairId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), transferDirection: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(TransferDirection)), undefined]), contributionPillar: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(ContributionPillar)), undefined]), ...overrideResponse})
+
+export const getUpdateTransferResponseMock = (overrideResponse: Partial< Transaction > = {}): Transaction => ({id: faker.string.uuid(), accountId: faker.string.uuid(), categoryId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), type: faker.helpers.arrayElement(Object.values(TransactionType)), amountCents: faker.number.int({min: 1, max: undefined}), date: faker.date.past().toISOString().split('T')[0], description: faker.string.alpha({length: {min: 10, max: 20}}), note: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), status: faker.helpers.arrayElement(Object.values(TransactionStatus)), transferPairId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), transferDirection: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(TransferDirection)), undefined]), contributionPillar: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(ContributionPillar)), undefined]), ...overrideResponse})
 
 
 export const getCreateTransferMockHandler = (overrideResponse?: Transaction | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<Transaction> | Transaction), options?: RequestHandlerOptions) => {
@@ -43,6 +46,19 @@ export const getCreateTransferMockHandler = (overrideResponse?: Transaction | ((
       })
   }, options)
 }
+
+export const getUpdateTransferMockHandler = (overrideResponse?: Transaction | ((info: Parameters<Parameters<typeof http.patch>[1]>[0]) => Promise<Transaction> | Transaction), options?: RequestHandlerOptions) => {
+  return http.patch('*/workspaces/:workspaceId/transfers/:transactionId', async (info) => {await delay(1000);
+  
+    return new HttpResponse(JSON.stringify(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getUpdateTransferResponseMock()),
+      { status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+  }, options)
+}
 export const getTransfersMock = () => [
-  getCreateTransferMockHandler()
+  getCreateTransferMockHandler(),
+  getUpdateTransferMockHandler()
 ]

@@ -14,7 +14,7 @@ export type ErrorResponseFieldErrorsItem = {
 };
 
 export interface ErrorResponse {
-  /** Machine-readable code translated by the client. Known codes include: EMAIL_ALREADY_USED, INVALID_CREDENTIALS, NOT_A_MEMBER, ACCOUNT_HAS_TRANSACTIONS, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_ALREADY_SETTLED, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, INVITE_EXPIRED, VALIDATION_ERROR.
+  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
  */
   code: string;
   params?: ErrorResponseParams;
@@ -81,6 +81,15 @@ export type TransactionStatus = typeof TransactionStatus[keyof typeof Transactio
 export const TransactionStatus = {
   SETTLED: 'SETTLED',
   PENDING: 'PENDING',
+} as const;
+
+export type TransferDirection = typeof TransferDirection[keyof typeof TransferDirection];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const TransferDirection = {
+  OUT: 'OUT',
+  IN: 'IN',
 } as const;
 
 export type StatementStatus = typeof StatementStatus[keyof typeof StatementStatus];
@@ -151,12 +160,12 @@ export interface Account {
   type: AccountType;
   initialBalanceCents: number;
   /**
-   * initial + settled transactions (R5). Null until BE-3 lands.
+   * initial + settled transactions (R5).
    * @nullable
    */
   balanceCents?: number | null;
   /**
-   * balance + pending transactions.
+   * balance + settled and pending transactions (R5).
    * @nullable
    */
   projectedBalanceCents?: number | null;
@@ -241,6 +250,13 @@ export interface PillarAllocation {
 }
 
 /**
+ * OUT on the source leg, IN on the destination leg; null for INCOME/EXPENSE. amountCents is always positive, so this is the only way to tell money leaving an account from money arriving in it when rendering a transfer in the extrato.
+
+ * @nullable
+ */
+export type TransactionTransferDirection = TransferDirection | null;
+
+/**
  * Set on transfer legs into INVESTMENT/SAVINGS accounts (R9).
  * @nullable
  */
@@ -264,6 +280,12 @@ export interface Transaction {
   status: TransactionStatus;
   /** @nullable */
   transferPairId?: string | null;
+  /**
+   * OUT on the source leg, IN on the destination leg; null for INCOME/EXPENSE. amountCents is always positive, so this is the only way to tell money leaving an account from money arriving in it when rendering a transfer in the extrato.
+
+   * @nullable
+   */
+  transferDirection?: TransactionTransferDirection;
   /**
    * Set on transfer legs into INVESTMENT/SAVINGS accounts (R9).
    * @nullable
@@ -320,6 +342,50 @@ export interface TransferRequest {
    * @nullable
    */
   contributionPillar?: TransferRequestContributionPillar;
+}
+
+/**
+ * Applied to both legs; omit to keep the current one. A half-settled transfer is never produced.
+ * @nullable
+ */
+export type TransferUpdateRequestStatus = TransactionStatus | null;
+
+/**
+ * Re-targets the contribution (R9). Omit to keep whichever pillar the transfer already carries. Only meaningful when the destination account is INVESTMENT/SAVINGS; sending it for any other destination answers INVALID_CONTRIBUTION_PILLAR.
+
+ * @nullable
+ */
+export type TransferUpdateRequestContributionPillar = ContributionPillar | null;
+
+/**
+ * Payload for PATCH /transfers/{transactionId}. It has no categoryId and no type on purpose: a transfer carries neither, which is exactly why TransactionRequest cannot express it.
+
+ */
+export interface TransferUpdateRequest {
+  /**
+   * Moves only the leg being edited to another account; omit to leave it where it is. Pointing it at the sibling's account answers INSUFFICIENT_TRANSFER_ACCOUNTS.
+
+   * @nullable
+   */
+  accountId?: string | null;
+  /** @minimum 1 */
+  amountCents: number;
+  date: string;
+  /** @maxLength 255 */
+  description: string;
+  /** @nullable */
+  note?: string | null;
+  /**
+   * Applied to both legs; omit to keep the current one. A half-settled transfer is never produced.
+   * @nullable
+   */
+  status?: TransferUpdateRequestStatus;
+  /**
+   * Re-targets the contribution (R9). Omit to keep whichever pillar the transfer already carries. Only meaningful when the destination account is INVESTMENT/SAVINGS; sending it for any other destination answers INVALID_CONTRIBUTION_PILLAR.
+
+   * @nullable
+   */
+  contributionPillar?: TransferUpdateRequestContributionPillar;
 }
 
 export interface Card {
@@ -499,6 +565,12 @@ export type ConflictResponse = ErrorResponse;
  * Resource expired or already used.
  */
 export type GoneResponse = ErrorResponse;
+
+/**
+ * No such resource in this workspace. Another workspace's resource is indistinguishable from a nonexistent one — a 404, never a leak (R8).
+
+ */
+export type NotFoundResponse = ErrorResponse;
 
 /**
  * Reference month YYYY-MM; defaults to current month in America/Sao_Paulo.

@@ -31,7 +31,8 @@ import type {
   CardPurchaseRequest,
   CardRequest,
   ConflictResponse,
-  ListCardsParams
+  ListCardsParams,
+  NotFoundResponse
 } from '../mKFinanceAPI.schemas';
 
 import { apiFetch } from '../../fetcher';
@@ -248,6 +249,67 @@ const {mutation: mutationOptions} = options ?
       > => {
 
       const mutationOptions = getUpdateCardMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Archives the card (idempotent). An archived card is read-only history: it stays visible with includeArchived=true and its statements can still be read and paid, but no new purchase may be charged to it (CARD_ARCHIVED).
+
+ */
+export const archiveCard = (
+    workspaceId: string,
+    cardId: string,
+ signal?: AbortSignal
+) => {
+      
+      
+      return apiFetch<Card>(
+      {url: `/workspaces/${workspaceId}/cards/${cardId}/archive`, method: 'POST', signal
+    },
+      );
+    }
+  
+
+
+export const getArchiveCardMutationOptions = <TError = NotFoundResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveCard>>, TError,{workspaceId: string;cardId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof archiveCard>>, TError,{workspaceId: string;cardId: string}, TContext> => {
+
+const mutationKey = ['archiveCard'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveCard>>, {workspaceId: string;cardId: string}> = (props) => {
+          const {workspaceId,cardId} = props ?? {};
+
+          return  archiveCard(workspaceId,cardId,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ArchiveCardMutationResult = NonNullable<Awaited<ReturnType<typeof archiveCard>>>
+    
+    export type ArchiveCardMutationError = NotFoundResponse
+
+    export const useArchiveCard = <TError = NotFoundResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof archiveCard>>, TError,{workspaceId: string;cardId: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof archiveCard>>,
+        TError,
+        {workspaceId: string;cardId: string},
+        TContext
+      > => {
+
+      const mutationOptions = getArchiveCardMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

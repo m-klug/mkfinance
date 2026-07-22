@@ -195,7 +195,8 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Editing one leg of a transfer updates its pair atomically.
+ * Edits an INCOME or EXPENSE entry. Transfer legs are not editable here — a transfer has no category and its type cannot change, so it has its own payload at PATCH /transfers/{transactionId}; sending a transfer leg's id to this endpoint answers TRANSACTION_TYPE_IMMUTABLE.
+
  */
 export const updateTransaction = (
     workspaceId: string,
