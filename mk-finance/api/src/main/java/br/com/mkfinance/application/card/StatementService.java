@@ -70,7 +70,10 @@ public class StatementService {
     public StatementView.Detail detail(UUID workspaceId, UUID statementId) {
         Statement statement = getStatement(workspaceId, statementId);
         List<StatementItemRow> items = installmentRepository.findItemsOfStatement(statementId);
-        return new StatementView.Detail(toView(statement, totalsLoader.load(statementId)), items);
+        return new StatementView.Detail(
+                toView(statement, totalsLoader.load(statementId)),
+                items,
+                paymentRepository.findByStatementIdOrderByPaymentDateAsc(statementId));
     }
 
     /**
@@ -83,15 +86,18 @@ public class StatementService {
      */
     public StatementView pay(UUID workspaceId, UUID statementId, StatementPaymentInput input) {
         Statement statement = getStatement(workspaceId, statementId);
-        if (statement.isImmutable()) {
-            throw AppException.statementAlreadyPaid();
-        }
 
         StatementTotals totals = totalsLoader.load(statementId);
         if (totals.totalCents() <= 0) {
             throw AppException.statementEmpty();
         }
         long remaining = totals.remainingCents();
+        // Refused because nothing is owed, read off the same derived totals as everything else —
+        // not by consulting the R6 charge freeze. The two conditions coincide on a PAID statement,
+        // but they are different rules, and only one of them may govern reversePayment.
+        if (remaining == 0) {
+            throw AppException.statementAlreadyPaid();
+        }
         if (input.amountCents() > remaining) {
             throw AppException.paymentExceedsRemaining(remaining);
         }
@@ -116,6 +122,42 @@ public class StatementService {
                 .build());
 
         return toView(statement, totalsLoader.refreshStatus(statement));
+    }
+
+    /**
+     * Undoes one payment: the {@code statement_payment} row and the debit it created, atomically.
+     *
+     * <p><strong>Allowed on a PAID statement, by design.</strong> R6 freezes a settled bill against
+     * charges (see {@link Statement#chargesFrozen()}), and this deliberately does not consult it —
+     * otherwise the payment that made the statement PAID would be the one payment nobody could take
+     * back, which is exactly the mistake users need to undo. Nothing here touches an installment, so
+     * R6 is not weakened: the bill's total is untouched and only what was paid against it changes.
+     *
+     * <p>No status has to be unwound and no total corrected, because neither is a stored truth: the
+     * status is recomputed from the remaining payments and lands back on PARTIAL or OPEN on its own.
+     *
+     * <p>Order matters. The payment row is deleted and flushed <em>before</em> the debit, both to
+     * release {@code statement_payment.transaction_id} and because
+     * {@code TransactionService#delete} now refuses any transaction a payment still points at.
+     */
+    public void reversePayment(UUID workspaceId, UUID statementId, UUID paymentId) {
+        Statement statement = getStatement(workspaceId, statementId);
+        StatementPayment payment = paymentRepository
+                .findByIdAndStatementId(paymentId, statement.getId())
+                .orElseThrow(AppException::statementPaymentNotFound);
+
+        UUID transactionId = payment.getTransactionId();
+        paymentRepository.delete(payment);
+        // Force the DELETE out now: the guard in TransactionService reads statement_payment through
+        // native SQL, and must not still see the row we are in the middle of removing.
+        paymentRepository.flush();
+
+        if (transactionId != null) {
+            // BE-3 owns money movement in both directions: the debit is removed the same way any
+            // other expense is, so the account balance recovers with no bespoke arithmetic here.
+            transactionService.delete(workspaceId, transactionId);
+        }
+        totalsLoader.refreshStatus(statement);
     }
 
     @Transactional(readOnly = true)

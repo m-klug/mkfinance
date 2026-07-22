@@ -1,6 +1,7 @@
 package br.com.mkfinance.application.card;
 
 import br.com.mkfinance.domain.model.Statement;
+import br.com.mkfinance.domain.model.StatementPayment;
 import br.com.mkfinance.domain.model.StatementStatus;
 import br.com.mkfinance.infrastructure.persistence.StatementItemRow;
 import java.util.List;
@@ -14,7 +15,14 @@ import java.util.List;
  */
 public record StatementView(Statement statement, StatementStatus status, long totalCents, long paidCents) {
 
-    /** A statement together with its line items (contract: {@code StatementDetail}). */
-    public record Detail(StatementView summary, List<StatementItemRow> items) {
+    /**
+     * A statement together with its line items and the payments made against it (contract:
+     * {@code StatementDetail}).
+     *
+     * <p>The payments are listed, not just summed into {@code paidCents}, because each one is
+     * individually reversible — without their ids the client can show that a bill was paid but has
+     * no way to name <em>which</em> payment to undo.
+     */
+    public record Detail(StatementView summary, List<StatementItemRow> items, List<StatementPayment> payments) {
     }
 }

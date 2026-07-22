@@ -11,6 +11,7 @@ import br.com.mkfinance.api.card.StatementResponse;
 import br.com.mkfinance.api.category.CategoryResponse;
 import br.com.mkfinance.api.error.ErrorResponse;
 import br.com.mkfinance.api.transaction.TransactionPageResponse;
+import br.com.mkfinance.api.transaction.TransactionRequest;
 import br.com.mkfinance.api.transaction.TransactionResponse;
 import br.com.mkfinance.domain.exception.ErrorCode;
 import br.com.mkfinance.domain.model.StatementStatus;
@@ -18,6 +19,7 @@ import br.com.mkfinance.domain.model.TransactionStatus;
 import br.com.mkfinance.domain.model.TransactionType;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -205,6 +207,190 @@ class StatementPaymentIntegrationTest extends AbstractCardIntegrationTest {
     }
 
     @Nested
+    @DisplayName("reversing a payment")
+    class Reversal {
+
+        @Test
+        @DisplayName("a fully paid statement can be un-paid — the whole point of the feature")
+        void reversingThePaymentThatSettledTheStatementBringsItBackToOpen() {
+            createPurchase(card.id(), "Mercado", 20_000L, LocalDate.of(2026, 7, 10), 1);
+            UUID statementId = statementOfMonth(card.id(), "2026-07").id();
+            pay(statementId, account.id(), 20_000L, LocalDate.of(2026, 8, 5));
+            assertThat(statementOfMonth(card.id(), "2026-07").status()).isEqualTo(StatementStatus.PAID);
+
+            reverse(statementId, onlyPaymentOf(statementId).id());
+
+            // Status is derived from the payments that remain, so it falls back on its own. The
+            // stored status is OPEN again; what the client sees is OPEN or CLOSED depending on
+            // whether the bill's closing date has passed, which is not what this test is about.
+            StatementResponse july = statementOfMonth(card.id(), "2026-07");
+            assertThat(july.status()).isIn(StatementStatus.OPEN, StatementStatus.CLOSED);
+            assertThat(july.paidCents()).isZero();
+            // The bill itself is untouched: reversal undoes the payment, never the charges.
+            assertThat(july.totalCents()).isEqualTo(20_000L);
+        }
+
+        @Test
+        @DisplayName("reversing one of two payments leaves the statement PARTIAL")
+        void reversingOnePartialPaymentLeavesTheOther() {
+            createPurchase(card.id(), "Mercado", 20_000L, LocalDate.of(2026, 7, 10), 1);
+            UUID statementId = statementOfMonth(card.id(), "2026-07").id();
+            pay(statementId, account.id(), 8_000L, LocalDate.of(2026, 8, 5));
+            pay(statementId, account.id(), 12_000L, LocalDate.of(2026, 8, 20));
+
+            UUID secondPaymentId = paymentsOf(statementId).get(1).id();
+            reverse(statementId, secondPaymentId);
+
+            StatementResponse july = statementOfMonth(card.id(), "2026-07");
+            assertThat(july.status()).isEqualTo(StatementStatus.PARTIAL);
+            assertThat(july.paidCents()).isEqualTo(8_000L);
+            // Only the reversed payment is gone; the first one still stands.
+            assertThat(paymentsOf(statementId))
+                    .extracting(StatementDetailResponse.StatementPaymentResponse::amountCents)
+                    .containsExactly(8_000L);
+        }
+
+        @Test
+        @DisplayName("the debit leaves the extrato and the money returns to the account")
+        void theAccountBalanceIsRestored() {
+            createPurchase(card.id(), "Mercado", 20_000L, LocalDate.of(2026, 7, 10), 1);
+            UUID statementId = statementOfMonth(card.id(), "2026-07").id();
+            long balanceBefore = accountById(account.id()).balanceCents();
+
+            pay(statementId, account.id(), 20_000L, LocalDate.of(2026, 8, 5));
+            assertThat(accountById(account.id()).balanceCents()).isEqualTo(balanceBefore - 20_000L);
+
+            reverse(statementId, onlyPaymentOf(statementId).id());
+
+            assertThat(accountById(account.id()).balanceCents()).isEqualTo(balanceBefore);
+            assertThat(transactionsOfAccount(account.id()).content()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a paid statement still refuses new charges (R6) — only the payment is reversible")
+        void reversibilityDoesNotWeakenTheChargeFreeze() {
+            createPurchase(card.id(), "Mercado", 20_000L, LocalDate.of(2026, 7, 10), 1);
+            UUID statementId = statementOfMonth(card.id(), "2026-07").id();
+            pay(statementId, account.id(), 20_000L, LocalDate.of(2026, 8, 5));
+
+            // Same statement, same PAID status: charging it is refused...
+            ResponseEntity<CardPurchaseResponse> charge =
+                    purchaseResponse(card.id(), "Padaria", 1_000L, LocalDate.of(2026, 7, 11), 1);
+            assertThat(charge.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+            // ...while reversing the payment on that very statement is allowed.
+            reverse(statementId, onlyPaymentOf(statementId).id());
+            assertThat(statementOfMonth(card.id(), "2026-07").status())
+                    .isIn(StatementStatus.OPEN, StatementStatus.CLOSED);
+        }
+
+        @Test
+        @DisplayName("a payment id belonging to another statement is not reachable through this one")
+        void aPaymentOfAnotherStatementIsRefused() {
+            createPurchase(card.id(), "Notebook", 10_000L, LocalDate.of(2026, 7, 10), 2);
+            UUID july = statementOfMonth(card.id(), "2026-07").id();
+            UUID august = statementOfMonth(card.id(), "2026-08").id();
+            pay(july, account.id(), 5_000L, LocalDate.of(2026, 8, 5));
+            UUID julyPaymentId = onlyPaymentOf(july).id();
+
+            ResponseEntity<ErrorResponse> response = reverseRaw(august, julyPaymentId);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(response.getBody().code()).isEqualTo(ErrorCode.STATEMENT_PAYMENT_NOT_FOUND);
+            // The payment it could not reach is still there, and July is still partially paid.
+            assertThat(paymentsOf(july)).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("another workspace's payment is invisible, not merely forbidden (R8)")
+        void aPaymentOfAnotherWorkspaceIsRefused() {
+            createPurchase(card.id(), "Mercado", 20_000L, LocalDate.of(2026, 7, 10), 1);
+            UUID statementId = statementOfMonth(card.id(), "2026-07").id();
+            pay(statementId, account.id(), 20_000L, LocalDate.of(2026, 8, 5));
+            UUID paymentId = onlyPaymentOf(statementId).id();
+
+            register();
+
+            // The statement lookup is workspace-scoped and fails first, so the intruder cannot even
+            // learn whether the payment exists.
+            ResponseEntity<ErrorResponse> response = reverseRaw(statementId, paymentId);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(response.getBody().code()).isEqualTo(ErrorCode.STATEMENT_NOT_FOUND);
+        }
+
+        @Test
+        void anUnknownPaymentIdIsNotFound() {
+            createPurchase(card.id(), "Mercado", 20_000L, LocalDate.of(2026, 7, 10), 1);
+            UUID statementId = statementOfMonth(card.id(), "2026-07").id();
+
+            ResponseEntity<ErrorResponse> response = reverseRaw(statementId, UUID.randomUUID());
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(response.getBody().code()).isEqualTo(ErrorCode.STATEMENT_PAYMENT_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("after reversing, the statement can simply be paid again")
+        void theStatementCanBePaidAgainAfterReversal() {
+            createPurchase(card.id(), "Mercado", 20_000L, LocalDate.of(2026, 7, 10), 1);
+            UUID statementId = statementOfMonth(card.id(), "2026-07").id();
+            // Paid from the wrong account — the mistake the whole feature exists to undo.
+            AccountResponse wrongAccount = createAccount("Poupança", 100_000L);
+            pay(statementId, wrongAccount.id(), 20_000L, LocalDate.of(2026, 8, 5));
+
+            reverse(statementId, onlyPaymentOf(statementId).id());
+            StatementResponse repaid = pay(statementId, account.id(), 20_000L, LocalDate.of(2026, 8, 6));
+
+            assertThat(repaid.status()).isEqualTo(StatementStatus.PAID);
+            assertThat(accountById(wrongAccount.id()).balanceCents()).isEqualTo(100_000L);
+            assertThat(paymentsOf(statementId))
+                    .extracting(StatementDetailResponse.StatementPaymentResponse::accountId)
+                    .containsExactly(account.id());
+        }
+    }
+
+    @Nested
+    @DisplayName("the payment debit is not deletable from the extrato (item C)")
+    class DebitIsLocked {
+
+        @Test
+        @DisplayName("deleting it names the way out instead of failing on the foreign key")
+        void deletingThePaymentDebitIsRefusedWithASpecificCode() {
+            createPurchase(card.id(), "Mercado", 20_000L, LocalDate.of(2026, 7, 10), 1);
+            UUID statementId = statementOfMonth(card.id(), "2026-07").id();
+            pay(statementId, account.id(), 20_000L, LocalDate.of(2026, 8, 5));
+            UUID debitId = onlyTransactionOfAccount(account.id()).id();
+
+            ResponseEntity<ErrorResponse> response =
+                    session.delete(path("/transactions/" + debitId), ErrorResponse.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+            // Specifically not DATA_INTEGRITY_VIOLATION: that code tells the user nothing about how
+            // to proceed, and this one maps to "undo it on the statement screen".
+            assertThat(response.getBody().code()).isEqualTo(ErrorCode.TRANSACTION_LOCKED_BY_PAYMENT);
+            assertThat(response.getBody().code()).isNotEqualTo(ErrorCode.DATA_INTEGRITY_VIOLATION);
+            // Nothing moved: the debit and the payment both survive the refused attempt.
+            assertThat(transactionsOfAccount(account.id()).content()).hasSize(1);
+            assertThat(statementOfMonth(card.id(), "2026-07").status()).isEqualTo(StatementStatus.PAID);
+        }
+
+        @Test
+        @DisplayName("an ordinary expense is still deletable — the guard is narrow")
+        void anUnrelatedTransactionIsStillDeletable() {
+            createPurchase(card.id(), "Mercado", 20_000L, LocalDate.of(2026, 7, 10), 1);
+            UUID statementId = statementOfMonth(card.id(), "2026-07").id();
+            pay(statementId, account.id(), 20_000L, LocalDate.of(2026, 8, 5));
+            UUID ordinaryId = createExpense(account.id(), 3_000L, LocalDate.of(2026, 8, 7)).id();
+
+            ResponseEntity<Void> response = session.delete(path("/transactions/" + ordinaryId), Void.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+            assertThat(transactionsOfAccount(account.id()).content()).hasSize(1);
+        }
+    }
+
+    @Nested
     @DisplayName("workspace isolation (R8)")
     class Isolation {
 
@@ -238,6 +424,54 @@ class StatementPaymentIntegrationTest extends AbstractCardIntegrationTest {
                 path("/statements/" + statementId + "/payments"),
                 new StatementPaymentRequest(accountId, amountCents, LocalDate.of(2026, 8, 10)),
                 ErrorResponse.class);
+    }
+
+    private void reverse(UUID statementId, UUID paymentId) {
+        ResponseEntity<Void> response = session.delete(
+                path("/statements/" + statementId + "/payments/" + paymentId), Void.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    private ResponseEntity<ErrorResponse> reverseRaw(UUID statementId, UUID paymentId) {
+        return session.delete(
+                path("/statements/" + statementId + "/payments/" + paymentId), ErrorResponse.class);
+    }
+
+    private List<StatementDetailResponse.StatementPaymentResponse> paymentsOf(UUID statementId) {
+        return session.get(path("/statements/" + statementId), StatementDetailResponse.class)
+                .getBody()
+                .payments();
+    }
+
+    private StatementDetailResponse.StatementPaymentResponse onlyPaymentOf(UUID statementId) {
+        List<StatementDetailResponse.StatementPaymentResponse> payments = paymentsOf(statementId);
+        assertThat(payments).hasSize(1);
+        return payments.get(0);
+    }
+
+    private AccountResponse accountById(UUID accountId) {
+        AccountResponse[] accounts = session.get(path("/accounts"), AccountResponse[].class).getBody();
+        return Arrays.stream(accounts)
+                .filter(candidate -> candidate.id().equals(accountId))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Account " + accountId + " not in the workspace"));
+    }
+
+    /** A plain expense on the account, to prove the delete guard only catches payment debits. */
+    private TransactionResponse createExpense(UUID accountId, long amountCents, LocalDate date) {
+        return session.post(
+                        path("/transactions"),
+                        new TransactionRequest(
+                                accountId,
+                                someExpenseCategory().id(),
+                                TransactionType.EXPENSE,
+                                amountCents,
+                                date,
+                                "Padaria",
+                                null,
+                                TransactionStatus.SETTLED),
+                        TransactionResponse.class)
+                .getBody();
     }
 
     private TransactionPageResponse transactionsOfAccount(UUID accountId) {

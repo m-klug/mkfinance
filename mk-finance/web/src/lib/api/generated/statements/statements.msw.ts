@@ -30,7 +30,7 @@ import type {
 
 export const getListStatementsResponseMock = (): Statement[] => (Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({id: faker.string.uuid(), cardId: faker.string.uuid(), referenceMonth: faker.string.alpha({length: {min: 10, max: 20}}), closingDate: faker.date.past().toISOString().split('T')[0], dueDate: faker.date.past().toISOString().split('T')[0], status: faker.helpers.arrayElement(Object.values(StatementStatus)), totalCents: faker.number.int({min: undefined, max: undefined}), paidCents: faker.number.int({min: undefined, max: undefined})})))
 
-export const getGetStatementResponseMock = (): StatementDetail => ({...{id: faker.string.uuid(), cardId: faker.string.uuid(), referenceMonth: faker.string.alpha({length: {min: 10, max: 20}}), closingDate: faker.date.past().toISOString().split('T')[0], dueDate: faker.date.past().toISOString().split('T')[0], status: faker.helpers.arrayElement(Object.values(StatementStatus)), totalCents: faker.number.int({min: undefined, max: undefined}), paidCents: faker.number.int({min: undefined, max: undefined})},...{items: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({installmentId: faker.string.uuid(), purchaseId: faker.string.uuid(), description: faker.string.alpha({length: {min: 10, max: 20}}), categoryId: faker.string.uuid(), amountCents: faker.number.int({min: undefined, max: undefined}), purchaseDate: faker.date.past().toISOString().split('T')[0], installmentNumber: faker.number.int({min: undefined, max: undefined}), installmentCount: faker.number.int({min: undefined, max: undefined})}))},})
+export const getGetStatementResponseMock = (): StatementDetail => ({...{id: faker.string.uuid(), cardId: faker.string.uuid(), referenceMonth: faker.string.alpha({length: {min: 10, max: 20}}), closingDate: faker.date.past().toISOString().split('T')[0], dueDate: faker.date.past().toISOString().split('T')[0], status: faker.helpers.arrayElement(Object.values(StatementStatus)), totalCents: faker.number.int({min: undefined, max: undefined}), paidCents: faker.number.int({min: undefined, max: undefined})},...{payments: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({id: faker.string.uuid(), accountId: faker.string.uuid(), amountCents: faker.number.int({min: undefined, max: undefined}), paymentDate: faker.date.past().toISOString().split('T')[0], transactionId: faker.helpers.arrayElement([faker.string.uuid(), undefined])})), items: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({installmentId: faker.string.uuid(), purchaseId: faker.string.uuid(), description: faker.string.alpha({length: {min: 10, max: 20}}), categoryId: faker.string.uuid(), amountCents: faker.number.int({min: undefined, max: undefined}), purchaseDate: faker.date.past().toISOString().split('T')[0], installmentNumber: faker.number.int({min: undefined, max: undefined}), installmentCount: faker.number.int({min: undefined, max: undefined})}))},})
 
 export const getPayStatementResponseMock = (overrideResponse: Partial< Statement > = {}): Statement => ({id: faker.string.uuid(), cardId: faker.string.uuid(), referenceMonth: faker.string.alpha({length: {min: 10, max: 20}}), closingDate: faker.date.past().toISOString().split('T')[0], dueDate: faker.date.past().toISOString().split('T')[0], status: faker.helpers.arrayElement(Object.values(StatementStatus)), totalCents: faker.number.int({min: undefined, max: undefined}), paidCents: faker.number.int({min: undefined, max: undefined}), ...overrideResponse})
 
@@ -70,8 +70,19 @@ export const getPayStatementMockHandler = (overrideResponse?: Statement | ((info
       })
   }, options)
 }
+
+export const getReverseStatementPaymentMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.delete>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
+  return http.delete('*/workspaces/:workspaceId/statements/:statementId/payments/:paymentId', async (info) => {await delay(1000);
+  if (typeof overrideResponse === 'function') {await overrideResponse(info); }
+    return new HttpResponse(null,
+      { status: 204,
+        
+      })
+  }, options)
+}
 export const getStatementsMock = () => [
   getListStatementsMockHandler(),
   getGetStatementMockHandler(),
-  getPayStatementMockHandler()
+  getPayStatementMockHandler(),
+  getReverseStatementPaymentMockHandler()
 ]

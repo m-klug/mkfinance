@@ -72,11 +72,24 @@ public class Statement {
     }
 
     /**
-     * A fully paid statement is frozen (R6): its installments cannot be edited, moved or deleted,
-     * and corrections go through an adjusting entry instead. Partially paid ones stay editable —
-     * the MVP keeps the outstanding remainder as a plain balance, with no interest (§9.5).
+     * R6 — a fully paid statement is frozen <em>against new or changed charges</em>: its installments
+     * cannot be edited, moved or deleted, and corrections there go through an adjusting entry
+     * instead. Partially paid ones stay chargeable — the MVP keeps the outstanding remainder as a
+     * plain balance, with no interest (§9.5).
+     *
+     * <p><strong>This is deliberately narrower than "the statement is read-only".</strong> Reversing
+     * a payment is exempt, and must stay exempt: the payment is precisely what made the statement
+     * PAID, so treating PAID as a blanket freeze would make the most likely mistake — paying the
+     * wrong bill, the wrong account or the wrong amount — the one mistake impossible to undo. A
+     * reversal only removes a {@code statement_payment} row, and the status follows the remaining
+     * sum straight back to PARTIAL or OPEN.
+     *
+     * <p>Read it as a question about charges, and ask it only where a charge is at stake — today
+     * that is {@code CardPurchaseService} alone. Paying refuses a settled bill on its own terms
+     * (nothing is owed, derived from {@link br.com.mkfinance.application.card.StatementTotals}),
+     * not by consulting this flag.
      */
-    public boolean isImmutable() {
+    public boolean chargesFrozen() {
         return status == StatementStatus.PAID;
     }
 

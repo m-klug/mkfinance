@@ -64,15 +64,15 @@ class StatementStatusTest {
     }
 
     @Nested
-    @DisplayName("immutability (R6)")
-    class Immutability {
+    @DisplayName("charge freeze (R6)")
+    class ChargeFreeze {
 
         @Test
         void onlyAFullyPaidStatementIsFrozen() {
             LocalDate closing = LocalDate.of(2026, 7, 20);
-            assertThat(statementClosingOn(closing, StatementStatus.PAID).isImmutable()).isTrue();
-            assertThat(statementClosingOn(closing, StatementStatus.PARTIAL).isImmutable()).isFalse();
-            assertThat(statementClosingOn(closing, StatementStatus.OPEN).isImmutable()).isFalse();
+            assertThat(statementClosingOn(closing, StatementStatus.PAID).chargesFrozen()).isTrue();
+            assertThat(statementClosingOn(closing, StatementStatus.PARTIAL).chargesFrozen()).isFalse();
+            assertThat(statementClosingOn(closing, StatementStatus.OPEN).chargesFrozen()).isFalse();
         }
     }
 

@@ -2,6 +2,7 @@ package br.com.mkfinance.api.card;
 
 import br.com.mkfinance.api.card.CardPurchaseResponse.InstallmentResponse;
 import br.com.mkfinance.api.card.StatementDetailResponse.StatementItemResponse;
+import br.com.mkfinance.api.card.StatementDetailResponse.StatementPaymentResponse;
 import br.com.mkfinance.application.card.CardInput;
 import br.com.mkfinance.application.card.CardPurchaseInput;
 import br.com.mkfinance.application.card.StatementPaymentInput;
@@ -10,6 +11,7 @@ import br.com.mkfinance.domain.model.Card;
 import br.com.mkfinance.domain.model.CardPurchase;
 import br.com.mkfinance.domain.model.Installment;
 import br.com.mkfinance.domain.model.Statement;
+import br.com.mkfinance.domain.model.StatementPayment;
 import br.com.mkfinance.infrastructure.persistence.StatementItemRow;
 import java.time.YearMonth;
 import java.util.List;
@@ -105,7 +107,17 @@ public class CardMapper {
                 view.status(),
                 view.totalCents(),
                 view.paidCents(),
-                detail.items().stream().map(this::toResponse).toList());
+                detail.items().stream().map(this::toResponse).toList(),
+                detail.payments().stream().map(this::toResponse).toList());
+    }
+
+    private StatementPaymentResponse toResponse(StatementPayment payment) {
+        return new StatementPaymentResponse(
+                payment.getId(),
+                payment.getAccountId(),
+                payment.getAmountCents(),
+                payment.getPaymentDate(),
+                payment.getTransactionId());
     }
 
     private InstallmentResponse toResponse(Installment installment, YearMonth statementMonth) {
