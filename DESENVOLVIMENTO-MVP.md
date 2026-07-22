@@ -158,7 +158,15 @@ docker compose -f mk-finance/docker/docker-compose.yml config -q
 
 Gate adicional por etapa — E1: registro/login manual via `curl` + front logando contra MSW; E2: cenário canônico de cartão validado (compra dia do fechamento, 3 parcelas, pagamento); E3: percentuais de alocação conferidos manualmente contra planilha do cenário canônico; E4: aceite do INT-1.
 
-## 6. Estado atual (E0 + E1 concluídas)
+## 6. Estado atual (E0 + E1 + E2 concluídas)
+
+> **E2 concluída em 22/07/2026 — gate verde**: backend 151 testes, front 44 testes, build e `docker compose config` OK, cenário canônico do cartão validado.
+> **O handoff operacional vive em `CONTEXTO-E3.md`** — leia-o antes de iniciar a E3. Ele traz o que a E2 entregou, as pendências abertas (patches de contrato, saldos de conta) e as armadilhas de orquestração descobertas.
+>
+> Resolvido nesta etapa: **Lombok nas entidades JPA, `record` nos DTOs** (decisão do usuário, 21/07/2026) — encerra a nota "a confirmar" abaixo.
+> Migrações aplicadas: V1, V2, **V7** (BE-3), **V9** (BE-4). V3–V6, V8, V10, V11 ficaram vagas — não renumere. BE-5 usa V12.
+
+### 6.1 E0 + E1
 
 **Fundação (E0)**: `mk-finance/` com contrato `openapi.yaml`, `api/` Spring Boot 3.5/Java 21/Maven, `web/` Vite/React/TS + orval/MSW/i18n, `docker/` (compose+Caddy+Dockerfiles), personas em `.claude/agents/`.
 
