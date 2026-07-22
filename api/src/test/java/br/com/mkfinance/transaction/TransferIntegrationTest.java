@@ -8,11 +8,14 @@ import br.com.mkfinance.api.transaction.TransactionPageResponse;
 import br.com.mkfinance.api.transaction.TransactionRequest;
 import br.com.mkfinance.api.transaction.TransactionResponse;
 import br.com.mkfinance.api.transaction.TransferRequest;
+import br.com.mkfinance.api.transaction.TransferUpdateRequest;
 import br.com.mkfinance.application.transaction.AccountBalanceService;
 import br.com.mkfinance.domain.model.AccountType;
+import br.com.mkfinance.domain.model.CategoryType;
 import br.com.mkfinance.domain.model.ContributionPillar;
 import br.com.mkfinance.domain.model.TransactionStatus;
 import br.com.mkfinance.domain.model.TransactionType;
+import br.com.mkfinance.domain.model.TransferDirection;
 import br.com.mkfinance.domain.service.BalanceCalculator.Balance;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -141,6 +144,229 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
 
         assertThat(balanceService.balanceOf(workspaceId, wallet.id()).currentCents()).isZero();
         assertThat(balanceService.balanceOf(workspaceId, savings.id()).currentCents()).isEqualTo(50_000L);
+    }
+
+    // --- PATCH /transfers/{transactionId} -------------------------------------------------------
+    // The dedicated endpoint exists because TransactionRequest cannot express a transfer: it
+    // requires a categoryId and only enumerates INCOME/EXPENSE. Same engine, payload a generated
+    // client can actually build.
+
+    @Test
+    @DisplayName("PATCH /transfers edits both legs atomically through the outgoing one")
+    void transferEndpointEditsBothLegs() {
+        TransactionResponse outgoing = session.post(
+                        path("/transfers"),
+                        new TransferRequest(checking.id(), wallet.id(), 100_000L, DATE, "Saque", null),
+                        TransactionResponse.class)
+                .getBody();
+
+        LocalDate newDate = DATE.plusDays(3);
+        ResponseEntity<TransactionResponse> updated = session.patch(
+                path("/transfers/" + outgoing.id()),
+                new TransferUpdateRequest(null, 75_000L, newDate, "Saque corrigido", "conferido", null, null),
+                TransactionResponse.class);
+
+        assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(updated.getBody().id()).as("answers with the leg that was addressed").isEqualTo(outgoing.id());
+
+        assertThat(allTransactions())
+                .as("both legs moved together — no half-edited transfer")
+                .hasSize(2)
+                .allSatisfy(leg -> {
+                    assertThat(leg.amountCents()).isEqualTo(75_000L);
+                    assertThat(leg.date()).isEqualTo(newDate);
+                    assertThat(leg.description()).isEqualTo("Saque corrigido");
+                    assertThat(leg.note()).isEqualTo("conferido");
+                });
+        assertThat(balanceService.balanceOf(workspaceId, checking.id()).currentCents()).isEqualTo(425_000L);
+        assertThat(balanceService.balanceOf(workspaceId, wallet.id()).currentCents()).isEqualTo(75_000L);
+    }
+
+    @Test
+    @DisplayName("PATCH /transfers works through the incoming leg too")
+    void transferEndpointEditsThroughIncomingLeg() {
+        session.post(
+                path("/transfers"),
+                new TransferRequest(checking.id(), wallet.id(), 20_000L, DATE, "Saque", null),
+                TransactionResponse.class);
+        TransactionResponse incoming = legOn(wallet.id());
+
+        TransactionResponse updated = session.patch(
+                        path("/transfers/" + incoming.id()),
+                        new TransferUpdateRequest(null, 45_000L, DATE, "Saque maior", null, null, null),
+                        TransactionResponse.class)
+                .getBody();
+
+        assertThat(updated.id()).isEqualTo(incoming.id());
+        assertThat(allTransactions()).allSatisfy(leg -> assertThat(leg.amountCents()).isEqualTo(45_000L));
+    }
+
+    @Test
+    @DisplayName("PATCH /transfers moves only the addressed leg's account")
+    void transferEndpointMovesOnlyTheAddressedLeg() {
+        AccountResponse other = createAccount("Outra Conta", AccountType.CHECKING, 0L);
+        TransactionResponse outgoing = session.post(
+                        path("/transfers"),
+                        new TransferRequest(checking.id(), wallet.id(), 50_000L, DATE, "Saque", null),
+                        TransactionResponse.class)
+                .getBody();
+
+        session.patch(
+                path("/transfers/" + outgoing.id()),
+                new TransferUpdateRequest(other.id(), 50_000L, DATE, "Saque", null, null, null),
+                TransactionResponse.class);
+
+        assertThat(legOn(other.id()).id()).isEqualTo(outgoing.id());
+        assertThat(legOn(wallet.id()).id()).as("the destination leg stayed put").isNotNull();
+        assertThat(balanceService.balanceOf(workspaceId, checking.id()).currentCents())
+                .as("the money left the new source, not the old one")
+                .isEqualTo(500_000L);
+        assertThat(balanceService.balanceOf(workspaceId, other.id()).currentCents()).isEqualTo(-50_000L);
+    }
+
+    @Test
+    @DisplayName("PATCH /transfers can send both legs to PENDING at once")
+    void transferEndpointMovesStatusOnBothLegs() {
+        TransactionResponse outgoing = session.post(
+                        path("/transfers"),
+                        new TransferRequest(checking.id(), wallet.id(), 30_000L, DATE, "Saque", null),
+                        TransactionResponse.class)
+                .getBody();
+
+        session.patch(
+                path("/transfers/" + outgoing.id()),
+                new TransferUpdateRequest(
+                        null, 30_000L, DATE, "Saque", null, TransactionStatus.PENDING, null),
+                TransactionResponse.class);
+
+        assertThat(allTransactions()).allSatisfy(leg -> assertThat(leg.status()).isEqualTo(TransactionStatus.PENDING));
+        assertThat(balanceService.balanceOf(workspaceId, checking.id()).currentCents())
+                .as("pending money has not left yet")
+                .isEqualTo(500_000L);
+    }
+
+    @Test
+    @DisplayName("PATCH /transfers re-targets a contribution's pillar (R9)")
+    void transferEndpointRetargetsContributionPillar() {
+        AccountResponse brokerage =
+                createAccount("Corretora", AccountType.INVESTMENT, 0L, ContributionPillar.FINANCIAL_FREEDOM);
+        TransactionResponse outgoing = session.post(
+                        path("/transfers"),
+                        new TransferRequest(checking.id(), brokerage.id(), 60_000L, DATE, "Aporte", null),
+                        TransactionResponse.class)
+                .getBody();
+        assertThat(legOn(brokerage.id()).contributionPillar()).isEqualTo(ContributionPillar.FINANCIAL_FREEDOM);
+
+        TransactionResponse updated = session.patch(
+                        path("/transfers/" + outgoing.id()),
+                        new TransferUpdateRequest(
+                                null, 60_000L, DATE, "Aporte", null, null, ContributionPillar.GOALS),
+                        TransactionResponse.class)
+                .getBody();
+
+        assertThat(updated.contributionPillar())
+                .as("the response echoes the pillar actually applied, like POST /transfers")
+                .isEqualTo(ContributionPillar.GOALS);
+        assertThat(legOn(brokerage.id()).contributionPillar()).isEqualTo(ContributionPillar.GOALS);
+        assertThat(legOn(checking.id()).contributionPillar())
+                .as("still only the incoming leg carries it")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("PATCH /transfers keeps the current pillar when none is sent")
+    void transferEndpointKeepsPillarWhenOmitted() {
+        AccountResponse brokerage = createAccount("Corretora", AccountType.INVESTMENT, 0L, ContributionPillar.GOALS);
+        TransactionResponse outgoing = session.post(
+                        path("/transfers"),
+                        new TransferRequest(
+                                checking.id(), brokerage.id(), 60_000L, DATE, "Aporte", ContributionPillar.GOALS),
+                        TransactionResponse.class)
+                .getBody();
+
+        session.patch(
+                path("/transfers/" + outgoing.id()),
+                new TransferUpdateRequest(null, 90_000L, DATE, "Aporte maior", null, null, null),
+                TransactionResponse.class);
+
+        assertThat(legOn(brokerage.id()).contributionPillar()).isEqualTo(ContributionPillar.GOALS);
+    }
+
+    @Test
+    @DisplayName("PATCH /transfers refuses a pillar on a destination that takes none")
+    void transferEndpointRejectsPillarOnPlainDestination() {
+        TransactionResponse outgoing = session.post(
+                        path("/transfers"),
+                        new TransferRequest(checking.id(), wallet.id(), 10_000L, DATE, "Saque", null),
+                        TransactionResponse.class)
+                .getBody();
+
+        ResponseEntity<ErrorResponse> response = session.patch(
+                path("/transfers/" + outgoing.id()),
+                new TransferUpdateRequest(null, 10_000L, DATE, "Saque", null, null, ContributionPillar.GOALS),
+                ErrorResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().code()).isEqualTo("INVALID_CONTRIBUTION_PILLAR");
+    }
+
+    @Test
+    @DisplayName("PATCH /transfers refuses collapsing both legs onto one account")
+    void transferEndpointRejectsMovingLegOntoItsSibling() {
+        TransactionResponse outgoing = session.post(
+                        path("/transfers"),
+                        new TransferRequest(checking.id(), wallet.id(), 10_000L, DATE, "Saque", null),
+                        TransactionResponse.class)
+                .getBody();
+
+        ResponseEntity<ErrorResponse> response = session.patch(
+                path("/transfers/" + outgoing.id()),
+                new TransferUpdateRequest(wallet.id(), 10_000L, DATE, "Saque", null, null, null),
+                ErrorResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().code()).isEqualTo("INSUFFICIENT_TRANSFER_ACCOUNTS");
+    }
+
+    @Test
+    @DisplayName("PATCH /transfers on a plain expense is a 404, not a broken transfer")
+    void transferEndpointRejectsNonTransferId() {
+        TransactionResponse expense = session.post(
+                        path("/transactions"),
+                        new TransactionRequest(
+                                checking.id(),
+                                someCategory(CategoryType.EXPENSE).id(),
+                                TransactionType.EXPENSE,
+                                5_000L,
+                                DATE,
+                                "Mercado",
+                                null,
+                                null),
+                        TransactionResponse.class)
+                .getBody();
+
+        ResponseEntity<ErrorResponse> response = session.patch(
+                path("/transfers/" + expense.id()),
+                new TransferUpdateRequest(null, 5_000L, DATE, "Mercado", null, null, null),
+                ErrorResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody().code()).isEqualTo("TRANSACTION_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("both legs expose their direction, so the extrato can tell them apart")
+    void legsExposeTheirTransferDirection() {
+        session.post(
+                path("/transfers"),
+                new TransferRequest(checking.id(), wallet.id(), 25_000L, DATE, "Saque", null),
+                TransactionResponse.class);
+
+        assertThat(legOn(checking.id()).transferDirection()).isEqualTo(TransferDirection.OUT);
+        assertThat(legOn(wallet.id()).transferDirection()).isEqualTo(TransferDirection.IN);
+        assertThat(legOn(checking.id()).amountCents())
+                .as("amount stays positive on both sides; only the direction distinguishes them")
+                .isEqualTo(legOn(wallet.id()).amountCents());
     }
 
     @Test
