@@ -1,0 +1,13 @@
+package com.ir.portfolio.domain.exception;
+
+public enum ErrorCode {
+    ASSET_NOT_FOUND,
+    ORDER_NOT_FOUND,
+    TICKER_ALREADY_EXISTS,
+    ORDER_VALUE_REQUIRED,
+    INSUFFICIENT_QUANTITY,
+    INVALID_ORDER_HISTORY,
+    PTAX_UNAVAILABLE,
+    PTAX_SERVICE_UNAVAILABLE,
+    VALIDATION_ERROR
+}

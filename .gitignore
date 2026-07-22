@@ -1,0 +1,20 @@
+# OS
+.DS_Store
+
+# Java / Maven
+target/
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Secrets and machine-local env.
+# Note: .env.example and .env.development are intentionally NOT ignored —
+# they hold safe, shareable dev config (e.g. VITE_API_MOCK=true).
+.env
+.env.local
+.env.*.local
+
+# Claude Code machine-local settings (agents/ and launch.json ARE tracked)
+.claude/settings.local.json
