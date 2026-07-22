@@ -129,7 +129,8 @@ O build agora emite aviso de chunk >500 kB (535,98 kB / 164,86 kB gzip). **É no
 
 ### 6.9 Pendências herdadas da E2, ainda válidas
 - **Integração real** front↔API só na INT-1. Pontos a acertar: `context-path: /api` no backend e o fluxo CSRF (GET inicial → cookie `XSRF-TOKEN` → ecoar em `X-XSRF-TOKEN`).
-- **Visibilidade do repo no GitHub** não verificada (`gh` CLI não instalado).
+- **Visibilidade do repo no GitHub**: ✅ **privado** (confirmado pelo usuário em 22/07/2026). O `gh` CLI não está instalado nesta máquina, então a confirmação é do usuário, não verificada por ferramenta.
+- **Push pendente**: o trabalho da E2 e das passadas pré-E3 está commitado só localmente. `main` está à frente de `origin/main`; enviar é decisão do usuário.
 
 ## 7. Armadilhas operacionais descobertas na E2 (leia antes de orquestrar a E3)
 
