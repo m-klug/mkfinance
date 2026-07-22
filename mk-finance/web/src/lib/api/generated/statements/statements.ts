@@ -27,6 +27,7 @@ import type {
 
 import type {
   ConflictResponse,
+  ErrorResponse,
   ListStatementsParams,
   Statement,
   StatementDetail,
@@ -293,6 +294,67 @@ const {mutation: mutationOptions} = options ?
       > => {
 
       const mutationOptions = getPayStatementMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Reverses one payment, deleting the EXPENSE transaction it created on the account along with it. Allowed on a PAID statement — R6 freezes a settled bill against charges, not against undoing the payment that settled it. The status is derived from the payments that remain, so it returns to PARTIAL or OPEN by itself and the statement total is unaffected. Deleting that EXPENSE directly through /transactions is refused with TRANSACTION_LOCKED_BY_PAYMENT; this is the way out.
+
+ */
+export const reverseStatementPayment = (
+    workspaceId: string,
+    statementId: string,
+    paymentId: string,
+ ) => {
+      
+      
+      return apiFetch<void>(
+      {url: `/workspaces/${workspaceId}/statements/${statementId}/payments/${paymentId}`, method: 'DELETE'
+    },
+      );
+    }
+  
+
+
+export const getReverseStatementPaymentMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reverseStatementPayment>>, TError,{workspaceId: string;statementId: string;paymentId: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof reverseStatementPayment>>, TError,{workspaceId: string;statementId: string;paymentId: string}, TContext> => {
+
+const mutationKey = ['reverseStatementPayment'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reverseStatementPayment>>, {workspaceId: string;statementId: string;paymentId: string}> = (props) => {
+          const {workspaceId,statementId,paymentId} = props ?? {};
+
+          return  reverseStatementPayment(workspaceId,statementId,paymentId,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReverseStatementPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof reverseStatementPayment>>>
+    
+    export type ReverseStatementPaymentMutationError = ErrorResponse
+
+    export const useReverseStatementPayment = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reverseStatementPayment>>, TError,{workspaceId: string;statementId: string;paymentId: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reverseStatementPayment>>,
+        TError,
+        {workspaceId: string;statementId: string;paymentId: string},
+        TContext
+      > => {
+
+      const mutationOptions = getReverseStatementPaymentMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

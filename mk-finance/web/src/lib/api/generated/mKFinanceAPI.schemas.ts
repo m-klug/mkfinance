@@ -14,7 +14,7 @@ export type ErrorResponseFieldErrorsItem = {
 };
 
 export interface ErrorResponse {
-  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
+  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
  */
   code: string;
   params?: ErrorResponseParams;
@@ -484,6 +484,15 @@ export interface Statement {
   paidCents: number;
 }
 
+export type StatementDetailAllOfPaymentsItem = {
+  id: string;
+  accountId: string;
+  amountCents: number;
+  paymentDate: string;
+  /** The EXPENSE row this payment created in the extrato (R2). */
+  transactionId?: string;
+};
+
 export type StatementDetailAllOfItemsItem = {
   installmentId: string;
   purchaseId: string;
@@ -496,6 +505,9 @@ export type StatementDetailAllOfItemsItem = {
 };
 
 export type StatementDetailAllOf = {
+  /** Payments made against this statement, oldest first. Listed individually rather than only summed into paidCents because each one is separately reversible — the client needs the id to say which.
+ */
+  payments: StatementDetailAllOfPaymentsItem[];
   items: StatementDetailAllOfItemsItem[];
 };
 
