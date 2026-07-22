@@ -258,7 +258,8 @@ const {mutation: mutationOptions} = options ?
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Deleting one leg of a transfer deletes its pair atomically.
+ * Deleting one leg of a transfer deletes its pair atomically. The debit created by a credit-card statement payment cannot be deleted here — it answers 409 TRANSACTION_LOCKED_BY_PAYMENT, and the client should send the user to reverse the payment on the statement, which removes both.
+
  */
 export const deleteTransaction = (
     workspaceId: string,
@@ -274,7 +275,7 @@ export const deleteTransaction = (
   
 
 
-export const getDeleteTransactionMutationOptions = <TError = unknown,
+export const getDeleteTransactionMutationOptions = <TError = ConflictResponse,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTransaction>>, TError,{workspaceId: string;transactionId: string}, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteTransaction>>, TError,{workspaceId: string;transactionId: string}, TContext> => {
 
@@ -301,9 +302,9 @@ const {mutation: mutationOptions} = options ?
 
     export type DeleteTransactionMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTransaction>>>
     
-    export type DeleteTransactionMutationError = unknown
+    export type DeleteTransactionMutationError = ConflictResponse
 
-    export const useDeleteTransaction = <TError = unknown,
+    export const useDeleteTransaction = <TError = ConflictResponse,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTransaction>>, TError,{workspaceId: string;transactionId: string}, TContext>, }
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteTransaction>>,

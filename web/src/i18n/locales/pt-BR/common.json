@@ -179,6 +179,7 @@
     "INSUFFICIENT_TRANSFER_ACCOUNTS": "É preciso ter ao menos duas contas para transferir.",
     "CONTRIBUTION_PILLAR_REQUIRED": "Selecione o pilar deste aporte.",
     "TRANSACTION_ALREADY_SETTLED": "Este lançamento já foi efetivado.",
+    "TRANSACTION_LOCKED_BY_PAYMENT": "Este lançamento é o pagamento de uma fatura — desfaça o pagamento pela tela da fatura.",
     "STATEMENT_ALREADY_PAID": "Esta fatura já foi paga.",
     "STATEMENT_IMMUTABLE": "Faturas pagas não podem ser alteradas.",
     "PAYMENT_EXCEEDS_REMAINING": "O valor excede o restante da fatura.",

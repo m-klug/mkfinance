@@ -351,12 +351,17 @@ paths:
     delete:
       tags: [transactions]
       operationId: deleteTransaction
-      description: Deleting one leg of a transfer deletes its pair atomically.
+      description: >
+        Deleting one leg of a transfer deletes its pair atomically. The debit created by a
+        credit-card statement payment cannot be deleted here — it answers 409
+        TRANSACTION_LOCKED_BY_PAYMENT, and the client should send the user to reverse the
+        payment on the statement, which removes both.
       parameters:
         - { $ref: '#/components/parameters/workspaceId' }
         - { $ref: '#/components/parameters/transactionId' }
       responses:
         '204': { description: Deleted. }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /workspaces/{workspaceId}/transactions/{transactionId}/settle:
     post:
@@ -608,6 +613,35 @@ paths:
               schema: { $ref: '#/components/schemas/Statement' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /workspaces/{workspaceId}/statements/{statementId}/payments/{paymentId}:
+    delete:
+      tags: [statements]
+      operationId: reverseStatementPayment
+      description: >
+        Reverses one payment, deleting the EXPENSE transaction it created on the account
+        along with it. Allowed on a PAID statement — R6 freezes a settled bill against
+        charges, not against undoing the payment that settled it. The status is derived
+        from the payments that remain, so it returns to PARTIAL or OPEN by itself and the
+        statement total is unaffected. Deleting that EXPENSE directly through
+        /transactions is refused with TRANSACTION_LOCKED_BY_PAYMENT; this is the way out.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/statementId' }
+        - name: paymentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Payment reversed. }
+        '404':
+          description: >
+            STATEMENT_PAYMENT_NOT_FOUND when no such payment exists on this statement —
+            including a payment id that belongs to a different statement — or
+            STATEMENT_NOT_FOUND when the statement is not in this workspace.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /workspaces/{workspaceId}/dashboard/summary:
     get:
       tags: [dashboard]
@@ -743,10 +777,10 @@ components:
             CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY;
             transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED,
             TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS,
-            CONTRIBUTION_PILLAR_REQUIRED;
+            CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT;
             cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND,
-            STATEMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID,
-            PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY;
+            STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE,
+            STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY;
             generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
         params:
           type: object
@@ -1093,8 +1127,26 @@ components:
       allOf:
         - $ref: '#/components/schemas/Statement'
         - type: object
-          required: [items]
+          required: [items, payments]
           properties:
+            payments:
+              description: >
+                Payments made against this statement, oldest first. Listed individually
+                rather than only summed into paidCents because each one is separately
+                reversible — the client needs the id to say which.
+              type: array
+              items:
+                type: object
+                required: [id, accountId, amountCents, paymentDate]
+                properties:
+                  id: { type: string, format: uuid }
+                  accountId: { type: string, format: uuid }
+                  amountCents: { type: integer, format: int64 }
+                  paymentDate: { type: string, format: date }
+                  transactionId:
+                    type: string
+                    format: uuid
+                    description: The EXPENSE row this payment created in the extrato (R2).
             items:
               type: array
               items:
