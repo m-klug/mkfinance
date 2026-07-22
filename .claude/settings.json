@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk mvn *)",
+      "Bash(rtk npm *)",
+      "Bash(rtk npx *)",
+      "Bash(rtk git *)",
+      "Bash(rtk ls *)",
+      "Bash(rtk grep *)",
+      "Bash(rtk find *)",
+      "Bash(rtk read *)",
+      "Bash(./mvnw *)",
+      "Bash(mvn *)",
+      "Bash(npm test *)",
+      "Bash(npm run *)",
+      "Bash(npm ci *)",
+      "Bash(npm install *)",
+      "Bash(npm ls *)",
+      "Bash(npx *)",
+      "Bash(git worktree *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git branch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git merge *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git stash *)",
+      "Bash(docker info)",
+      "Bash(docker version *)",
+      "Bash(docker ps *)",
+      "Bash(docker compose * config *)",
+      "Bash(java -version)",
+      "Bash(node -v)",
+      "Bash(mkdir -p *)",
+      "Bash(sed -n *)",
+      "Bash(find *)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(git reset --hard *)",
+      "Bash(rm -rf *)"
+    ]
+  }
+}
