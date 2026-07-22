@@ -16,7 +16,7 @@ Gate da E2 rodado sobre a `main` já integrada:
 
 | Eixo | Resultado |
 |---|---|
-| `./mvnw verify` | **151 testes, 0 falhas, BUILD SUCCESS** |
+| `./mvnw verify` | **175 testes, 0 falhas, BUILD SUCCESS** (151 na E2 + 24 nas passadas pré-E3) |
 | `npm test` | **44 testes, 8 arquivos** |
 | `npm run build` | verde |
 | `docker compose config -q` | OK |
@@ -81,8 +81,20 @@ Executada com nada mais rodando em paralelo, para não quebrar mocks de nenhuma 
 
 **Consistência corrigida de brinde**: `POST /transfers` *rejeitava* um pilar apontado a destino comum (`INVALID_CONTRIBUTION_PILLAR`), enquanto o update o *descartava em silêncio*. O update passou a concordar com a criação — checando o veredito do próprio motor, não re-derivando a regra, para ela seguir existindo num lugar só. Omitir o pilar continua significando "não mexer".
 
-### 6.5 Sem endpoint de estorno de pagamento de fatura
-Excluir pelo `/transactions` a despesa gerada por um pagamento é bloqueado pelo FK de `statement_payment.transaction_id` → 409 `DATA_INTEGRITY_VIOLATION`. Protetivo e aceitável, mas o código de erro é genérico e não há caminho de estorno no contrato. Decisão de produto.
+### 6.5 Estorno de pagamento de fatura — ✅ RESOLVIDO (22/07/2026)
+
+**Decisão do usuário: opção A + C.** Gate: **175 testes backend** (165 + 10), 44 front, build verde. Sem migração — estorno é DELETE de linha.
+
+- **A** — `DELETE /workspaces/{workspaceId}/statements/{statementId}/payments/{paymentId}`. Remove a linha e a despesa vinculada (via `TransactionService.delete` de BE-3) na mesma transação; o status volta sozinho a OPEN/PARTIAL porque é **derivado** de `StatementTotals`, e o dinheiro retorna ao saldo.
+- **C** — excluir a despesa de pagamento pelo `/transactions` agora devolve `TRANSACTION_LOCKED_BY_PAYMENT` em vez de `DATA_INTEGRITY_VIOLATION` genérico, apontando para a tela da fatura. Implementado como guard de repositório, seguindo o precedente da E1 (`existsCardPurchaseForCategory`).
+
+**Como "estornar" foi separado de "lançar cobrança"** (era o risco central da tarefa): `Statement.isImmutable()` era um booleano único consultado por dois chamadores com intenções diferentes. Foi renomeado para **`chargesFrozen()`**, que agora tem **um único chamador** (`CardPurchaseService.requireAllMutable`) — a R6 segue intacta. O `pay()` deixou de consultar status persistido e recusa por `remaining == 0`, derivado como todo o resto da feature. O `reversePayment()` não consulta nenhum dos dois. O teste `reversibilityDoesNotWeakenTheChargeFreeze` fixa que fatura PAID **recusa compra nova e aceita estorno** na mesma asserção.
+
+**Detalhe de implementação que importa**: o DELETE da linha é *flushed* explicitamente antes de chamar `TransactionService.delete`, porque o guard novo lê `statement_payment` por SQL nativo e não pode enxergar a linha em remoção. Depender do auto-flush do Hibernate ali seria frágil.
+
+**Adição além do briefing, sinalizada pela frente**: `StatementDetail` passou a devolver o array `payments`. Sem isso **não havia `paymentId` alcançável** — `paidCents` diz que foi pago, mas não qual pagamento desfazer. Aditivo ao contrato.
+
+⚠️ **Pendente para a FE-3**: a UI de estorno. `useReverseStatementPayment` e o array `payments` já estão gerados. Falta a tradução de `STATEMENT_PAYMENT_NOT_FOUND` (só a tela de fatura alcança). E o texto de `STATEMENT_IMMUTABLE` ("Faturas pagas não podem ser alteradas") ficou largo demais agora que pagamentos **são** reversíveis — só é emitido para cobranças, então não está errado, mas a tela merece redação mais precisa.
 
 ### 6.6 Transferência não editável — ✅ RESOLVIDO (defeito de contrato, não decisão de produto)
 Diagnóstico correto: o backend **sempre soube** editar transferência. `TransferService.update` altera as duas pernas atomicamente (valor, data, descrição, nota, status, conta da perna, e re-derivação do pilar do aporte), com 14 testes de integração, e o `TransactionController` já roteava o `PATCH` para lá.
@@ -125,6 +137,7 @@ Fichas completas em `DESENVOLVIMENTO-MVP.md` §4. Rode isoladas em git worktrees
 
 **Itens de UI/refino que sobraram e cabem nas fichas da E3:**
 - **FE-3** (ou ajuste pontual em `features/transactions/`): reexibir o botão de editar em linhas TRANSFER — contrato e backend destravados, falta só a UI. Os hooks `useUpdateTransfer` e `useArchiveCard` já existem gerados.
+- **FE-3**: UI de estorno de pagamento (`useReverseStatementPayment` + array `payments` já gerados), tradução de `STATEMENT_PAYMENT_NOT_FOUND`, e revisar a redação de `STATEMENT_IMMUTABLE` (§6.5).
 - **BE-5**: mover o override de pilar para uma sobrecarga de `TransferService.update` e aposentar o `TransferUpdateHandler` (§6.1–6.4, nota de débito técnico).
 - **FE-4**: `manualChunks` ou import dinâmico ao adicionar Recharts (§6.8).
 
