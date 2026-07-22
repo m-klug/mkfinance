@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: mk-finance-api
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:mkfinance}
+    username: ${POSTGRES_USER:mkfinance}
+    password: ${POSTGRES_PASSWORD:mkfinance}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  threads:
+    virtual:
+      enabled: true
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+    session:
+      cookie:
+        name: MK_FINANCE_SESSION
+        http-only: true
+        same-site: lax
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# Dev origin for the Vite SPA (PLANEJAMENTO §3.2). Override per environment.
+mkfinance:
+  cors:
+    allowed-origins: http://localhost:5173

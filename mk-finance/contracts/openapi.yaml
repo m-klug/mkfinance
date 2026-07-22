@@ -1,0 +1,1070 @@
+openapi: 3.0.3
+info:
+  title: MK Finance API
+  description: >
+    Personal finance API (MVP). Money values are always integer cents (int64).
+    Business dates are ISO local dates in America/Sao_Paulo. Errors return a
+    machine-readable code translated by the client. See PLANEJAMENTO.md for
+    the business rules referenced here (R1..R10).
+  version: 0.1.0
+servers:
+  - url: /api
+tags:
+  - name: auth
+  - name: workspaces
+  - name: accounts
+  - name: categories
+  - name: pillars
+  - name: transactions
+  - name: transfers
+  - name: cards
+  - name: statements
+  - name: dashboard
+  - name: export
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: User created; personal workspace seeded; session cookie set.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Session cookie set.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      responses:
+        '204': { description: Session invalidated. }
+
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current user with workspace memberships.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /workspaces:
+    get:
+      tags: [workspaces]
+      operationId: listWorkspaces
+      responses:
+        '200':
+          description: Workspaces the current user is a member of.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Workspace' }
+    post:
+      tags: [workspaces]
+      operationId: createWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkspaceRequest' }
+      responses:
+        '201':
+          description: Workspace created with defaults seeded; caller becomes OWNER.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workspace' }
+
+  /workspaces/{workspaceId}/invites:
+    post:
+      tags: [workspaces]
+      operationId: createInvite
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      responses:
+        '201':
+          description: Single-use invite token (share as link).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invite' }
+
+  /invites/{token}/accept:
+    post:
+      tags: [workspaces]
+      operationId: acceptInvite
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Current user joined the workspace as MEMBER.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workspace' }
+        '410': { $ref: '#/components/responses/Gone' }
+
+  /workspaces/{workspaceId}/accounts:
+    get:
+      tags: [accounts]
+      operationId: listAccounts
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - name: includeArchived
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Accounts with current and projected balances (balances null until BE-3 lands).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Account' }
+    post:
+      tags: [accounts]
+      operationId: createAccount
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+
+  /workspaces/{workspaceId}/accounts/{accountId}:
+    patch:
+      tags: [accounts]
+      operationId: updateAccount
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/accountId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountRequest' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+    delete:
+      tags: [accounts]
+      operationId: deleteAccount
+      description: Fails with ACCOUNT_HAS_TRANSACTIONS if any transaction references it (archive instead).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/accountId' }
+      responses:
+        '204': { description: Deleted. }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/accounts/{accountId}/archive:
+    post:
+      tags: [accounts]
+      operationId: archiveAccount
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/accountId' }
+      responses:
+        '200':
+          description: Archived (idempotent).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+
+  /workspaces/{workspaceId}/categories:
+    get:
+      tags: [categories]
+      operationId: listCategories
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - name: type
+          in: query
+          schema: { $ref: '#/components/schemas/CategoryType' }
+      responses:
+        '200':
+          description: Flat list; client builds the tree via parentId, grouped by pillar.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Category' }
+    post:
+      tags: [categories]
+      operationId: createCategory
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryRequest' }
+      responses:
+        '201':
+          description: Created. EXPENSE requires pillar; INCOME forbids it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+
+  /workspaces/{workspaceId}/categories/{categoryId}:
+    patch:
+      tags: [categories]
+      operationId: updateCategory
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/categoryId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryRequest' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+    delete:
+      tags: [categories]
+      operationId: deleteCategory
+      description: Fails with CATEGORY_IN_USE if referenced; archive semantics handled client-side by hiding.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/categoryId' }
+      responses:
+        '204': { description: Deleted. }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/pillar-allocations:
+    get:
+      tags: [pillars]
+      operationId: listPillarAllocations
+      description: Fixed targets in the MVP (30/10/20/10/25/5); editing arrives in Phase 2.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      responses:
+        '200':
+          description: Target percent per pillar.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PillarAllocation' }
+
+  /workspaces/{workspaceId}/transactions:
+    get:
+      tags: [transactions]
+      operationId: listTransactions
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: accountId, in: query, schema: { type: string, format: uuid } }
+        - { name: categoryId, in: query, schema: { type: string, format: uuid } }
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/TransactionType' } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/TransactionStatus' } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        '200':
+          description: Paginated transactions, newest first.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransactionPage' }
+    post:
+      tags: [transactions]
+      operationId: createTransaction
+      description: INCOME or EXPENSE only — transfers/contributions go through /transfers.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransactionRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+
+  /workspaces/{workspaceId}/transactions/{transactionId}:
+    patch:
+      tags: [transactions]
+      operationId: updateTransaction
+      description: Editing one leg of a transfer updates its pair atomically.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/transactionId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransactionRequest' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+    delete:
+      tags: [transactions]
+      operationId: deleteTransaction
+      description: Deleting one leg of a transfer deletes its pair atomically.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/transactionId' }
+      responses:
+        '204': { description: Deleted. }
+
+  /workspaces/{workspaceId}/transactions/{transactionId}/settle:
+    post:
+      tags: [transactions]
+      operationId: settleTransaction
+      description: One-click settle of a PENDING transaction (R5).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/transactionId' }
+      responses:
+        '200':
+          description: Now SETTLED.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/transfers:
+    post:
+      tags: [transfers]
+      operationId: createTransfer
+      description: >
+        Creates the mirrored pair (R4). When the destination account type is INVESTMENT or
+        SAVINGS this is a contribution: contributionPillar applies (defaults to the account's
+        defaultContributionPillar, R9) and the amount counts toward that pillar's allocation
+        without being an expense.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferRequest' }
+      responses:
+        '201':
+          description: Both legs created; returns the outgoing leg.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+
+  /workspaces/{workspaceId}/cards:
+    get:
+      tags: [cards]
+      operationId: listCards
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - name: includeArchived
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Cards with available limit (limit − unpaid statements).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Card' }
+    post:
+      tags: [cards]
+      operationId: createCard
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Card' }
+
+  /workspaces/{workspaceId}/cards/{cardId}:
+    patch:
+      tags: [cards]
+      operationId: updateCard
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/cardId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardRequest' }
+      responses:
+        '200':
+          description: Updated. Changing closingDay/dueDay only affects OPEN/future statements.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Card' }
+
+  /workspaces/{workspaceId}/cards/{cardId}/purchases:
+    post:
+      tags: [cards]
+      operationId: createCardPurchase
+      description: >
+        Creates the purchase and all installments up-front, allocated to consecutive
+        statements starting from the one determined by purchaseDate vs closingDay (R1, R3).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/cardId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardPurchaseRequest' }
+      responses:
+        '201':
+          description: Purchase with generated installments.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardPurchase' }
+
+  /workspaces/{workspaceId}/purchases/{purchaseId}:
+    patch:
+      tags: [cards]
+      operationId: updateCardPurchase
+      description: Affects only installments on non-PAID statements (R6); otherwise STATEMENT_IMMUTABLE.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/purchaseId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardPurchaseRequest' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardPurchase' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [cards]
+      operationId: deleteCardPurchase
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/purchaseId' }
+      responses:
+        '204': { description: Deleted (only if no installment sits on a PAID statement). }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/cards/{cardId}/statements:
+    get:
+      tags: [statements]
+      operationId: listStatements
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/cardId' }
+        - name: from
+          in: query
+          description: Reference month (YYYY-MM), inclusive.
+          schema: { type: string, pattern: '^\d{4}-\d{2}$' }
+        - name: to
+          in: query
+          schema: { type: string, pattern: '^\d{4}-\d{2}$' }
+      responses:
+        '200':
+          description: Statements in the window (created lazily as needed).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Statement' }
+
+  /workspaces/{workspaceId}/statements/{statementId}:
+    get:
+      tags: [statements]
+      operationId: getStatement
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/statementId' }
+      responses:
+        '200':
+          description: Statement with line items.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatementDetail' }
+
+  /workspaces/{workspaceId}/statements/{statementId}/payments:
+    post:
+      tags: [statements]
+      operationId: payStatement
+      description: >
+        Full or partial payment. Debits the chosen account by creating an EXPENSE
+        transaction with the system category "statement payment" (excluded from category
+        reports, R2). Partial payment sets status PARTIAL; no revolving interest (MVP).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/statementId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StatementPaymentRequest' }
+      responses:
+        '201':
+          description: Payment registered.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Statement' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/dashboard/summary:
+    get:
+      tags: [dashboard]
+      operationId: getDashboardSummary
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/month' }
+      responses:
+        '200':
+          description: Balances, month income/expense, category breakdown, open statements, previous-month comparison.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardSummary' }
+
+  /workspaces/{workspaceId}/dashboard/pillar-allocation:
+    get:
+      tags: [dashboard]
+      operationId: getPillarAllocation
+      description: 'Percent of month income consumed per pillar vs target (R2, R9, R10): expenses by competency + contributions, divided by month income.'
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/month' }
+      responses:
+        '200':
+          description: Allocation report; noIncome=true means percents are null and absolute values should be shown.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PillarAllocationReport' }
+
+  /workspaces/{workspaceId}/export/transactions.csv:
+    get:
+      tags: [export]
+      operationId: exportTransactionsCsv
+      description: Same filters as listTransactions. UTF-8 with BOM, ';' separator (Excel pt-BR).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: CSV stream.
+          content:
+            text/csv:
+              schema: { type: string }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: MK_FINANCE_SESSION
+
+  parameters:
+    workspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    accountId:
+      name: accountId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    categoryId:
+      name: categoryId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    transactionId:
+      name: transactionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    cardId:
+      name: cardId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    purchaseId:
+      name: purchaseId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    statementId:
+      name: statementId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    month:
+      name: month
+      in: query
+      description: Reference month YYYY-MM; defaults to current month in America/Sao_Paulo.
+      schema: { type: string, pattern: '^\d{4}-\d{2}$' }
+
+  responses:
+    Unauthorized:
+      description: Not authenticated.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: Business rule violation; see error code.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Gone:
+      description: Resource expired or already used.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: >
+            Machine-readable code translated by the client. Known codes include:
+            EMAIL_ALREADY_USED, INVALID_CREDENTIALS, NOT_A_MEMBER, ACCOUNT_HAS_TRANSACTIONS,
+            CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN,
+            INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED,
+            TRANSACTION_ALREADY_SETTLED, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID,
+            PAYMENT_EXCEEDS_REMAINING, INVITE_EXPIRED, VALIDATION_ERROR.
+        params:
+          type: object
+          additionalProperties: true
+        fieldErrors:
+          type: array
+          items:
+            type: object
+            required: [field, code]
+            properties:
+              field: { type: string }
+              code: { type: string }
+
+    Pillar:
+      type: string
+      enum: [FIXED_COSTS, COMFORT, GOALS, PLEASURES, FINANCIAL_FREEDOM, KNOWLEDGE]
+    ContributionPillar:
+      type: string
+      enum: [GOALS, FINANCIAL_FREEDOM]
+    AccountType:
+      type: string
+      enum: [CHECKING, SAVINGS, CASH, INVESTMENT, OTHER]
+    CategoryType:
+      type: string
+      enum: [INCOME, EXPENSE]
+    TransactionType:
+      type: string
+      enum: [INCOME, EXPENSE, TRANSFER]
+    TransactionStatus:
+      type: string
+      enum: [SETTLED, PENDING]
+    StatementStatus:
+      type: string
+      enum: [OPEN, CLOSED, PAID, PARTIAL]
+    MemberRole:
+      type: string
+      enum: [OWNER, MEMBER]
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, maxLength: 120 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    CurrentUser:
+      type: object
+      required: [id, name, email, workspaces]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string }
+        locale: { type: string, example: pt-BR }
+        workspaces:
+          type: array
+          items: { $ref: '#/components/schemas/Workspace' }
+
+    Workspace:
+      type: object
+      required: [id, name, role]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/MemberRole' }
+
+    WorkspaceRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 120 }
+
+    Invite:
+      type: object
+      required: [token, expiresAt]
+      properties:
+        token: { type: string }
+        expiresAt: { type: string, format: date-time }
+
+    Account:
+      type: object
+      required: [id, name, type, initialBalanceCents, archived]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/AccountType' }
+        initialBalanceCents: { type: integer, format: int64 }
+        balanceCents:
+          type: integer
+          format: int64
+          nullable: true
+          description: initial + settled transactions (R5). Null until BE-3 lands.
+        projectedBalanceCents:
+          type: integer
+          format: int64
+          nullable: true
+          description: balance + pending transactions.
+        defaultContributionPillar:
+          allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
+          nullable: true
+        color: { type: string, nullable: true, example: '#16A34A' }
+        icon: { type: string, nullable: true }
+        archived: { type: boolean }
+
+    AccountRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name: { type: string, maxLength: 120 }
+        type: { $ref: '#/components/schemas/AccountType' }
+        initialBalanceCents: { type: integer, format: int64, default: 0 }
+        defaultContributionPillar:
+          allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
+          nullable: true
+        color: { type: string, nullable: true }
+        icon: { type: string, nullable: true }
+
+    Category:
+      type: object
+      required: [id, name, type, system]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/CategoryType' }
+        pillar:
+          allOf: [{ $ref: '#/components/schemas/Pillar' }]
+          nullable: true
+          description: Required for EXPENSE, null for INCOME.
+        parentId: { type: string, format: uuid, nullable: true }
+        color: { type: string, nullable: true }
+        icon: { type: string, nullable: true }
+        system:
+          type: boolean
+          description: System categories (e.g. statement payment) cannot be edited/deleted and are excluded from category reports (R2).
+
+    CategoryRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name: { type: string, maxLength: 80 }
+        type: { $ref: '#/components/schemas/CategoryType' }
+        pillar:
+          allOf: [{ $ref: '#/components/schemas/Pillar' }]
+          nullable: true
+        parentId: { type: string, format: uuid, nullable: true }
+        color: { type: string, nullable: true }
+        icon: { type: string, nullable: true }
+
+    PillarAllocation:
+      type: object
+      required: [pillar, targetPercent]
+      properties:
+        pillar: { $ref: '#/components/schemas/Pillar' }
+        targetPercent: { type: integer, minimum: 0, maximum: 100 }
+
+    Transaction:
+      type: object
+      required: [id, accountId, type, amountCents, date, description, status]
+      properties:
+        id: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        categoryId: { type: string, format: uuid, nullable: true, description: Null for transfers. }
+        type: { $ref: '#/components/schemas/TransactionType' }
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        date: { type: string, format: date }
+        description: { type: string }
+        note: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/TransactionStatus' }
+        transferPairId: { type: string, format: uuid, nullable: true }
+        contributionPillar:
+          allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
+          nullable: true
+          description: Set on transfer legs into INVESTMENT/SAVINGS accounts (R9).
+
+    TransactionRequest:
+      type: object
+      required: [accountId, categoryId, type, amountCents, date, description]
+      properties:
+        accountId: { type: string, format: uuid }
+        categoryId: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [INCOME, EXPENSE]
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        date: { type: string, format: date }
+        description: { type: string, maxLength: 255 }
+        note: { type: string, nullable: true }
+        status:
+          allOf: [{ $ref: '#/components/schemas/TransactionStatus' }]
+          default: SETTLED
+
+    TransactionPage:
+      type: object
+      required: [content, page, size, totalElements]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/Transaction' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+
+    TransferRequest:
+      type: object
+      required: [fromAccountId, toAccountId, amountCents, date, description]
+      properties:
+        fromAccountId: { type: string, format: uuid }
+        toAccountId: { type: string, format: uuid }
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        date: { type: string, format: date }
+        description: { type: string, maxLength: 255 }
+        contributionPillar:
+          allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
+          nullable: true
+          description: Only when destination is INVESTMENT/SAVINGS; defaults to the account's default pillar.
+
+    Card:
+      type: object
+      required: [id, name, limitCents, closingDay, dueDay, archived]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        brand: { type: string, nullable: true }
+        limitCents: { type: integer, format: int64 }
+        availableLimitCents:
+          type: integer
+          format: int64
+          nullable: true
+          description: limit − sum of unpaid statements.
+        closingDay: { type: integer, minimum: 1, maximum: 28 }
+        dueDay: { type: integer, minimum: 1, maximum: 28 }
+        defaultPaymentAccountId: { type: string, format: uuid, nullable: true }
+        color: { type: string, nullable: true }
+        archived: { type: boolean }
+
+    CardRequest:
+      type: object
+      required: [name, limitCents, closingDay, dueDay]
+      properties:
+        name: { type: string, maxLength: 120 }
+        brand: { type: string, nullable: true }
+        limitCents: { type: integer, format: int64, minimum: 0 }
+        closingDay: { type: integer, minimum: 1, maximum: 28 }
+        dueDay: { type: integer, minimum: 1, maximum: 28 }
+        defaultPaymentAccountId: { type: string, format: uuid, nullable: true }
+        color: { type: string, nullable: true }
+
+    CardPurchaseRequest:
+      type: object
+      required: [categoryId, description, totalAmountCents, purchaseDate]
+      properties:
+        categoryId: { type: string, format: uuid }
+        description: { type: string, maxLength: 255 }
+        totalAmountCents: { type: integer, format: int64, minimum: 1 }
+        purchaseDate: { type: string, format: date }
+        installmentCount: { type: integer, minimum: 1, maximum: 60, default: 1 }
+
+    CardPurchase:
+      type: object
+      required: [id, cardId, categoryId, description, totalAmountCents, purchaseDate, installmentCount, installments]
+      properties:
+        id: { type: string, format: uuid }
+        cardId: { type: string, format: uuid }
+        categoryId: { type: string, format: uuid }
+        description: { type: string }
+        totalAmountCents: { type: integer, format: int64 }
+        purchaseDate: { type: string, format: date }
+        installmentCount: { type: integer }
+        installments:
+          type: array
+          items: { $ref: '#/components/schemas/Installment' }
+
+    Installment:
+      type: object
+      required: [id, number, amountCents, statementId]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer, description: 1-based. Cent remainder goes to the last installment (R1). }
+        amountCents: { type: integer, format: int64 }
+        statementId: { type: string, format: uuid }
+        statementMonth: { type: string, example: '2026-08' }
+
+    Statement:
+      type: object
+      required: [id, cardId, referenceMonth, closingDate, dueDate, status, totalCents, paidCents]
+      properties:
+        id: { type: string, format: uuid }
+        cardId: { type: string, format: uuid }
+        referenceMonth: { type: string, example: '2026-07' }
+        closingDate: { type: string, format: date }
+        dueDate: { type: string, format: date }
+        status: { $ref: '#/components/schemas/StatementStatus' }
+        totalCents: { type: integer, format: int64 }
+        paidCents: { type: integer, format: int64 }
+
+    StatementDetail:
+      allOf:
+        - $ref: '#/components/schemas/Statement'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                required: [installmentId, purchaseId, description, categoryId, amountCents, purchaseDate, installmentNumber, installmentCount]
+                properties:
+                  installmentId: { type: string, format: uuid }
+                  purchaseId: { type: string, format: uuid }
+                  description: { type: string }
+                  categoryId: { type: string, format: uuid }
+                  amountCents: { type: integer, format: int64 }
+                  purchaseDate: { type: string, format: date }
+                  installmentNumber: { type: integer }
+                  installmentCount: { type: integer }
+
+    StatementPaymentRequest:
+      type: object
+      required: [accountId, amountCents, paymentDate]
+      properties:
+        accountId: { type: string, format: uuid }
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        paymentDate: { type: string, format: date }
+
+    DashboardSummary:
+      type: object
+      required: [month, totalBalanceCents, totalBalanceWithInvestmentsCents, incomeCents, expenseCents, accounts, expenseByCategory, openStatements]
+      properties:
+        month: { type: string, example: '2026-07' }
+        totalBalanceCents: { type: integer, format: int64, description: Excludes INVESTMENT accounts. }
+        totalBalanceWithInvestmentsCents: { type: integer, format: int64 }
+        incomeCents: { type: integer, format: int64 }
+        expenseCents: { type: integer, format: int64, description: By competency — card purchases count on purchase date (R2). }
+        previousMonthIncomeCents: { type: integer, format: int64, nullable: true }
+        previousMonthExpenseCents: { type: integer, format: int64, nullable: true }
+        accounts:
+          type: array
+          items: { $ref: '#/components/schemas/Account' }
+        expenseByCategory:
+          type: array
+          items:
+            type: object
+            required: [categoryId, pillar, amountCents]
+            properties:
+              categoryId: { type: string, format: uuid }
+              pillar: { $ref: '#/components/schemas/Pillar' }
+              amountCents: { type: integer, format: int64 }
+        openStatements:
+          type: array
+          items: { $ref: '#/components/schemas/Statement' }
+
+    PillarAllocationReport:
+      type: object
+      required: [month, incomeCents, noIncome, pillars]
+      properties:
+        month: { type: string, example: '2026-07' }
+        incomeCents: { type: integer, format: int64 }
+        noIncome:
+          type: boolean
+          description: True when month income is zero — show absolute values instead of percents (R10).
+        pillars:
+          type: array
+          items:
+            type: object
+            required: [pillar, targetPercent, spentCents]
+            properties:
+              pillar: { $ref: '#/components/schemas/Pillar' }
+              targetPercent: { type: integer }
+              spentCents:
+                type: integer
+                format: int64
+                description: Expenses by competency + contributions of the pillar (R2, R9).
+              actualPercent:
+                type: number
+                format: double
+                nullable: true
+                description: spent ÷ income × 100; null when noIncome.
+
+security:
+  - cookieAuth: []

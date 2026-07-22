@@ -1,0 +1,31 @@
+# MK Finance — internal HTTPS (PWA requires a secure context).
+#
+# Current setup: Caddy's internal CA (`tls internal`). Install the root cert on
+# each device, or switch to option (a) below when a real domain exists.
+#
+# Option (a), recommended (PLANEJAMENTO §3.4): real domain + Let's Encrypt via
+# DNS-01 — valid cert everywhere, no exposed ports. Requires a Caddy build with
+# your DNS provider module, then:
+#
+#   mkfinance.home.example.com {
+#       tls {
+#           dns <provider> <credentials>
+#       }
+#       ...same routes...
+#   }
+
+{
+    local_certs
+}
+
+mkfinance.internal {
+    tls internal
+
+    handle /api/* {
+        reverse_proxy api:8080
+    }
+
+    handle {
+        reverse_proxy web:80
+    }
+}
