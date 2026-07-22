@@ -145,7 +145,7 @@ paths:
           schema: { type: boolean, default: false }
       responses:
         '200':
-          description: Accounts with current and projected balances (balances null until BE-3 lands).
+          description: Accounts with their current and projected balances (R5).
           content:
             application/json:
               schema:
@@ -329,7 +329,11 @@ paths:
     patch:
       tags: [transactions]
       operationId: updateTransaction
-      description: Editing one leg of a transfer updates its pair atomically.
+      description: >
+        Edits an INCOME or EXPENSE entry. Transfer legs are not editable here — a transfer has no
+        category and its type cannot change, so it has its own payload at
+        PATCH /transfers/{transactionId}; sending a transfer leg's id to this endpoint answers
+        TRANSACTION_TYPE_IMMUTABLE.
       parameters:
         - { $ref: '#/components/parameters/workspaceId' }
         - { $ref: '#/components/parameters/transactionId' }
@@ -392,6 +396,34 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Transaction' }
 
+  /workspaces/{workspaceId}/transfers/{transactionId}:
+    patch:
+      tags: [transfers]
+      operationId: updateTransfer
+      description: >
+        Edits a transfer through either of its legs, updating the mirrored pair atomically (R4).
+        Shared facts (amountCents, date, description, note, status) are written to both legs;
+        accountId moves only the leg addressed by transactionId, since each side lives on its own
+        account. Moving the incoming leg to a non-INVESTMENT/SAVINGS account drops the contribution
+        pillar instead of failing (R9). Transfers have their own payload because they carry no
+        category and their type cannot change, which TransactionRequest requires.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/transactionId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferUpdateRequest' }
+      responses:
+        '200':
+          description: Both legs updated; returns the leg addressed by transactionId.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transaction' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /workspaces/{workspaceId}/cards:
     get:
       tags: [cards]
@@ -443,6 +475,25 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Card' }
+
+  /workspaces/{workspaceId}/cards/{cardId}/archive:
+    post:
+      tags: [cards]
+      operationId: archiveCard
+      description: >
+        Archives the card (idempotent). An archived card is read-only history: it stays visible
+        with includeArchived=true and its statements can still be read and paid, but no new
+        purchase may be charged to it (CARD_ARCHIVED).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/cardId' }
+      responses:
+        '200':
+          description: Archived (idempotent).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Card' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /workspaces/{workspaceId}/cards/{cardId}/purchases:
     post:
@@ -667,6 +718,13 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: >
+        No such resource in this workspace. Another workspace's resource is indistinguishable from
+        a nonexistent one — a 404, never a leak (R8).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   schemas:
     ErrorResponse:
@@ -676,12 +734,20 @@ components:
         code:
           type: string
           description: >
-            Machine-readable code translated by the client. Known codes include:
-            EMAIL_ALREADY_USED, INVALID_CREDENTIALS, NOT_A_MEMBER, ACCOUNT_HAS_TRANSACTIONS,
-            CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN,
-            INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED,
-            TRANSACTION_ALREADY_SETTLED, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID,
-            PAYMENT_EXCEEDS_REMAINING, INVITE_EXPIRED, VALIDATION_ERROR.
+            Machine-readable code translated by the client. Kept in sync with
+            domain/exception/ErrorCode.java. Known codes include:
+            auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED;
+            workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED;
+            accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR;
+            categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED,
+            CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY;
+            transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED,
+            TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS,
+            CONTRIBUTION_PILLAR_REQUIRED;
+            cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND,
+            STATEMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID,
+            PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY;
+            generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
         params:
           type: object
           additionalProperties: true
@@ -712,6 +778,9 @@ components:
     TransactionStatus:
       type: string
       enum: [SETTLED, PENDING]
+    TransferDirection:
+      type: string
+      enum: [OUT, IN]
     StatementStatus:
       type: string
       enum: [OPEN, CLOSED, PAID, PARTIAL]
@@ -779,12 +848,12 @@ components:
           type: integer
           format: int64
           nullable: true
-          description: initial + settled transactions (R5). Null until BE-3 lands.
+          description: initial + settled transactions (R5).
         projectedBalanceCents:
           type: integer
           format: int64
           nullable: true
-          description: balance + pending transactions.
+          description: balance + settled and pending transactions (R5).
         defaultContributionPillar:
           allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
           nullable: true
@@ -857,6 +926,13 @@ components:
         note: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/TransactionStatus' }
         transferPairId: { type: string, format: uuid, nullable: true }
+        transferDirection:
+          allOf: [{ $ref: '#/components/schemas/TransferDirection' }]
+          nullable: true
+          description: >
+            OUT on the source leg, IN on the destination leg; null for INCOME/EXPENSE. amountCents
+            is always positive, so this is the only way to tell money leaving an account from money
+            arriving in it when rendering a transfer in the extrato.
         contributionPillar:
           allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
           nullable: true
@@ -903,6 +979,36 @@ components:
           allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
           nullable: true
           description: Only when destination is INVESTMENT/SAVINGS; defaults to the account's default pillar.
+
+    TransferUpdateRequest:
+      type: object
+      required: [amountCents, date, description]
+      description: >
+        Payload for PATCH /transfers/{transactionId}. It has no categoryId and no type on purpose:
+        a transfer carries neither, which is exactly why TransactionRequest cannot express it.
+      properties:
+        accountId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Moves only the leg being edited to another account; omit to leave it where it is.
+            Pointing it at the sibling's account answers INSUFFICIENT_TRANSFER_ACCOUNTS.
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        date: { type: string, format: date }
+        description: { type: string, maxLength: 255 }
+        note: { type: string, nullable: true }
+        status:
+          allOf: [{ $ref: '#/components/schemas/TransactionStatus' }]
+          nullable: true
+          description: Applied to both legs; omit to keep the current one. A half-settled transfer is never produced.
+        contributionPillar:
+          allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
+          nullable: true
+          description: >
+            Re-targets the contribution (R9). Omit to keep whichever pillar the transfer already
+            carries. Only meaningful when the destination account is INVESTMENT/SAVINGS; sending it
+            for any other destination answers INVALID_CONTRIBUTION_PILLAR.
 
     Card:
       type: object
