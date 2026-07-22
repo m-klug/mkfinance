@@ -17,8 +17,11 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ConflictResponse,
+  NotFoundResponse,
   Transaction,
-  TransferRequest
+  TransferRequest,
+  TransferUpdateRequest
 } from '../mKFinanceAPI.schemas';
 
 import { apiFetch } from '../../fetcher';
@@ -86,6 +89,69 @@ const {mutation: mutationOptions} = options ?
       > => {
 
       const mutationOptions = getCreateTransferMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Edits a transfer through either of its legs, updating the mirrored pair atomically (R4). Shared facts (amountCents, date, description, note, status) are written to both legs; accountId moves only the leg addressed by transactionId, since each side lives on its own account. Moving the incoming leg to a non-INVESTMENT/SAVINGS account drops the contribution pillar instead of failing (R9). Transfers have their own payload because they carry no category and their type cannot change, which TransactionRequest requires.
+
+ */
+export const updateTransfer = (
+    workspaceId: string,
+    transactionId: string,
+    transferUpdateRequest: TransferUpdateRequest,
+ ) => {
+      
+      
+      return apiFetch<Transaction>(
+      {url: `/workspaces/${workspaceId}/transfers/${transactionId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: transferUpdateRequest
+    },
+      );
+    }
+  
+
+
+export const getUpdateTransferMutationOptions = <TError = NotFoundResponse | ConflictResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTransfer>>, TError,{workspaceId: string;transactionId: string;data: TransferUpdateRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateTransfer>>, TError,{workspaceId: string;transactionId: string;data: TransferUpdateRequest}, TContext> => {
+
+const mutationKey = ['updateTransfer'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTransfer>>, {workspaceId: string;transactionId: string;data: TransferUpdateRequest}> = (props) => {
+          const {workspaceId,transactionId,data} = props ?? {};
+
+          return  updateTransfer(workspaceId,transactionId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTransferMutationResult = NonNullable<Awaited<ReturnType<typeof updateTransfer>>>
+    export type UpdateTransferMutationBody = TransferUpdateRequest
+    export type UpdateTransferMutationError = NotFoundResponse | ConflictResponse
+
+    export const useUpdateTransfer = <TError = NotFoundResponse | ConflictResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTransfer>>, TError,{workspaceId: string;transactionId: string;data: TransferUpdateRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateTransfer>>,
+        TError,
+        {workspaceId: string;transactionId: string;data: TransferUpdateRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateTransferMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }
