@@ -1,9 +1,13 @@
 package br.com.mkfinance.api.account;
 
 import br.com.mkfinance.application.account.AccountService;
+import br.com.mkfinance.application.transaction.AccountBalanceService;
+import br.com.mkfinance.domain.model.Account;
+import br.com.mkfinance.domain.service.BalanceCalculator.Balance;
 import br.com.mkfinance.infrastructure.security.WorkspaceContext;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,28 +33,39 @@ import org.springframework.web.bind.annotation.RestController;
 public class AccountController {
 
     private final AccountService accountService;
+    private final AccountBalanceService balanceService;
     private final AccountMapper mapper;
     private final WorkspaceContext workspaceContext;
 
+    /**
+     * Balances come from one aggregated query for the whole workspace, not one per account — the
+     * same shape as {@code CardController.list} and its available limits. Listing a hundred accounts
+     * costs two queries, not a hundred and one.
+     */
     @GetMapping
     public List<AccountResponse> list(
             @PathVariable UUID workspaceId, @RequestParam(defaultValue = "false") boolean includeArchived) {
-        return accountService.list(workspaceContext.getWorkspaceId(), includeArchived).stream()
-                .map(mapper::toResponse)
+        UUID scope = workspaceContext.getWorkspaceId();
+        Map<UUID, Balance> balances = balanceService.balancesByAccount(scope);
+        return accountService.list(scope, includeArchived).stream()
+                .map(account -> mapper.toResponse(account, balanceOf(balances, account)))
                 .toList();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AccountResponse create(@PathVariable UUID workspaceId, @Valid @RequestBody AccountRequest request) {
-        return mapper.toResponse(accountService.create(workspaceContext.getWorkspaceId(), mapper.toInput(request)));
+        Account account = accountService.create(workspaceContext.getWorkspaceId(), mapper.toInput(request));
+        // A brand-new account has no history, so both balances are its initial balance by definition.
+        return mapper.toResponse(account, Balance.ofInitial(account.getInitialBalanceCents()));
     }
 
     @PatchMapping("/{accountId}")
     public AccountResponse update(
             @PathVariable UUID workspaceId, @PathVariable UUID accountId, @Valid @RequestBody AccountRequest request) {
-        return mapper.toResponse(
-                accountService.update(workspaceContext.getWorkspaceId(), accountId, mapper.toInput(request)));
+        UUID scope = workspaceContext.getWorkspaceId();
+        Account account = accountService.update(scope, accountId, mapper.toInput(request));
+        return mapper.toResponse(account, balanceService.balanceOf(scope, account.getId()));
     }
 
     @DeleteMapping("/{accountId}")
@@ -61,6 +76,14 @@ public class AccountController {
 
     @PostMapping("/{accountId}/archive")
     public AccountResponse archive(@PathVariable UUID workspaceId, @PathVariable UUID accountId) {
-        return mapper.toResponse(accountService.archive(workspaceContext.getWorkspaceId(), accountId));
+        UUID scope = workspaceContext.getWorkspaceId();
+        Account account = accountService.archive(scope, accountId);
+        return mapper.toResponse(account, balanceService.balanceOf(scope, account.getId()));
+    }
+
+    /** An account the aggregate query never saw simply has no movements yet. */
+    private Balance balanceOf(Map<UUID, Balance> balances, Account account) {
+        Balance balance = balances.get(account.getId());
+        return balance != null ? balance : Balance.ofInitial(account.getInitialBalanceCents());
     }
 }

@@ -9,8 +9,9 @@ public record AccountResponse(
         String name,
         AccountType type,
         long initialBalanceCents,
-        /** Always null in E1 — balance calculation belongs to BE-3 (contract note). */
+        /** Initial balance + settled movements (R5). */
         Long balanceCents,
+        /** Initial balance + settled and pending movements — the "saldo projetado" (R5). */
         Long projectedBalanceCents,
         ContributionPillar defaultContributionPillar,
         String color,

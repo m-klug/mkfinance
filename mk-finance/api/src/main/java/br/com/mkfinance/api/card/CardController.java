@@ -65,6 +65,13 @@ public class CardController {
         return mapper.toResponse(card, cardService.availableLimitByCard(List.of(card)).get(card.getId()));
     }
 
+    /** Idempotent, mirroring {@code POST /accounts/{accountId}/archive}. */
+    @PostMapping("/{cardId}/archive")
+    public CardResponse archive(@PathVariable UUID workspaceId, @PathVariable UUID cardId) {
+        Card card = cardService.archive(workspaceContext.getWorkspaceId(), cardId);
+        return mapper.toResponse(card, cardService.availableLimitByCard(List.of(card)).get(card.getId()));
+    }
+
     @PostMapping("/{cardId}/purchases")
     @ResponseStatus(HttpStatus.CREATED)
     public CardPurchaseResponse createPurchase(
