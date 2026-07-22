@@ -66,27 +66,37 @@ Migrações aplicadas: `V1`, `V2` (E0/E1), **`V7`** (BE-3 — `transfer_directio
 
 ## 6. Pendências abertas — decisões do usuário
 
-### 6.1 Contrato: `transferDirection` ausente (levantada pela BE-3)
-O schema `Transaction` não expressa a direção da transferência e `amountCents` tem `minimum: 1`, então o front **não consegue distinguir entrada de saída** no extrato. Correção sugerida, aditiva e não-quebra: `transferDirection: { enum: [OUT, IN], nullable: true }`. O backend já persiste o dado (V7); faltaria só mapear.
+### 6.1–6.4 — ✅ RESOLVIDOS na passada de contrato pré-E3 (22/07/2026)
 
-### 6.2 Contrato: não há como arquivar um cartão (levantada pela BE-4)
-`Card.archived` existe e `listCards?includeArchived` existe, mas `CardRequest` não tem o campo e não há endpoint `/archive` (contas têm). Hoje `archived` é **inalcançável pela API**. Sugestão: `POST /cards/{cardId}/archive`, espelhando contas. **A FE-3 vai bater nisso.**
+Executada com nada mais rodando em paralelo, para não quebrar mocks de nenhuma frente. Gate: **165 testes backend** (151 + 14), **44 front**, build verde, regeneração do cliente sem nenhuma quebra (todas as mudanças foram aditivas).
 
-### 6.3 Contrato: códigos de erro a sincronizar
-A BE-4 adicionou `CARD_NOT_FOUND`, `CARD_ARCHIVED`, `PURCHASE_NOT_FOUND`, `STATEMENT_NOT_FOUND`, `STATEMENT_EMPTY`. A lista do contrato diz "include", então não é quebra — mas vale sincronizar.
+- **6.1 `transferDirection`** — exposto no schema `Transaction` (+ enum `TransferDirection`). O extrato já pode distinguir entrada de saída.
+- **6.2 Arquivar cartão** — `POST /cards/{cardId}/archive`, espelhando contas. Semântica confirmada por teste: fatura de cartão arquivado continua **legível e pagável**; só compras novas são recusadas.
+- **6.3 Códigos de erro** — sincronizados e reagrupados por área. Além dos 5 da BE-4, a BE-3 tinha outros 3 nunca listados: `CATEGORY_TYPE_MISMATCH`, `TRANSACTION_TYPE_IMMUTABLE`, `TRANSACTION_NOT_FOUND`.
+- **6.4 Saldos de conta** — `balanceCents`/`projectedBalanceCents` agora preenchidos. Ligados no `AccountController` (não no `AccountService`), espelhando o precedente de `CardController`/`availableLimitByCard` e evitando dependência `application/account → application/transaction`. Uma query agregada por listagem, sem N+1; `create()` pula a query.
 
-### 6.4 `AccountResponse.balanceCents` ainda retorna `null`
-O `AccountBalanceService` está pronto e testado, mas expô-lo exige editar `api/account/AccountMapper` e `application/account/AccountService` — **arquivos da BE-2**. Ambas as frentes de backend se recusaram a invadir a fatia alheia, corretamente. Mudança de ~5 linhas: injetar o serviço, chamar `balancesByAccount(workspaceId)` uma vez no endpoint de lista, passar cada `Balance` ao mapper.
-Não bloqueia o front (que trabalha contra mocks e já tem fallback isolado em `effectiveBalanceCents`), **mas bloqueia a INT-1**.
+**Nota de qualidade**: os dois testes da BE-2 que fixavam `balanceCents` em `null` foram atualizados para valores reais — eles codificavam justamente o comportamento incompleto que esta passada completou. Não foi teste dobrado para esconder quebra; a suíte ganhou um teste novo que confere a aritmética (100.000 + 20.000 − 30.000 = 90.000 atual, 85.000 projetado com um pendente).
+
+**Débito técnico introduzido conscientemente**: `TransferService.update` não aceita `contributionPillar` (sua assinatura recebe `TransactionInput`, que não tem o campo). Para não alterar código da BE-3, a passada criou `api/transaction/TransferUpdateHandler` (`@Transactional`), que grava o pilar pedido na perna de entrada antes de delegar — funciona pela garantia de identidade do JPA dentro da mesma transação, e o motor valida igual à criação. **É orquestração na camada de API por respeito à fronteira de propriedade, não o lugar certo.** Ação para a E3: mover para uma sobrecarga de `TransferService.update` e aposentar o handler.
+
+**Consistência corrigida de brinde**: `POST /transfers` *rejeitava* um pilar apontado a destino comum (`INVALID_CONTRIBUTION_PILLAR`), enquanto o update o *descartava em silêncio*. O update passou a concordar com a criação — checando o veredito do próprio motor, não re-derivando a regra, para ela seguir existindo num lugar só. Omitir o pilar continua significando "não mexer".
 
 ### 6.5 Sem endpoint de estorno de pagamento de fatura
 Excluir pelo `/transactions` a despesa gerada por um pagamento é bloqueado pelo FK de `statement_payment.transaction_id` → 409 `DATA_INTEGRITY_VIOLATION`. Protetivo e aceitável, mas o código de erro é genérico e não há caminho de estorno no contrato. Decisão de produto.
 
-### 6.6 Transferência não é editável no extrato
-Consequência do contrato, que só aceita payload INCOME/EXPENSE no update; editar um lado só corromperia o par espelhado. A FE-2 escondeu o editar em linhas TRANSFER — correção é excluir e relançar. Candidata a revisão na INT-1.
+### 6.6 Transferência não editável — ✅ RESOLVIDO (defeito de contrato, não decisão de produto)
+Diagnóstico correto: o backend **sempre soube** editar transferência. `TransferService.update` altera as duas pernas atomicamente (valor, data, descrição, nota, status, conta da perna, e re-derivação do pilar do aporte), com 14 testes de integração, e o `TransactionController` já roteava o `PATCH` para lá.
 
-### 6.7 Selects nativos em vez do `Select` do shadcn
-A FE-2 usou `<select>` estilizado nos forms (picker do SO no mobile, acessibilidade de graça, evita stubs de Radix no jsdom). Cria inconsistência visual com o design system; o componente do shadcn segue intocado e a reversão é possível.
+O que travava era uma **contradição interna do contrato**: a descrição do `PATCH /transactions/{id}` prometia *"Editing one leg of a transfer updates its pair atomically"*, mas o schema `TransactionRequest` declarava `type: enum [INCOME, EXPENSE]` e exigia `categoryId` — que uma transferência não tem. O cliente TypeScript gerado não conseguia montar payload válido, então a FE-2 escondeu o botão.
+
+**Decisão do usuário (22/07/2026): opção A** — endpoint dedicado `PATCH /transfers/{transactionId}` com payload próprio, mantendo o `TransactionRequest` rigoroso (exigir `categoryId` em INCOME/EXPENSE é validação que vale preservar). Aplicado na passada de contrato pré-E3.
+
+⚠️ **Pendente para a E3**: reexibir o botão de editar em linhas TRANSFER no extrato (`features/transactions/`). O contrato e o backend estão destravados; falta só a UI.
+
+### 6.7 Selects nativos — ✅ DECIDIDO: manter
+**Decisão do usuário (22/07/2026): manter os `<select>` nativos estilizados.** Razões que sustentam a escolha: picker do SO no mobile (o app é majoritariamente mobile), acessibilidade de teclado e leitor de tela sem trabalho extra, e evita os stubs de `hasPointerCapture`/`scrollIntoView` que o Radix exige no jsdom.
+
+**FE-3 e FE-4 devem seguir o mesmo padrão** — não introduzir o `Select` do shadcn em forms novos, sob pena de inconsistência visual entre telas. O componente do shadcn continua no repositório, intocado.
 
 ### 6.8 Bundle cruzou 500 kB
 O build agora emite aviso de chunk >500 kB (535,98 kB / 164,86 kB gzip). **É novo da E2** — no baseline da E1 eram 483,66 kB sem aviso. Não é erro, é dica de code-splitting. A FE-4 vai adicionar Recharts e piorar isso: considere `manualChunks` ou import dinâmico.
@@ -111,7 +121,12 @@ Fichas completas em `DESENVOLVIMENTO-MVP.md` §4. Rode isoladas em git worktrees
 - **FE-3 — Telas de cartão e fatura** `[react-specialist]` — ⚠️ depende de §6.2 (arquivar cartão) para a tela de cartões ficar completa.
 - **FE-4 — Dashboard** `[react-specialist]` — adiciona Recharts; ver §6.8.
 
-**Ordem sugerida**: aplicar os patches de contrato (§6.1, §6.2, §6.3) com o `java-architect` **antes** de lançar as frentes, já que nenhuma outra frente está rodando agora e mudar o contrato sob um front em execução quebraria os mocks dele. Depois `npm run api:generate` e as três frentes em paralelo.
+**A passada de contrato já foi feita** (§6.1–6.4 e §6.6 resolvidos). As três frentes podem ser lançadas em paralelo imediatamente.
+
+**Itens de UI/refino que sobraram e cabem nas fichas da E3:**
+- **FE-3** (ou ajuste pontual em `features/transactions/`): reexibir o botão de editar em linhas TRANSFER — contrato e backend destravados, falta só a UI. Os hooks `useUpdateTransfer` e `useArchiveCard` já existem gerados.
+- **BE-5**: mover o override de pilar para uma sobrecarga de `TransferService.update` e aposentar o `TransferUpdateHandler` (§6.1–6.4, nota de débito técnico).
+- **FE-4**: `manualChunks` ou import dinâmico ao adicionar Recharts (§6.8).
 
 ## 9. Gate da E3
 
