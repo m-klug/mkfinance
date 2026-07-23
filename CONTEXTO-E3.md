@@ -153,7 +153,7 @@ Fichas completas em `DESENVOLVIMENTO-MVP.md` §4. Rode isoladas em git worktrees
 **Itens de UI/refino que sobraram e cabem nas fichas da E3:**
 - **FE-3** (ou ajuste pontual em `features/transactions/`): reexibir o botão de editar em linhas TRANSFER — contrato e backend destravados, falta só a UI. Os hooks `useUpdateTransfer` e `useArchiveCard` já existem gerados.
 - **FE-3**: UI de estorno de pagamento (`useReverseStatementPayment` + array `payments` já gerados), tradução de `STATEMENT_PAYMENT_NOT_FOUND`, e revisar a redação de `STATEMENT_IMMUTABLE` (§6.5).
-- **BE-5**: mover o override de pilar para uma sobrecarga de `TransferService.update` e aposentar o `TransferUpdateHandler` (§6.1–6.4, nota de débito técnico).
+- ~~**BE-5**: aposentar o `TransferUpdateHandler`~~ — ✅ **FEITO (22/07/2026)**, fora do fluxo de frente. `TransferService.update` passou a receber um `TransferUpdateInput` dedicado (com `contributionPillar` de primeira classe), faz o próprio lookup pelo repositório (preservando a não-dependência de `TransactionService`) e resolve o pilar pela regra única `resolveContributionPillar`. O `PATCH /transactions` faz ponte para um `TransferUpdateInput` que mantém o pilar. Handler deletado; 175 testes verdes, nenhum reescrito; sem mudança de contrato/migração/front.
 - **FE-4**: `manualChunks` ou import dinâmico ao adicionar Recharts (§6.8).
 
 ## 9. Gate da E3
