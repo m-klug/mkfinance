@@ -1,11 +1,13 @@
-# MK Finance — internal HTTPS (PWA requires a secure context).
+# MK Finance — internal HTTPS with your own CA (PWA requires a secure context).
 #
-# Current setup: Caddy's internal CA (`tls internal`). Install the root cert on
-# each device, or switch to option (a) below when a real domain exists.
+# Current setup: a static leaf cert signed by your own root CA (see
+# certs/gen-ca.sh). Generate the CA + leaf once, trust certs/mkfinance-ca.crt on
+# each device, and the same root works on the PC and on the Proxmox LXC. The
+# site answers on both the hostname and the LXC IP.
 #
-# Option (a), recommended (PLANEJAMENTO §3.4): real domain + Let's Encrypt via
-# DNS-01 — valid cert everywhere, no exposed ports. Requires a Caddy build with
-# your DNS provider module, then:
+# Option (a), recommended when a real domain exists (PLANEJAMENTO §3.4): real
+# domain + Let's Encrypt via DNS-01 — valid cert everywhere, no exposed ports.
+# Requires a Caddy build with your DNS provider module, then:
 #
 #   mkfinance.home.example.com {
 #       tls {
@@ -14,12 +16,8 @@
 #       ...same routes...
 #   }
 
-{
-    local_certs
-}
-
-mkfinance.internal {
-    tls internal
+mkfinance.internal, 192.168.1.247 {
+    tls /etc/caddy/certs/mkfinance.crt /etc/caddy/certs/mkfinance.key
 
     handle /api/* {
         reverse_proxy api:8080

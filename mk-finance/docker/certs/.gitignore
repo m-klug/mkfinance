@@ -1,0 +1,11 @@
+# Private keys and generation artifacts — NEVER commit these.
+*.key
+*.srl
+*.csr
+
+# Generated leaf cert (recreated by gen-ca.sh; no reason to track it).
+mkfinance.crt
+
+# mkfinance-ca.crt (the public root) is intentionally trackable: commit it if
+# you want the repo to distribute the root for devices to trust. It carries no
+# secret — only the matching *.key does, and that is ignored above.
