@@ -158,13 +158,14 @@ docker compose -f mk-finance/docker/docker-compose.yml config -q
 
 Gate adicional por etapa — E1: registro/login manual via `curl` + front logando contra MSW; E2: cenário canônico de cartão validado (compra dia do fechamento, 3 parcelas, pagamento); E3: percentuais de alocação conferidos manualmente contra planilha do cenário canônico; E4: aceite do INT-1.
 
-## 6. Estado atual (E0 + E1 + E2 concluídas)
+## 6. Estado atual (E0 + E1 + E2 + E3 concluídas)
 
-> **E2 concluída em 22/07/2026 — gate verde**: backend 151 testes, front 44 testes, build e `docker compose config` OK, cenário canônico do cartão validado.
-> **O handoff operacional vive em `CONTEXTO-E3.md`** — leia-o antes de iniciar a E3. Ele traz o que a E2 entregou, as pendências abertas (patches de contrato, saldos de conta) e as armadilhas de orquestração descobertas.
+> **E3 concluída em 23/07/2026 — gate verde**: backend **187 testes**, front **74 testes**, build e `docker compose config` OK, percentuais de alocação do cenário canônico conferidos à mão.
+> **O handoff operacional vive em `CONTEXTO-E4.md`** — leia-o antes de iniciar a E4/INT-1. Traz o estado completo do MVP, o ponto crítico de integração (CSRF + context-path) e as armadilhas de orquestração.
 >
-> Resolvido nesta etapa: **Lombok nas entidades JPA, `record` nos DTOs** (decisão do usuário, 21/07/2026) — encerra a nota "a confirmar" abaixo.
-> Migrações aplicadas: V1, V2, **V7** (BE-3), **V9** (BE-4). V3–V6, V8, V10, V11 ficaram vagas — não renumere. BE-5 usa V12.
+> Todo o MVP funcional está implementado: falta só a INT-1 (ligar front↔API real, E2E, PWA, Docker final).
+> Decisões fechadas: **Lombok nas entidades / `record` nos DTOs**; **selects nativos** no front; estorno de pagamento via `DELETE /statements/{id}/payments/{paymentId}`.
+> Migrações aplicadas: V1, V2, **V7** (BE-3), **V9** (BE-4). V3–V6, V8, V10–V12 vagas — não renumere.
 
 ### 6.1 E0 + E1
 
