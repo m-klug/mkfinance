@@ -1,0 +1,16 @@
+# Keep the build context lean and, critically, never ship the host's
+# node_modules (wrong-arch native binaries) into the image — the Dockerfile
+# runs `npm ci` for a clean linux install before COPY . .
+node_modules
+dist
+coverage
+test-results
+playwright-report
+blob-report
+playwright/.cache
+.env.local
+.env.*.local
+*.local
+.DS_Store
+Dockerfile
+.dockerignore

@@ -1,0 +1,9 @@
+# The Dockerfile copies only pom.xml and src/, but keep the context small and
+# avoid leaking local build state anyway.
+target
+.mvn
+mvnw
+mvnw.cmd
+*.iml
+.idea
+.DS_Store
