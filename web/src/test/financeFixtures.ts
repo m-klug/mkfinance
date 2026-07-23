@@ -5,10 +5,14 @@ import {
   CategoryType,
   ContributionPillar,
   Pillar,
+  StatementStatus,
   TransactionStatus,
   TransactionType,
   type Account,
+  type Card,
   type Category,
+  type Statement,
+  type StatementDetail,
   type Transaction,
   type TransactionPage,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
@@ -109,6 +113,65 @@ export const pendingExpense: Transaction = {
   status: TransactionStatus.PENDING,
 };
 
+export const creditCard: Card = {
+  id: "card-nubank",
+  name: "Nubank",
+  brand: "Mastercard",
+  limitCents: 500000,
+  // limit − unpaid statements (R1): the backend fills this in.
+  availableLimitCents: 350000,
+  closingDay: 20,
+  dueDay: 5,
+  defaultPaymentAccountId: checkingAccount.id,
+  color: null,
+  archived: false,
+};
+
+export const archivedCard: Card = {
+  id: "card-old",
+  name: "Cartão Antigo",
+  brand: null,
+  limitCents: 100000,
+  availableLimitCents: 100000,
+  closingDay: 10,
+  dueDay: 20,
+  defaultPaymentAccountId: null,
+  color: null,
+  archived: true,
+};
+
+export const defaultCards: Card[] = [creditCard];
+
+// A R$ 100,00 purchase in 3× (33,33 / 33,33 / 33,34) landing on this statement,
+// mirroring the canonical scenario (CONTEXTO §3).
+export const openStatement: Statement = {
+  id: "stmt-2026-07",
+  cardId: creditCard.id,
+  referenceMonth: "2026-07",
+  closingDate: "2026-07-20",
+  dueDate: "2026-08-05",
+  status: StatementStatus.OPEN,
+  totalCents: 10000,
+  paidCents: 0,
+};
+
+export const openStatementDetail: StatementDetail = {
+  ...openStatement,
+  payments: [],
+  items: [
+    {
+      installmentId: "inst-1",
+      purchaseId: "purchase-1",
+      description: "Notebook",
+      categoryId: groceriesCategory.id,
+      amountCents: 3333,
+      purchaseDate: "2026-07-18",
+      installmentNumber: 1,
+      installmentCount: 3,
+    },
+  ],
+};
+
 export const defaultAccounts: Account[] = [checkingAccount, investmentAccount];
 export const defaultCategories: Category[] = [
   groceriesCategory,
@@ -147,5 +210,42 @@ export function financeReadHandlers({
     http.get("*/workspaces/:workspaceId/transactions", () =>
       HttpResponse.json(transactionPage(transactions)),
     ),
+  ];
+}
+
+interface CardHandlerOptions {
+  cards?: Card[];
+  /** Statements keyed by reference month (YYYY-MM); the list is filtered by from=to. */
+  statements?: Statement[];
+  detail?: StatementDetail;
+}
+
+/**
+ * Read handlers for the cards + statements screens. The statements list honours
+ * the from/to window so month navigation returns the matching statement only.
+ */
+export function cardReadHandlers({
+  cards = defaultCards,
+  statements = [openStatement],
+  detail = openStatementDetail,
+}: CardHandlerOptions = {}) {
+  return [
+    http.get("*/workspaces/:workspaceId/cards", ({ request }) => {
+      const includeArchived = new URL(request.url).searchParams.get("includeArchived") === "true";
+      return HttpResponse.json(includeArchived ? cards : cards.filter((card) => !card.archived));
+    }),
+    http.get("*/workspaces/:workspaceId/cards/:cardId/statements", ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      const from = params.get("from");
+      const to = params.get("to");
+      return HttpResponse.json(
+        statements.filter(
+          (statement) =>
+            (!from || statement.referenceMonth >= from) &&
+            (!to || statement.referenceMonth <= to),
+        ),
+      );
+    }),
+    http.get("*/workspaces/:workspaceId/statements/:statementId", () => HttpResponse.json(detail)),
   ];
 }
