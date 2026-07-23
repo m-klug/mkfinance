@@ -9,6 +9,7 @@ import RegisterPage from "@/features/auth/RegisterPage";
 import AccountsPage from "@/features/accounts/AccountsPage";
 import CategoriesPage from "@/features/categories/CategoriesPage";
 import TransactionsPage from "@/features/transactions/TransactionsPage";
+import DashboardPage from "@/features/dashboard/DashboardPage";
 
 // Feature screens land in FE-2/3/4; kept as translated placeholders here so
 // the shell and routing are fully navigable from E1 onward.
@@ -34,7 +35,7 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
-            <Route path="/" element={<Placeholder titleKey="nav.dashboard" />} />
+            <Route path="/" element={<DashboardPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
             <Route path="/cards" element={<Placeholder titleKey="nav.cards" />} />
