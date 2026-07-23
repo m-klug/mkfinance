@@ -167,6 +167,54 @@
     "FINANCIAL_FREEDOM": "Liberdade Financeira",
     "KNOWLEDGE": "Conhecimento"
   },
+  "dashboard": {
+    "month": {
+      "previous": "Mês anterior",
+      "next": "Próximo mês"
+    },
+    "allocation": {
+      "title": "Alocação por pilar",
+      "subtitle": "Quanto da renda do mês foi consumido em cada pilar, comparado ao alvo.",
+      "actualVsTarget": "{{actual}} · meta {{target}}%",
+      "targetTitle": "Alvo: {{target}}%",
+      "overrunBadge": "Estourou",
+      "overrunWarning": "{{count}} pilar(es) acima do alvo neste mês.",
+      "noIncomeWarning": "Sem receita registrada neste mês — mostrando os valores gastos, sem percentuais."
+    },
+    "balance": {
+      "title": "Saldo",
+      "subtitle": "Saldo total e por conta, com e sem investimentos.",
+      "total": "Saldo total",
+      "totalWithInvestments": "Com investimentos",
+      "investmentBadge": "Investimento",
+      "empty": "Nenhuma conta cadastrada ainda."
+    },
+    "incomeExpense": {
+      "title": "Receitas e despesas",
+      "subtitle": "Movimento do mês e comparação com o mês anterior.",
+      "income": "Receitas",
+      "expense": "Despesas",
+      "net": "Saldo do mês",
+      "vsPrevious": "{{value}} vs mês anterior",
+      "noComparison": "Sem mês anterior para comparar"
+    },
+    "categories": {
+      "title": "Gastos por categoria",
+      "subtitle": "Detalhe das despesas do mês, com filtro por pilar.",
+      "filterLabel": "Filtrar por pilar",
+      "allPillars": "Todos",
+      "unknown": "Sem categoria",
+      "empty": "Nenhuma despesa no período."
+    },
+    "statements": {
+      "title": "Faturas abertas",
+      "subtitle": "Faturas em aberto e próximos vencimentos.",
+      "empty": "Nenhuma fatura em aberto.",
+      "dueOn": "Vence em {{date}}",
+      "dueSoon": "Vence em breve",
+      "remaining": "Em aberto"
+    }
+  },
   "error": {
     "UNKNOWN_ERROR": "Algo deu errado. Tente novamente.",
     "EMAIL_ALREADY_USED": "Este e-mail já está em uso.",
