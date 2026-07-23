@@ -197,6 +197,7 @@ continuam valendo — não precisa re-trustar nada.
 |---|---|---|
 | "Safari can't find the server" | nome não resolve ou host inalcançável | teste pelo IP; `ping <ip>`; `nc -vz <ip> 443`; `/etc/hosts` + flushcache |
 | Aviso de certificado | CA não confiável no dispositivo | trustar `mkfinance-ca.crt` (passo 3); reabrir o navegador |
+| iOS: "não estabelece conexão segura" (Mac funciona) | folha com validade > 398 dias e/ou sem AKI — o iOS é mais rígido | rerode `gen-ca.sh` (já gera folha de 398 dias com AKI, reaproveitando a CA), recopie a folha e `docker compose restart caddy`. Não precisa re-trustar |
 | `platform (arm64) does not match (amd64)` | imagem buildada em Apple Silicon | rebuild com `DOCKER_DEFAULT_PLATFORM=linux/amd64` (passo 2) |
 | Caddy não sobe | falta `Caddyfile` ou a folha em `certs/` | conferir arquivos (passo 4); `docker compose logs caddy` |
 | `compose up` tenta buildar | imagens não carregadas | `docker load` das imagens (passo 5) |

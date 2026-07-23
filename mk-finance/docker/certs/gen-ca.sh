@@ -18,7 +18,9 @@ CA_CRT=mkfinance-ca.crt
 LEAF_KEY=mkfinance.key
 LEAF_CRT=mkfinance.crt
 CA_DAYS=3650   # root CA validity (~10 years)
-LEAF_DAYS=825  # leaf validity — 825 is the max Apple/Chrome accept; rerun to renew
+LEAF_DAYS=398  # leaf validity — iOS/Safari REJECT server certs valid for more than 398 days
+               # (Apple, certs issued after 2020-09-01). Rerun this script to renew (~yearly);
+               # it reuses the CA, so devices stay trusted — only the leaf is replaced.
 HOST=mkfinance.internal
 
 # Names/addresses the leaf cert is valid for. The Proxmox LXC IP is included so
@@ -34,8 +36,14 @@ if [[ -f "$CA_KEY" && -f "$CA_CRT" ]]; then
 else
   echo "==> Generating root CA (valid ${CA_DAYS} days)"
   openssl genrsa -out "$CA_KEY" 4096
+  # Explicit CA extensions (not relying on the system openssl.cnf) so iOS accepts the root:
+  # a critical CA:TRUE and keyCertSign are what strict validators require of a signing CA.
   openssl req -x509 -new -nodes -key "$CA_KEY" -sha256 -days "$CA_DAYS" \
-    -subj "/CN=MK Finance Internal CA" -out "$CA_CRT"
+    -subj "/CN=MK Finance Internal CA" \
+    -addext "basicConstraints=critical,CA:TRUE" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" \
+    -addext "subjectKeyIdentifier=hash" \
+    -out "$CA_CRT"
 fi
 
 # 2) Leaf cert for the site, signed by the CA.
@@ -45,7 +53,7 @@ openssl genrsa -out "$LEAF_KEY" 2048
 openssl req -new -key "$LEAF_KEY" -subj "/CN=${HOST}" -out mkfinance.csr
 openssl x509 -req -in mkfinance.csr -CA "$CA_CRT" -CAkey "$CA_KEY" -CAcreateserial \
   -days "$LEAF_DAYS" -sha256 \
-  -extfile <(printf "subjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth" "$SAN") \
+  -extfile <(printf "subjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer" "$SAN") \
   -out "$LEAF_CRT"
 rm -f mkfinance.csr
 
