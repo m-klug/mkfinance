@@ -1,4 +1,14 @@
-# Contexto para execução da E4 / INT-1 — MK Finance
+# Contexto — MK Finance (INT-1 CONCLUÍDA · MVP entregue)
+
+> ✅ **MVP COMPLETO em 23/07/2026 (commit `54bac2a`).** As 6 fases da INT-1 foram entregues e verificadas: API real ligada (context-path `/api` + CSRF, o fix foi o cookie `XSRF-TOKEN` em `path("/")`), smoke E2E Playwright, PWA instalável, stack Docker em HTTPS (CA interna) e restore de backup testado. Gate final verde: backend 187 testes, front 74 + build + PWA, `docker compose config` OK.
+>
+> **Pós-MVP em aberto (não bloqueiam):** `git push` (só o usuário, trava de segurança); `npm audit` = 5 vulnerabilidades (1 moderada, 4 altas) das devDeps novas (Playwright/PWA); domínio real + DNS-01 no Caddy; absorção do app `IR/` na Fase 5.
+>
+> ⚠️ **Lição operacional:** após mergear branch que adiciona deps npm, rodar `npm install` no checkout principal ANTES do gate — o `node_modules` do worktree mascara a falta e o `main` quebra com `ERR_MODULE_NOT_FOUND`.
+>
+> O texto abaixo foi o handoff usado para EXECUTAR a INT-1; fica como registro do que foi feito.
+
+---
 
 > **Leia este arquivo primeiro.** Handoff autocontido para iniciar a Etapa E4 (INT-1, integração & entrega) num chat novo.
 > Detalhamento: `PLANEJAMENTO.md` (verdade de negócio) e `DESENVOLVIMENTO-MVP.md` (fichas/convenções, ficha INT-1 em §4).
