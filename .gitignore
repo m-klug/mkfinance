@@ -16,5 +16,8 @@ coverage/
 .env.local
 .env.*.local
 
+# Postgres dumps written by the docker `backup` service — never commit data.
+mk-finance/docker/backups/
+
 # Claude Code machine-local settings (agents/ and launch.json ARE tracked)
 .claude/settings.local.json
