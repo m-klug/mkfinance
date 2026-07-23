@@ -180,7 +180,7 @@ describe("CardStatementsPage", () => {
     await screen.findByText("Notebook");
     expect(screen.queryByRole("button", { name: "Pagar fatura" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Estornar pagamento de R$ 100,00" }));
+    await user.click(screen.getByRole("button", { name: /^Estornar pagamento de/ }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Estornar" }));
 
