@@ -1,5 +1,6 @@
 package br.com.mkfinance.application.card;
 
+import br.com.mkfinance.application.common.BusinessClock;
 import br.com.mkfinance.application.transaction.TransactionService;
 import br.com.mkfinance.domain.exception.AppException;
 import br.com.mkfinance.domain.model.Card;
