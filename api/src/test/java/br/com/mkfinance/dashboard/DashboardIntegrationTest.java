@@ -191,10 +191,6 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
 
     // --- helpers ---
 
-    private long nonEmptyLinesCount(String text) {
-        return text.lines().filter(l -> !l.isBlank()).count();
-    }
-
     private java.util.List<String> nonEmptyLines(String text) {
         return text.lines().filter(l -> !l.isBlank()).toList();
     }
