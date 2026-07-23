@@ -19,23 +19,31 @@ import {
   getListTransactionsQueryKey,
   useUpdateTransaction,
 } from "@/lib/api/generated/transactions/transactions";
+import { useUpdateTransfer } from "@/lib/api/generated/transfers/transfers";
 import {
   CategoryType,
+  ContributionPillar,
   TransactionRequestType,
   TransactionStatus,
   TransactionType,
+  TransferDirection,
   type Account,
   type Category,
   type Transaction,
   type TransactionRequest,
+  type TransferUpdateRequest,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { categoryOptions } from "@/features/transactions/transactionUtils";
+import {
+  contributionPillarOptions,
+  isContributionAccount,
+} from "@/features/accounts/accountOptions";
 
 interface TransactionFormDialogProps {
   workspaceId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Income/expense only — transfer legs are edited as a pair by the API. */
+  /** Income/expense edits its own row; a transfer leg edits its pair atomically. */
   transaction: Transaction;
   accounts: Account[];
   categories: Category[];
@@ -49,6 +57,7 @@ interface FormState {
   description: string;
   note: string;
   status: TransactionStatus;
+  contributionPillar: string;
 }
 
 function toFormState(transaction: Transaction): FormState {
@@ -60,6 +69,8 @@ function toFormState(transaction: Transaction): FormState {
     description: transaction.description,
     note: transaction.note ?? "",
     status: transaction.status,
+    contributionPillar:
+      transaction.contributionPillar ?? ContributionPillar.FINANCIAL_FREEDOM,
   };
 }
 
@@ -78,6 +89,8 @@ export function TransactionFormDialog({
     {},
   );
 
+  const isTransfer = transaction.type === TransactionType.TRANSFER;
+
   useEffect(() => {
     if (open) {
       setForm(toFormState(transaction));
@@ -86,6 +99,8 @@ export function TransactionFormDialog({
   }, [open, transaction]);
 
   const updateMutation = useUpdateTransaction();
+  const updateTransferMutation = useUpdateTransfer();
+  const isPending = updateMutation.isPending || updateTransferMutation.isPending;
 
   const availableCategories = useMemo(() => {
     const wanted =
@@ -93,14 +108,58 @@ export function TransactionFormDialog({
     return categories.filter((category) => category.type === wanted && !category.system);
   }, [categories, transaction.type]);
 
+  // R9: a contribution lives on the IN leg landing in an investment/savings
+  // account. Only then may the pillar be re-targeted; anywhere else the API
+  // answers INVALID_CONTRIBUTION_PILLAR, so the selector stays hidden.
+  const selectedAccount = accounts.find((account) => account.id === form.accountId);
+  const showPillar =
+    isTransfer &&
+    transaction.transferDirection === TransferDirection.IN &&
+    Boolean(selectedAccount && isContributionAccount(selectedAccount));
+
+  function invalidateAfterWrite() {
+    void queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey(workspaceId) });
+    void queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey(workspaceId) });
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors: { amount?: string; description?: string; category?: string } = {};
     if (form.amountCents <= 0) nextErrors.amount = t("validation.amountPositive");
     if (!form.description.trim()) nextErrors.description = t("validation.required");
-    if (!form.categoryId) nextErrors.category = t("validation.required");
+    if (!isTransfer && !form.categoryId) nextErrors.category = t("validation.required");
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
+
+    const onSuccess = () => {
+      invalidateAfterWrite();
+      toast.success(t("transactions.updated"));
+      onOpenChange(false);
+    };
+    const onError = (error: unknown) => {
+      toast.error(translateApiError(t, error));
+    };
+
+    if (isTransfer) {
+      const data: TransferUpdateRequest = {
+        // Sending the current leg account keeps it in place; picking another
+        // moves only this leg (pointing at the sibling's is rejected by the API).
+        accountId: form.accountId,
+        amountCents: form.amountCents,
+        date: form.date,
+        description: form.description.trim(),
+        note: form.note.trim() || null,
+        status: form.status,
+        contributionPillar: showPillar
+          ? (form.contributionPillar as ContributionPillar)
+          : null,
+      };
+      updateTransferMutation.mutate(
+        { workspaceId, transactionId: transaction.id, data },
+        { onSuccess, onError },
+      );
+      return;
+    }
 
     const data: TransactionRequest = {
       accountId: form.accountId,
@@ -118,19 +177,7 @@ export function TransactionFormDialog({
 
     updateMutation.mutate(
       { workspaceId, transactionId: transaction.id, data },
-      {
-        onSuccess: () => {
-          void queryClient.invalidateQueries({
-            queryKey: getListTransactionsQueryKey(workspaceId),
-          });
-          void queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey(workspaceId) });
-          toast.success(t("transactions.updated"));
-          onOpenChange(false);
-        },
-        onError: (error) => {
-          toast.error(translateApiError(t, error));
-        },
-      },
+      { onSuccess, onError },
     );
   }
 
@@ -138,7 +185,9 @@ export function TransactionFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("transactions.editTitle")}</DialogTitle>
+          <DialogTitle>
+            {isTransfer ? t("transactions.editTransferTitle") : t("transactions.editTitle")}
+          </DialogTitle>
           <DialogDescription>{t(`transactionType.${transaction.type}`)}</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
@@ -158,19 +207,21 @@ export function TransactionFormDialog({
             error={errors.description}
             onChange={(event) => setForm({ ...form, description: event.target.value })}
           />
-          <SelectField
-            id="transaction-category"
-            label={t("transactions.category")}
-            placeholder={t("transactions.categoryPlaceholder")}
-            options={categoryOptions(availableCategories)}
-            value={form.categoryId}
-            error={errors.category}
-            onChange={(event) => setForm({ ...form, categoryId: event.target.value })}
-          />
+          {!isTransfer && (
+            <SelectField
+              id="transaction-category"
+              label={t("transactions.category")}
+              placeholder={t("transactions.categoryPlaceholder")}
+              options={categoryOptions(availableCategories)}
+              value={form.categoryId}
+              error={errors.category}
+              onChange={(event) => setForm({ ...form, categoryId: event.target.value })}
+            />
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
               id="transaction-account"
-              label={t("transactions.account")}
+              label={isTransfer ? t("transactions.legAccount") : t("transactions.account")}
               options={accounts.map((account) => ({ value: account.id, label: account.name }))}
               value={form.accountId}
               onChange={(event) => setForm({ ...form, accountId: event.target.value })}
@@ -183,6 +234,18 @@ export function TransactionFormDialog({
               onChange={(event) => setForm({ ...form, date: event.target.value })}
             />
           </div>
+          {showPillar && (
+            <SelectField
+              id="transaction-contribution-pillar"
+              label={t("transactions.contributionPillar")}
+              hint={t("transactions.contributionPillarHint")}
+              options={contributionPillarOptions(t)}
+              value={form.contributionPillar}
+              onChange={(event) =>
+                setForm({ ...form, contributionPillar: event.target.value })
+              }
+            />
+          )}
           <SelectField
             id="transaction-status"
             label={t("transactions.status")}
@@ -206,8 +269,8 @@ export function TransactionFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? t("common.saving") : t("common.save")}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </form>

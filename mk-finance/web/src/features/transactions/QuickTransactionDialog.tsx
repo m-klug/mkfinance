@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyField, SelectField, TextField } from "@/components/form/fields";
+import { formatCents } from "@/lib/format";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import {
@@ -21,6 +22,12 @@ import {
   useListAccounts,
 } from "@/lib/api/generated/accounts/accounts";
 import { useListCategories } from "@/lib/api/generated/categories/categories";
+import {
+  getListCardsQueryKey,
+  useCreateCardPurchase,
+  useListCards,
+} from "@/lib/api/generated/cards/cards";
+import { getListStatementsQueryKey } from "@/lib/api/generated/statements/statements";
 import {
   getListTransactionsQueryKey,
   useCreateTransaction,
@@ -32,6 +39,7 @@ import {
   TransactionRequestType,
   TransactionStatus,
   type Account,
+  type CardPurchaseRequest,
   type TransactionRequest,
   type TransferRequest,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
@@ -44,12 +52,14 @@ import {
   categoryOptions,
   todayIso,
 } from "@/features/transactions/transactionUtils";
+import { INSTALLMENT_COUNTS, splitInstallments } from "@/features/cards/cardOptions";
 
-// The four things a user can register from anywhere in the app. A contribution
+// The things a user can register from anywhere in the app. A contribution
 // (aporte, R9) is a transfer into a savings/investment account, so it shares
 // the transfer payload — it is a separate tab only because it is a distinct
-// intention, and it pre-filters the destination to eligible accounts.
-const QUICK_MODES = ["EXPENSE", "INCOME", "TRANSFER", "CONTRIBUTION"] as const;
+// intention, and it pre-filters the destination to eligible accounts. A card
+// purchase (compra no cartão) posts to a card and generates its installments.
+const QUICK_MODES = ["EXPENSE", "INCOME", "TRANSFER", "CONTRIBUTION", "CARD"] as const;
 type QuickMode = (typeof QUICK_MODES)[number];
 
 interface QuickTransactionDialogProps {
@@ -62,6 +72,7 @@ interface FormErrors {
   description?: string;
   category?: string;
   accounts?: string;
+  card?: string;
 }
 
 export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionDialogProps) {
@@ -76,6 +87,8 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
   const [accountId, setAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [cardId, setCardId] = useState("");
+  const [installmentCount, setInstallmentCount] = useState(1);
   const [pending, setPending] = useState(false);
   // Null means "follow the destination account default" (R9).
   const [pillarOverride, setPillarOverride] = useState<ContributionPillar | null>(null);
@@ -92,11 +105,18 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     undefined,
     { query: { enabled } },
   );
+  const { data: cardsData } = useListCards(workspaceId ?? "", undefined, {
+    query: { enabled },
+  });
 
   const accounts = useMemo(() => activeAccounts(accountsData ?? []), [accountsData]);
   const contributionAccounts = useMemo(
     () => accounts.filter(isContributionAccount),
     [accounts],
+  );
+  const cards = useMemo(
+    () => (cardsData ?? []).filter((card) => !card.archived),
+    [cardsData],
   );
 
   const categories = useMemo(() => {
@@ -107,7 +127,15 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
   }, [categoriesData, mode]);
 
   const isTransferLike = mode === "TRANSFER" || mode === "CONTRIBUTION";
+  const isCardMode = mode === "CARD";
   const destinationAccounts = mode === "CONTRIBUTION" ? contributionAccounts : accounts;
+
+  // Preview mirrors the backend split: the cent remainder rides the last
+  // installment (R1), e.g. 100,00 in 3× → 33,33 + 33,33 + 33,34.
+  const installmentPreview = useMemo(
+    () => (amountCents > 0 ? splitInstallments(amountCents, installmentCount) : []),
+    [amountCents, installmentCount],
+  );
 
   // Reset to a clean, ready-to-submit state every time the modal opens: the
   // whole point of the quick entry is to reach "save" in <= 5 interactions,
@@ -118,6 +146,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     setDescription("");
     setDate(todayIso());
     setCategoryId("");
+    setInstallmentCount(1);
     setPillarOverride(null);
     setPending(false);
     setErrors({});
@@ -129,6 +158,13 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
       accounts.some((account) => account.id === current) ? current : accounts[0].id,
     );
   }, [open, accounts]);
+
+  useEffect(() => {
+    if (!open || cards.length === 0) return;
+    setCardId((current) =>
+      cards.some((card) => card.id === current) ? current : cards[0].id,
+    );
+  }, [open, cards]);
 
   useEffect(() => {
     if (!open) return;
@@ -154,14 +190,18 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
 
   const createTransaction = useCreateTransaction();
   const createTransfer = useCreateTransfer();
-  const isSubmitting = createTransaction.isPending || createTransfer.isPending;
+  const createCardPurchase = useCreateCardPurchase();
+  const isSubmitting =
+    createTransaction.isPending || createTransfer.isPending || createCardPurchase.isPending;
 
   function validate(): FormErrors {
     const next: FormErrors = {};
     if (amountCents <= 0) next.amount = t("validation.amountPositive");
     if (!description.trim()) next.description = t("validation.required");
     if (!isTransferLike && !categoryId) next.category = t("validation.required");
-    if (isTransferLike) {
+    if (isCardMode) {
+      if (!cardId) next.card = t("validation.required");
+    } else if (isTransferLike) {
       if (!accountId || !toAccountId) next.accounts = t("validation.transferAccountsRequired");
       else if (accountId === toAccountId) next.accounts = t("validation.transferAccountsDistinct");
     } else if (!accountId) {
@@ -192,6 +232,33 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     const onError = (error: unknown) => {
       toast.error(translateApiError(t, error));
     };
+
+    if (isCardMode) {
+      const data: CardPurchaseRequest = {
+        categoryId,
+        description: description.trim(),
+        totalAmountCents: amountCents,
+        purchaseDate: date,
+        installmentCount,
+      };
+      createCardPurchase.mutate(
+        { workspaceId, cardId, data },
+        {
+          onSuccess: () => {
+            // A purchase moves the available limit and the card's statements,
+            // but creates no account transaction until the bill is paid.
+            void queryClient.invalidateQueries({ queryKey: getListCardsQueryKey(workspaceId) });
+            void queryClient.invalidateQueries({
+              queryKey: getListStatementsQueryKey(workspaceId, cardId),
+            });
+            toast.success(t("quickEntry.cardPurchaseCreated"));
+            onOpenChange(false);
+          },
+          onError,
+        },
+      );
+      return;
+    }
 
     if (isTransferLike) {
       const data: TransferRequest = {
@@ -266,33 +333,82 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
             />
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SelectField
-              id="quick-account"
-              label={isTransferLike ? t("transactions.fromAccount") : t("transactions.account")}
-              options={accounts.map((account) => ({ value: account.id, label: account.name }))}
-              value={accountId}
-              error={errors.accounts}
-              onChange={(event) => setAccountId(event.target.value)}
-            />
-            {isTransferLike && (
+          {!isCardMode && (
+            <div className="grid gap-4 sm:grid-cols-2">
               <SelectField
-                id="quick-to-account"
-                label={t("transactions.toAccount")}
-                placeholder={t("transactions.toAccountPlaceholder")}
-                options={destinationAccounts.map((account) => ({
-                  value: account.id,
-                  label: account.name,
-                }))}
-                value={toAccountId}
-                onChange={(event) => {
-                  setToAccountId(event.target.value);
-                  // A new destination re-applies that account's default pillar.
-                  setPillarOverride(null);
-                }}
+                id="quick-account"
+                label={isTransferLike ? t("transactions.fromAccount") : t("transactions.account")}
+                options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+                value={accountId}
+                error={errors.accounts}
+                onChange={(event) => setAccountId(event.target.value)}
               />
-            )}
-          </div>
+              {isTransferLike && (
+                <SelectField
+                  id="quick-to-account"
+                  label={t("transactions.toAccount")}
+                  placeholder={t("transactions.toAccountPlaceholder")}
+                  options={destinationAccounts.map((account) => ({
+                    value: account.id,
+                    label: account.name,
+                  }))}
+                  value={toAccountId}
+                  onChange={(event) => {
+                    setToAccountId(event.target.value);
+                    // A new destination re-applies that account's default pillar.
+                    setPillarOverride(null);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {isCardMode && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectField
+                  id="quick-card"
+                  label={t("quickEntry.card")}
+                  placeholder={t("quickEntry.cardPlaceholder")}
+                  options={cards.map((card) => ({ value: card.id, label: card.name }))}
+                  value={cardId}
+                  error={errors.card}
+                  onChange={(event) => setCardId(event.target.value)}
+                />
+                <SelectField
+                  id="quick-installments"
+                  label={t("quickEntry.installments")}
+                  options={INSTALLMENT_COUNTS.map((count) => ({
+                    value: String(count),
+                    label: String(count),
+                  }))}
+                  value={String(installmentCount)}
+                  onChange={(event) => setInstallmentCount(Number(event.target.value))}
+                />
+              </div>
+              {installmentPreview.length > 0 && (
+                <div className="rounded-md border p-3 text-sm">
+                  <p className="mb-1 font-medium">{t("quickEntry.installmentPreview")}</p>
+                  <ul className="flex flex-col gap-0.5">
+                    {installmentPreview.map((cents, index) => (
+                      <li
+                        key={index}
+                        className="flex justify-between tabular-nums text-muted-foreground"
+                      >
+                        <span>
+                          {t("statement.installmentOf", {
+                            number: index + 1,
+                            count: installmentCount,
+                          })}
+                        </span>
+                        <span>{formatCents(cents)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
 
           {isTransferLike && isContribution && (
             <SelectField
@@ -310,12 +426,12 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
               id="quick-date"
-              label={t("transactions.date")}
+              label={isCardMode ? t("quickEntry.purchaseDate") : t("transactions.date")}
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}
             />
-            {!isTransferLike && (
+            {!isTransferLike && !isCardMode && (
               <label className="flex items-end gap-2 pb-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
