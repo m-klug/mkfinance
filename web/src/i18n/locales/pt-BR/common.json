@@ -314,8 +314,5 @@
     "PAYMENT_EXCEEDS_REMAINING": "O valor excede o restante da fatura.",
     "INVITE_EXPIRED": "Este convite expirou ou já foi usado.",
     "VALIDATION_ERROR": "Verifique os campos destacados."
-  },
-  "placeholder": {
-    "underConstruction": "Em construção — esta tela chega nas próximas etapas."
   }
 }
