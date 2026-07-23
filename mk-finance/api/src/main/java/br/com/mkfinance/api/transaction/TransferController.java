@@ -1,5 +1,6 @@
 package br.com.mkfinance.api.transaction;
 
+import br.com.mkfinance.application.transaction.TransferPair;
 import br.com.mkfinance.application.transaction.TransferService;
 import br.com.mkfinance.infrastructure.security.WorkspaceContext;
 import jakarta.validation.Valid;
@@ -31,7 +32,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class TransferController {
 
     private final TransferService transferService;
-    private final TransferUpdateHandler updateHandler;
     private final TransactionMapper mapper;
     private final WorkspaceContext workspaceContext;
 
@@ -44,13 +44,16 @@ public class TransferController {
 
     /**
      * Edits both legs atomically through either one. Returns the leg named in the path — not always
-     * the outgoing one — since that is the row the caller was looking at.
+     * the outgoing one — since that is the row the caller was looking at, echoing the contribution
+     * pillar from the IN leg where it lives (R9).
      */
     @PatchMapping("/{transactionId}")
     public TransactionResponse update(
             @PathVariable UUID workspaceId,
             @PathVariable UUID transactionId,
             @Valid @RequestBody TransferUpdateRequest request) {
-        return updateHandler.update(workspaceContext.getWorkspaceId(), transactionId, request);
+        TransferPair pair = transferService.update(
+                workspaceContext.getWorkspaceId(), transactionId, mapper.toInput(request));
+        return mapper.toResponse(pair.legById(transactionId), pair.incoming().getContributionPillar());
     }
 }

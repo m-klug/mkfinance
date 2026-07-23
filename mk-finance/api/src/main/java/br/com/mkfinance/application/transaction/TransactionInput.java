@@ -9,8 +9,10 @@ import java.util.UUID;
  * Service-layer command for an INCOME/EXPENSE entry, decoupled from the api-layer
  * {@code TransactionRequest} DTO.
  *
- * <p>When this updates an existing transfer leg, {@code type} and {@code categoryId} are ignored:
- * a transfer has no category and its type cannot change (TRANSACTION_TYPE_IMMUTABLE).
+ * <p>When {@code PATCH /transactions} addresses a transfer leg, {@code type} and {@code categoryId}
+ * are dropped as the request is bridged to {@link TransferUpdateInput}: a transfer has no category
+ * and its type cannot change (TRANSACTION_TYPE_IMMUTABLE). Re-targeting a contribution pillar is not
+ * possible here — that goes through {@code PATCH /transfers}.
  */
 public record TransactionInput(
         UUID accountId,

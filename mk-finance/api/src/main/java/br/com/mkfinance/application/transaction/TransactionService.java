@@ -100,7 +100,18 @@ public class TransactionService {
         Transaction transaction = get(workspaceId, transactionId);
 
         if (transaction.isTransfer()) {
-            return transferService.update(workspaceId, transaction, input);
+            // This endpoint has no pillar field, so a transfer edited here keeps whichever pillar it
+            // already carries (null = "leave alone"); re-targeting a contribution goes through
+            // PATCH /transfers. The reload inside the engine is a persistence-context hit, no SQL.
+            TransferUpdateInput transferInput = new TransferUpdateInput(
+                    input.accountId(),
+                    input.amountCents(),
+                    input.date(),
+                    input.description(),
+                    input.note(),
+                    input.status(),
+                    null);
+            return transferService.update(workspaceId, transactionId, transferInput).legById(transactionId);
         }
         if (input.type() == TransactionType.TRANSFER) {
             throw AppException.transactionTypeImmutable();

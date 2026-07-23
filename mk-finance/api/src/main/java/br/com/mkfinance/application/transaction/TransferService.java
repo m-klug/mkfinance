@@ -83,15 +83,35 @@ public class TransferService {
     }
 
     /**
-     * Applies an edit to both legs. Shared facts (amount, date, description, note, status) are
-     * mirrored; {@code accountId} only moves the leg being edited, since each side lives on its own
-     * account. The contribution pillar is then re-derived from whichever account the IN leg now
-     * points at: moving a contribution to a checking account drops the pillar, while moving it to
-     * another investment account keeps the pillar already chosen (falling back to the new account's
-     * default only when there is none) — a deliberate choice the user made is not silently
-     * overwritten by a destination's default.
+     * Applies an edit to both legs, addressed through either one. Shared facts (amount, date,
+     * description, note, status) are mirrored; {@code accountId} only moves the leg being edited,
+     * since each side lives on its own account.
+     *
+     * <p>The contribution pillar (R9) is resolved as an input, not read back as state: an explicit
+     * {@link TransferUpdateInput#contributionPillar()} re-targets the contribution and is refused
+     * with INVALID_CONTRIBUTION_PILLAR when the destination takes none — exactly as on creation,
+     * from the same rule ({@link #resolveContributionPillar}). Omitting it carries the current pillar
+     * forward against whatever account the IN leg now points at: moving a contribution to a checking
+     * account drops it, while moving it to another investment account keeps the pillar already
+     * chosen (falling back to the new account's default only when there is none), so a deliberate
+     * choice is never silently overwritten by a destination's default.
+     *
+     * <p>Loads the addressed leg itself (through {@code transactionRepository}, not
+     * {@code TransactionService}) so the endpoint needs a single call and this service keeps its
+     * one-directional relationship with {@link TransactionService}. Returns the pair so the caller
+     * can answer with the leg it addressed while echoing the pillar, which lives on the IN leg.
+     *
+     * @throws AppException TRANSACTION_NOT_FOUND when the id is not a transfer leg — a plain
+     *     INCOME/EXPENSE id included, since "no such transfer" is the honest answer and leaks
+     *     nothing about what the id really is
      */
-    public Transaction update(UUID workspaceId, Transaction leg, TransactionInput input) {
+    public TransferPair update(UUID workspaceId, UUID transactionId, TransferUpdateInput input) {
+        Transaction leg = transactionRepository
+                .findByIdAndWorkspaceId(transactionId, workspaceId)
+                .orElseThrow(AppException::transactionNotFound);
+        if (!leg.isTransfer()) {
+            throw AppException.transactionNotFound();
+        }
         Transaction sibling = requireSibling(leg);
         if (input.accountId() != null && !input.accountId().equals(leg.getAccountId())) {
             Account account = TransactionLookup.ownedAccount(accountRepository, workspaceId, input.accountId());
@@ -114,14 +134,17 @@ public class TransferService {
         Transaction incoming = leg.getTransferDirection() == TransferDirection.IN ? leg : sibling;
         Transaction outgoing = incoming == leg ? sibling : leg;
         Account destination = TransactionLookup.ownedAccount(accountRepository, workspaceId, incoming.getAccountId());
-        // Only carry the current pillar forward while the destination still accepts one; otherwise
-        // it must be dropped, not rejected — moving a contribution to a checking account is legal.
-        ContributionPillar carried = isContributionTarget(destination) ? incoming.getContributionPillar() : null;
+        // An explicit pillar re-targets the contribution; omitting it carries the current one forward
+        // while the destination still accepts one (dropped, not rejected, on a plain account). Either
+        // way resolveContributionPillar has the final say, so the create/edit rule stays in one place.
+        ContributionPillar requested = input.contributionPillar() != null
+                ? input.contributionPillar()
+                : (isContributionTarget(destination) ? incoming.getContributionPillar() : null);
         outgoing.setContributionPillar(null);
-        incoming.setContributionPillar(resolveContributionPillar(destination, carried));
+        incoming.setContributionPillar(resolveContributionPillar(destination, requested));
 
         transactionRepository.saveAll(List.of(outgoing, incoming));
-        return leg;
+        return new TransferPair(outgoing, incoming);
     }
 
     /** Settles both legs — a half-settled transfer would make one account's balance wrong. */
