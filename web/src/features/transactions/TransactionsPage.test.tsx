@@ -12,15 +12,38 @@ import {
   defaultCategories,
   financeReadHandlers,
   groceriesCategory,
+  investmentAccount,
   pendingExpense,
   settledExpense,
   streamingCategory,
   transactionPage,
 } from "@/test/financeFixtures";
 import {
+  ContributionPillar,
   TransactionStatus,
+  TransactionType,
+  TransferDirection,
+  type Transaction,
   type TransactionRequest,
+  type TransferUpdateRequest,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
+
+// A contribution is the IN leg of a transfer landing in an investment account
+// (R9), so it is the case that exercises both the transfer edit path and the
+// pillar re-targeting selector.
+const contributionLeg: Transaction = {
+  id: "tx-transfer-in",
+  accountId: investmentAccount.id,
+  categoryId: null,
+  type: TransactionType.TRANSFER,
+  amountCents: 100000,
+  date: "2026-07-10",
+  description: "Aporte mensal",
+  status: TransactionStatus.SETTLED,
+  transferPairId: "tx-transfer-out",
+  transferDirection: TransferDirection.IN,
+  contributionPillar: ContributionPillar.GOALS,
+};
 
 function renderPage() {
   seedAuthenticatedSession();
@@ -195,5 +218,52 @@ describe("TransactionsPage", () => {
     renderPage();
 
     expect(await screen.findByText("Nenhum lançamento no período.")).toBeInTheDocument();
+  });
+
+  // §6.6: transfer legs are editable again through the dedicated PATCH /transfers
+  // endpoint — the edit button is no longer hidden on TRANSFER rows.
+  it("edits a transfer leg through the dedicated transfer endpoint", async () => {
+    server.use(
+      ...financeReadHandlers({
+        accounts: defaultAccounts,
+        categories: defaultCategories,
+        transactions: [contributionLeg],
+      }),
+    );
+    const updates: TransferUpdateRequest[] = [];
+    let patchedId = "";
+    server.use(
+      http.patch("*/workspaces/:workspaceId/transfers/:transactionId", async ({ request, params }) => {
+        patchedId = String(params.transactionId);
+        updates.push((await request.json()) as TransferUpdateRequest);
+        return HttpResponse.json(contributionLeg);
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Editar Aporte mensal" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Editar transferência")).toBeInTheDocument();
+    // A transfer has no category, but a contribution leg re-targets its pillar.
+    expect(within(dialog).queryByLabelText("Categoria")).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Pilar do aporte")).toHaveValue(ContributionPillar.GOALS);
+
+    const amount = within(dialog).getByLabelText("Valor");
+    await user.clear(amount);
+    await user.type(amount, "120000");
+    await user.selectOptions(
+      within(dialog).getByLabelText("Pilar do aporte"),
+      ContributionPillar.FINANCIAL_FREEDOM,
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(updates).toHaveLength(1));
+    expect(patchedId).toBe(contributionLeg.id);
+    expect(updates[0]).toMatchObject({
+      amountCents: 120000,
+      contributionPillar: ContributionPillar.FINANCIAL_FREEDOM,
+    });
   });
 });
