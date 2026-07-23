@@ -16,8 +16,7 @@ describe("App routes", () => {
     expect(screen.getAllByText("Categorias").length).toBeGreaterThan(0);
   });
 
-  // FE-2 replaced the transactions placeholder with the real screen; /cards is
-  // still a placeholder until FE-3 lands.
+  // FE-2 replaced the transactions placeholder with the real screen.
   it("renders the transactions screen inside the shell", async () => {
     seedAuthenticatedSession();
     renderWithProviders(<App />, { route: "/transactions" });
@@ -25,12 +24,16 @@ describe("App routes", () => {
     expect(await screen.findByRole("heading", { name: "Lançamentos" })).toBeInTheDocument();
   });
 
-  it("renders the cards placeholder inside the shell", async () => {
+  // FE-3 replaced the cards placeholder with the real screen.
+  it("renders the cards screen inside the shell", async () => {
     seedAuthenticatedSession();
     renderWithProviders(<App />, { route: "/cards" });
 
     expect(await screen.findByRole("heading", { name: "Cartões" })).toBeInTheDocument();
-    expect(screen.getByText("Em construção — esta tela chega nas próximas etapas.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Novo cartão" })).toBeInTheDocument();
+    expect(
+      screen.queryByText("Em construção — esta tela chega nas próximas etapas."),
+    ).not.toBeInTheDocument();
   });
 
   it("redirects unknown routes to the dashboard", async () => {

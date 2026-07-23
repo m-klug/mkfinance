@@ -295,21 +295,19 @@ export default function TransactionsPage() {
                             <Check className="size-4" />
                           </Button>
                         )}
-                        {/* Transfer legs are mirrored pairs (R4) — the contract
-                            only accepts income/expense payloads on update, so
-                            they are corrected by deleting and re-entering. */}
-                        {transaction.type !== TransactionType.TRANSFER && (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={t("transactions.editAction", {
-                              description: transaction.description,
-                            })}
-                            onClick={() => setEditing(transaction)}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                        )}
+                        {/* Transfer legs are mirrored pairs (R4); editing one
+                            updates its sibling atomically through the dedicated
+                            PATCH /transfers endpoint (§6.6). */}
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={t("transactions.editAction", {
+                            description: transaction.description,
+                          })}
+                          onClick={() => setEditing(transaction)}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon-sm"
