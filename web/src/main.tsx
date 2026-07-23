@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router";
 import "./i18n";
 import "./index.css";
 import App from "./App";
+import { API_BASE_URL } from "./lib/api/fetcher";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,7 +25,22 @@ async function enableMocking() {
   return worker.start({ onUnhandledRequest: "bypass" });
 }
 
-void enableMocking().then(() => {
+// Primes the CSRF cookie against the real backend. The login/register pages issue no GET before
+// their POST (RequireAuth's /auth/me only runs inside the shell), so without this the very first
+// mutation would arrive with no XSRF-TOKEN cookie and be rejected (403). A harmless GET /auth/me
+// makes the server issue the readable token cookie; the 401 body is ignored. Skipped under MSW.
+async function primeCsrfToken() {
+  if (import.meta.env.VITE_API_MOCK === "true") {
+    return;
+  }
+  try {
+    await fetch(`${API_BASE_URL}/auth/me`, { credentials: "include" });
+  } catch {
+    // Backend unreachable at boot — the auth flow will surface the error on the first real call.
+  }
+}
+
+void Promise.all([enableMocking(), primeCsrfToken()]).then(() => {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>

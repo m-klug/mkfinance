@@ -50,7 +50,7 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        .csrfTokenRepository(csrfTokenRepository())
                         // Plain (non-XOR) handler: the SPA reads the raw XSRF-TOKEN cookie value
                         // and echoes it verbatim in the X-XSRF-TOKEN header, so the value must
                         // match exactly (Spring Security 6's default Xor handler would reject it).
@@ -77,6 +77,20 @@ public class SecurityConfig {
     @Bean
     SecurityContextRepository securityContextRepository() {
         return new HttpSessionSecurityContextRepository();
+    }
+
+    /**
+     * CSRF token cookie readable by the SPA (httpOnly=false) and scoped to path {@code "/"} rather
+     * than the servlet context-path {@code /api}. The default path would be {@code /api}, which the
+     * browser would only expose to {@code document.cookie} while the page URL is under {@code /api};
+     * the SPA lives at {@code /}, so it could never read the token to echo it in the
+     * {@code X-XSRF-TOKEN} header. Path {@code "/"} is visible to the SPA and still sent on every
+     * {@code /api} request.
+     */
+    private CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(cookie -> cookie.path("/"));
+        return repository;
     }
 
     @Bean
