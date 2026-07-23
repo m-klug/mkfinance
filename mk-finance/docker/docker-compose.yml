@@ -30,6 +30,8 @@ services:
       POSTGRES_DB: mkfinance
       POSTGRES_USER: mkfinance
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Real browser origins in production (comma-separated) — the hostname and the LXC IP.
+      MKFINANCE_CORS_ALLOWED_ORIGINS: https://mkfinance.internal,https://192.168.1.247
     depends_on:
       postgres:
         condition: service_healthy

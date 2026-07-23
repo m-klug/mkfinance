@@ -19,6 +19,11 @@ spring:
 
 server:
   port: 8080
+  # Behind Caddy (TLS terminated at the edge, proxied to the app over HTTP), honour the
+  # X-Forwarded-* headers so the app sees the real https scheme + external host. Without this a
+  # same-origin browser POST looks cross-origin to the app (http/:8080 vs the https Origin), and
+  # Spring's CORS filter rejects it with 403 before the controller.
+  forward-headers-strategy: framework
   servlet:
     context-path: /api
     session:
@@ -39,7 +44,9 @@ management:
       exposure:
         include: health,info
 
-# Dev origin for the Vite SPA (PLANEJAMENTO §3.2). Override per environment.
+# Allowed browser origins. Defaults to the Vite dev origin; override in production with the real
+# site origin(s) via MKFINANCE_CORS_ALLOWED_ORIGINS (comma-separated). With forward-headers-strategy
+# above, a same-origin request is no longer seen as CORS, so this mainly guards genuine cross-origin.
 mkfinance:
   cors:
-    allowed-origins: http://localhost:5173
+    allowed-origins: ${MKFINANCE_CORS_ALLOWED_ORIGINS:http://localhost:5173}
