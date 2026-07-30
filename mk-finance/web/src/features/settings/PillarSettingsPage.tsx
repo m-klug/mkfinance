@@ -125,7 +125,10 @@ export default function PillarSettingsPage() {
                     min={0}
                     max={100}
                     step={1}
-                    value={String(form[pillar])}
+                    // Empty (rather than "0") while zero, mirroring MoneyField —
+                    // otherwise clearing the field to retype leaves a stray "0"
+                    // that the next keystroke lands next to unpredictably.
+                    value={form[pillar] === 0 ? "" : String(form[pillar])}
                     onChange={(event) => handlePercentChange(pillar, event.target.value)}
                   />
                 ))}
