@@ -19,5 +19,14 @@ coverage/
 # Postgres dumps written by the docker `backup` service — never commit data.
 mk-finance/docker/backups/
 
+# Docker image bundles built for offline deploy (`docker save ... | gzip`).
+# Large, regenerable artifacts — never commit them.
+mk-finance/docker/*.tar.gz
+
+# curl cookie jars left over from manual API testing — they hold live
+# session/CSRF tokens. Never commit.
+*.cookie-jar
+mk-finance/docker/jar.txt
+
 # Claude Code machine-local settings (agents/ and launch.json ARE tracked)
 .claude/settings.local.json

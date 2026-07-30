@@ -16,6 +16,17 @@
 #       ...same routes...
 #   }
 
+# Clients that reach the site by IP (https://192.168.1.247) send no SNI — a TLS
+# ClientHello never carries an IP literal as the server name. Without this,
+# Caddy can't pick a cert for a no-SNI handshake and aborts it, which is exactly
+# how iOS Safari fails ("couldn't establish a secure connection") when opening
+# the site by IP, while a hostname (which does send SNI) works. default_sni tells
+# Caddy to treat a missing/unknown SNI as mkfinance.internal and serve our leaf;
+# the leaf's SAN includes the IP, so it still validates for https://192.168.1.247.
+{
+    default_sni mkfinance.internal
+}
+
 mkfinance.internal, 192.168.1.247 {
     tls /etc/caddy/certs/mkfinance.crt /etc/caddy/certs/mkfinance.key
 
