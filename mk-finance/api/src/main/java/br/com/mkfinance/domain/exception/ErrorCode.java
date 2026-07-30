@@ -69,6 +69,22 @@ public final class ErrorCode {
     /** Nothing to pay: the statement has no installments allocated to it yet. */
     public static final String STATEMENT_EMPTY = "STATEMENT_EMPTY";
 
+    // pillar targets (BE-6)
+    /** The six target percents must add up to exactly 100 — a partial budget is not a budget. */
+    public static final String PILLAR_TARGETS_MUST_SUM_100 = "PILLAR_TARGETS_MUST_SUM_100";
+
+    // recurrences (BE-7)
+    public static final String RECURRENCE_NOT_FOUND = "RECURRENCE_NOT_FOUND";
+    /**
+     * The given date is not an occurrence of this rule (wrong day, before its start, after its end,
+     * or already skipped). Scoping an edit to THIS_ONE needs a real occurrence to point at.
+     */
+    public static final String RECURRENCE_OCCURRENCE_NOT_FOUND = "RECURRENCE_OCCURRENCE_NOT_FOUND";
+
+    // tags (BE-8)
+    /** Tag names are unique per workspace, compared case-insensitively. */
+    public static final String TAG_NAME_DUPLICATE = "TAG_NAME_DUPLICATE";
+
     // generic
     public static final String VALIDATION_ERROR = "VALIDATION_ERROR";
     public static final String DATA_INTEGRITY_VIOLATION = "DATA_INTEGRITY_VIOLATION";

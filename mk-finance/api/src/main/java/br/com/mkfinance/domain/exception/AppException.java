@@ -157,4 +157,26 @@ public class AppException extends RuntimeException {
     public static AppException statementEmpty() {
         return of(ErrorCode.STATEMENT_EMPTY, HttpStatus.CONFLICT);
     }
+
+    /**
+     * The six pillar targets do not add up to 100. The database checks each row is within 0..100 but
+     * cannot check the set, so the sum is an application rule.
+     *
+     * @param sum what the payload actually added up to, so the client can say how far off it is
+     */
+    public static AppException pillarTargetsMustSum100(int sum) {
+        return of(ErrorCode.PILLAR_TARGETS_MUST_SUM_100, HttpStatus.BAD_REQUEST, Map.of("sum", sum));
+    }
+
+    public static AppException recurrenceNotFound() {
+        return of(ErrorCode.RECURRENCE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException recurrenceOccurrenceNotFound() {
+        return of(ErrorCode.RECURRENCE_OCCURRENCE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException tagNameDuplicate(String name) {
+        return of(ErrorCode.TAG_NAME_DUPLICATE, HttpStatus.CONFLICT, Map.of("name", name));
+    }
 }
