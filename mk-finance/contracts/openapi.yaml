@@ -20,6 +20,9 @@ tags:
   - name: cards
   - name: statements
   - name: dashboard
+  - name: recurrences
+  - name: calendar
+  - name: tags
   - name: export
 
 paths:
@@ -276,16 +279,48 @@ paths:
     get:
       tags: [pillars]
       operationId: listPillarAllocations
-      description: Fixed targets in the MVP (30/10/20/10/25/5); editing arrives in Phase 2.
-      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      description: >
+        Targets in force during the given month. Targets are versioned by competency: editing them
+        applies from the current month onwards and never rewrites a closed month, so a past report
+        keeps the targets it was judged against.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/month' }
       responses:
         '200':
-          description: Target percent per pillar.
+          description: Target percent per pillar for that month; always the six pillars, summing 100.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/PillarAllocation' }
+    put:
+      tags: [pillars]
+      operationId: updatePillarAllocations
+      description: >
+        Replaces the targets from the current month onwards (effectiveFrom = first day of the
+        current month in America/Sao_Paulo). Earlier competencies are left untouched. PUT rather
+        than PATCH because the six targets are one indivisible set — they only mean anything if
+        they add up to 100.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PillarAllocationsRequest' }
+      responses:
+        '200':
+          description: The targets now in force.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PillarAllocation' }
+        '400':
+          description: PILLAR_TARGETS_MUST_SUM_100 when the six targets do not add up to 100.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /workspaces/{workspaceId}/transactions:
     get:
@@ -300,6 +335,7 @@ paths:
         - { name: type, in: query, schema: { $ref: '#/components/schemas/TransactionType' } }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/TransactionStatus' } }
         - { name: search, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/tagsFilter' }
         - { name: page, in: query, schema: { type: integer, default: 0 } }
         - { name: size, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       responses:
@@ -671,6 +707,189 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PillarAllocationReport' }
 
+  /workspaces/{workspaceId}/recurrences:
+    get:
+      tags: [recurrences]
+      operationId: listRecurrences
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - name: active
+          in: query
+          description: Omit to list every rule, including the ones closed by a THIS_AND_FUTURE edit.
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Recurrence rules of the workspace.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Recurrence' }
+    post:
+      tags: [recurrences]
+      operationId: createRecurrence
+      description: >
+        Creates the rule only. Occurrences are materialized lazily as PENDING transactions when a
+        month is read (extrato or calendar), the same way statements are created on demand — so a
+        rule with no end date does not write rows into the year 2094.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurrenceRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recurrence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /workspaces/{workspaceId}/recurrences/{recurrenceId}:
+    patch:
+      tags: [recurrences]
+      operationId: updateRecurrence
+      description: >
+        Edits the series with calendar semantics, chosen by scope.
+        THIS_ONE touches only the occurrence at occurrenceDate — the rule is left alone and the
+        change lands on the transaction that occurrence materialized into; scheduling fields
+        (frequency, dayOfMonth, dayOfWeek, monthOfYear, startDate, endDate) are ignored, since one
+        occurrence has no schedule of its own.
+        THIS_AND_FUTURE closes the current rule (endDate = the day before occurrenceDate) and
+        creates a new one starting at occurrenceDate with the new values, which is what keeps the
+        past intact; the response is the new rule.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/recurrenceId' }
+        - { $ref: '#/components/parameters/recurrenceScope' }
+        - { $ref: '#/components/parameters/occurrenceDate' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurrenceRequest' }
+      responses:
+        '200':
+          description: The rule in force from occurrenceDate onwards.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recurrence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404':
+          description: >
+            RECURRENCE_NOT_FOUND, or RECURRENCE_OCCURRENCE_NOT_FOUND when occurrenceDate is not a
+            date this rule actually falls on.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    delete:
+      tags: [recurrences]
+      operationId: deleteRecurrence
+      description: >
+        THIS_ONE marks the occurrence at occurrenceDate as SKIPPED and removes the PENDING
+        transaction it had materialized; an occurrence already settled is kept, because deleting a
+        rule must never erase money that was actually spent.
+        THIS_AND_FUTURE closes the rule at the day before occurrenceDate and drops its
+        still-PENDING occurrences from there on. Omitting occurrenceDate ends the series today,
+        which is how the UI's plain "delete" behaves.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/recurrenceId' }
+        - { $ref: '#/components/parameters/recurrenceScope' }
+        - { $ref: '#/components/parameters/occurrenceDate' }
+      responses:
+        '204': { description: Occurrence skipped or series closed. }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /workspaces/{workspaceId}/calendar:
+    get:
+      tags: [calendar]
+      operationId: getCalendar
+      description: >
+        Read-only month agenda: statement due dates and every still-pending transaction, including
+        the ones a recurrence materialized (reading the month is what materializes them). There is
+        no separate "recurrence occurrence" entry — a materialized occurrence *is* a pending
+        transaction, and listing it twice would double the month. Entries carrying recurrenceId are
+        the ones a series produced. Nothing is confirmed or paid from here; settling still goes
+        through POST /transactions/{transactionId}/settle.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/month' }
+      responses:
+        '200':
+          description: Entries of the month, ascending by date.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalendarMonth' }
+
+  /workspaces/{workspaceId}/tags:
+    get:
+      tags: [tags]
+      operationId: listTags
+      description: Every tag of the workspace, alphabetical — the source for the client-side autocomplete.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      responses:
+        '200':
+          description: Tags.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Tag' }
+    post:
+      tags: [tags]
+      operationId: createTag
+      description: >
+        Explicit creation, for managing tags outside a transaction. Typing a new tag while filling
+        a transaction does not need this — TransactionRequest.tags creates what is missing.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TagRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/tags/{tagId}:
+    patch:
+      tags: [tags]
+      operationId: updateTag
+      description: Renames the tag on every transaction carrying it. TAG_NAME_DUPLICATE if the name is taken.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/tagId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TagRequest' }
+      responses:
+        '200':
+          description: Renamed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [tags]
+      operationId: deleteTag
+      description: >
+        Deletes the tag and unlinks it from every transaction. The transactions themselves are
+        never touched — a tag is a label, not the record.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/tagId' }
+      responses:
+        '204': { description: Deleted. }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /workspaces/{workspaceId}/export/transactions.csv:
     get:
       tags: [export]
@@ -730,15 +949,56 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    recurrenceId:
+      name: recurrenceId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    tagId:
+      name: tagId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     month:
       name: month
       in: query
       description: Reference month YYYY-MM; defaults to current month in America/Sao_Paulo.
       schema: { type: string, pattern: '^\d{4}-\d{2}$' }
+    recurrenceScope:
+      name: scope
+      in: query
+      description: Which part of the series the edit or deletion reaches.
+      schema:
+        allOf: [{ $ref: '#/components/schemas/RecurrenceScope' }]
+        default: THIS_AND_FUTURE
+    occurrenceDate:
+      name: occurrenceDate
+      in: query
+      description: >
+        The occurrence the scope pivots on. Required for THIS_ONE (VALIDATION_ERROR without it);
+        for THIS_AND_FUTURE it defaults to the next occurrence on or after today, so the change
+        takes effect going forward without the client having to compute the date.
+      schema: { type: string, format: date }
+    tagsFilter:
+      name: tags
+      in: query
+      description: >
+        Tag names; a transaction matches when it carries ANY of them (OR), narrowed further by the
+        other filters. Compared case-insensitively, like everything else about tag names.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items: { type: string }
 
   responses:
     Unauthorized:
       description: Not authenticated.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    BadRequest:
+      description: Malformed or inconsistent payload; see error code (VALIDATION_ERROR carries fieldErrors).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -781,6 +1041,9 @@ components:
             cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND,
             STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE,
             STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY;
+            pillar targets — PILLAR_TARGETS_MUST_SUM_100;
+            recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND;
+            tags — TAG_NAME_DUPLICATE;
             generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
         params:
           type: object
@@ -821,6 +1084,21 @@ components:
     MemberRole:
       type: string
       enum: [OWNER, MEMBER]
+    RecurrenceFrequency:
+      type: string
+      description: >
+        MONTHLY is the case that matters (salary, rent, subscriptions); WEEKLY and YEARLY round it
+        out. Deliberately not a cron expression — nothing in a personal budget needs one.
+      enum: [MONTHLY, WEEKLY, YEARLY]
+    RecurrenceScope:
+      type: string
+      enum: [THIS_ONE, THIS_AND_FUTURE]
+    DayOfWeek:
+      type: string
+      enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]
+    CalendarEntryKind:
+      type: string
+      enum: [STATEMENT_DUE, PENDING_TRANSACTION]
 
     RegisterRequest:
       type: object
@@ -945,6 +1223,30 @@ components:
       properties:
         pillar: { $ref: '#/components/schemas/Pillar' }
         targetPercent: { type: integer, minimum: 0, maximum: 100 }
+        effectiveFrom:
+          type: string
+          format: date
+          description: >
+            First day of the competency this target started applying from. Lets the UI say since
+            when the number has been in force; absent on requests.
+
+    PillarAllocationsRequest:
+      type: object
+      required: [allocations]
+      description: >
+        All six pillars at once. A subset is rejected — targets are only meaningful as a whole, and
+        a missing pillar is indistinguishable from one the client forgot.
+      properties:
+        allocations:
+          type: array
+          minItems: 6
+          maxItems: 6
+          items:
+            type: object
+            required: [pillar, targetPercent]
+            properties:
+              pillar: { $ref: '#/components/schemas/Pillar' }
+              targetPercent: { type: integer, minimum: 0, maximum: 100 }
 
     Transaction:
       type: object
@@ -971,6 +1273,19 @@ components:
           allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
           nullable: true
           description: Set on transfer legs into INVESTMENT/SAVINGS accounts (R9).
+        recurrenceId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            The rule that materialized this row, when it came from a recurrence. The extrato uses
+            it to badge the entry and to offer editing the whole series.
+        tags:
+          type: array
+          description: >
+            Always sent by the server, empty when the transaction has none. Optional here only so
+            that clients written before Phase 2 keep type-checking.
+          items: { $ref: '#/components/schemas/Tag' }
 
     TransactionRequest:
       type: object
@@ -988,6 +1303,13 @@ components:
         status:
           allOf: [{ $ref: '#/components/schemas/TransactionStatus' }]
           default: SETTLED
+        tags:
+          type: array
+          description: >
+            Tag names, not ids: a tag is its name, and typing one that does not exist yet creates
+            it. Duplicates within the list are collapsed case-insensitively. Sending the field
+            replaces the whole set; omitting it leaves the current tags alone.
+          items: { type: string, maxLength: 40 }
 
     TransactionPage:
       type: object
@@ -1170,6 +1492,131 @@ components:
         amountCents: { type: integer, format: int64, minimum: 1 }
         paymentDate: { type: string, format: date }
 
+    Recurrence:
+      type: object
+      required: [id, type, accountId, categoryId, amountCents, description, frequency, startDate, active]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [INCOME, EXPENSE]
+        accountId: { type: string, format: uuid }
+        categoryId: { type: string, format: uuid }
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        description: { type: string }
+        note: { type: string, nullable: true }
+        frequency: { $ref: '#/components/schemas/RecurrenceFrequency' }
+        dayOfMonth:
+          type: integer
+          minimum: 1
+          maximum: 31
+          nullable: true
+          description: >
+            MONTHLY and YEARLY. A day the month does not have falls on its last day — 31 becomes
+            the 28th in February — instead of skipping the month.
+        dayOfWeek:
+          allOf: [{ $ref: '#/components/schemas/DayOfWeek' }]
+          nullable: true
+          description: WEEKLY only.
+        monthOfYear:
+          type: integer
+          minimum: 1
+          maximum: 12
+          nullable: true
+          description: YEARLY only, paired with dayOfMonth.
+        startDate: { type: string, format: date }
+        endDate:
+          type: string
+          format: date
+          nullable: true
+          description: Inclusive; null means open-ended. Set by a THIS_AND_FUTURE edit when it closes the rule.
+        active:
+          type: boolean
+          description: >
+            A deactivated rule stops producing new occurrences but keeps the ones already
+            materialized — turning off the subscription does not undo the months you paid.
+
+    RecurrenceRequest:
+      type: object
+      required: [type, accountId, categoryId, amountCents, description, frequency, startDate]
+      description: >
+        The scheduling fields required depend on frequency — dayOfMonth for MONTHLY, dayOfWeek for
+        WEEKLY, dayOfMonth + monthOfYear for YEARLY. OpenAPI cannot express that conditional, so
+        the server checks it and answers VALIDATION_ERROR with the offending field.
+      properties:
+        type:
+          type: string
+          enum: [INCOME, EXPENSE]
+        accountId: { type: string, format: uuid }
+        categoryId: { type: string, format: uuid }
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        description: { type: string, maxLength: 255 }
+        note: { type: string, nullable: true }
+        frequency: { $ref: '#/components/schemas/RecurrenceFrequency' }
+        dayOfMonth: { type: integer, minimum: 1, maximum: 31, nullable: true }
+        dayOfWeek:
+          allOf: [{ $ref: '#/components/schemas/DayOfWeek' }]
+          nullable: true
+        monthOfYear: { type: integer, minimum: 1, maximum: 12, nullable: true }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date, nullable: true }
+        active: { type: boolean, default: true }
+
+    CalendarMonth:
+      type: object
+      required: [month, entries]
+      properties:
+        month: { type: string, example: '2026-08' }
+        entries:
+          type: array
+          items: { $ref: '#/components/schemas/CalendarEntry' }
+
+    CalendarEntry:
+      type: object
+      required: [date, kind, description, amountCents]
+      properties:
+        date: { type: string, format: date }
+        kind: { $ref: '#/components/schemas/CalendarEntryKind' }
+        description:
+          type: string
+          description: The transaction's description, or the card's name for a statement due date.
+        amountCents:
+          type: integer
+          format: int64
+          description: >
+            Always positive. What it means comes from kind and direction — the remaining balance of
+            the statement for STATEMENT_DUE, the transaction amount otherwise.
+        direction:
+          allOf: [{ $ref: '#/components/schemas/TransferDirection' }]
+          nullable: true
+          description: IN for money expected, OUT for money owed; null when kind carries it already.
+        transactionId: { type: string, format: uuid, nullable: true }
+        statementId: { type: string, format: uuid, nullable: true }
+        cardId: { type: string, format: uuid, nullable: true }
+        accountId: { type: string, format: uuid, nullable: true }
+        categoryId: { type: string, format: uuid, nullable: true }
+        recurrenceId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set when this pending transaction came from a recurrence.
+
+    Tag:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+
+    TagRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 40
+          description: Unique per workspace, compared case-insensitively; stored as typed.
+
     DashboardSummary:
       type: object
       required: [month, totalBalanceCents, totalBalanceWithInvestmentsCents, incomeCents, expenseCents, accounts, expenseByCategory, openStatements]
@@ -1213,11 +1660,18 @@ components:
             required: [pillar, targetPercent, spentCents]
             properties:
               pillar: { $ref: '#/components/schemas/Pillar' }
-              targetPercent: { type: integer }
+              targetPercent:
+                type: integer
+                description: >
+                  The target in force during this month, not today's — editing the targets does not
+                  rewrite how a closed month was judged.
               spentCents:
                 type: integer
                 format: int64
-                description: Expenses by competency + contributions of the pillar (R2, R9).
+                description: >
+                  Expenses by competency + contributions of the pillar (R2, R9), counting only
+                  SETTLED entries. Pending rows — which recurrences produce by the dozen — belong
+                  to the projected balance (R5), not to what the month actually consumed.
               actualPercent:
                 type: number
                 format: double

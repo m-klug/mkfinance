@@ -7,22 +7,29 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
-  PillarAllocation
+  ErrorResponse,
+  ListPillarAllocationsParams,
+  PillarAllocation,
+  PillarAllocationsRequest
 } from '../mKFinanceAPI.schemas';
 
 import { apiFetch } from '../../fetcher';
@@ -31,16 +38,19 @@ import { apiFetch } from '../../fetcher';
 
 
 /**
- * Fixed targets in the MVP (30/10/20/10/25/5); editing arrives in Phase 2.
+ * Targets in force during the given month. Targets are versioned by competency: editing them applies from the current month onwards and never rewrites a closed month, so a past report keeps the targets it was judged against.
+
  */
 export const listPillarAllocations = (
     workspaceId: string,
+    params?: ListPillarAllocationsParams,
  signal?: AbortSignal
 ) => {
       
       
       return apiFetch<PillarAllocation[]>(
-      {url: `/workspaces/${workspaceId}/pillar-allocations`, method: 'GET', signal
+      {url: `/workspaces/${workspaceId}/pillar-allocations`, method: 'GET',
+        params, signal
     },
       );
     }
@@ -48,23 +58,25 @@ export const listPillarAllocations = (
 
 
 
-export const getListPillarAllocationsQueryKey = (workspaceId?: string,) => {
+export const getListPillarAllocationsQueryKey = (workspaceId?: string,
+    params?: ListPillarAllocationsParams,) => {
     return [
-    `/workspaces/${workspaceId}/pillar-allocations`
+    `/workspaces/${workspaceId}/pillar-allocations`, ...(params ? [params]: [])
     ] as const;
     }
 
     
-export const getListPillarAllocationsQueryOptions = <TData = Awaited<ReturnType<typeof listPillarAllocations>>, TError = unknown>(workspaceId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>>, }
+export const getListPillarAllocationsQueryOptions = <TData = Awaited<ReturnType<typeof listPillarAllocations>>, TError = unknown>(workspaceId: string,
+    params?: ListPillarAllocationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListPillarAllocationsQueryKey(workspaceId);
+  const queryKey =  queryOptions?.queryKey ?? getListPillarAllocationsQueryKey(workspaceId,params);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPillarAllocations>>> = ({ signal }) => listPillarAllocations(workspaceId, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPillarAllocations>>> = ({ signal }) => listPillarAllocations(workspaceId,params, signal);
 
       
 
@@ -78,7 +90,8 @@ export type ListPillarAllocationsQueryError = unknown
 
 
 export function useListPillarAllocations<TData = Awaited<ReturnType<typeof listPillarAllocations>>, TError = unknown>(
- workspaceId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>> & Pick<
+ workspaceId: string,
+    params: undefined |  ListPillarAllocationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listPillarAllocations>>,
           TError,
@@ -88,7 +101,8 @@ export function useListPillarAllocations<TData = Awaited<ReturnType<typeof listP
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListPillarAllocations<TData = Awaited<ReturnType<typeof listPillarAllocations>>, TError = unknown>(
- workspaceId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>> & Pick<
+ workspaceId: string,
+    params?: ListPillarAllocationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listPillarAllocations>>,
           TError,
@@ -98,16 +112,18 @@ export function useListPillarAllocations<TData = Awaited<ReturnType<typeof listP
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListPillarAllocations<TData = Awaited<ReturnType<typeof listPillarAllocations>>, TError = unknown>(
- workspaceId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>>, }
+ workspaceId: string,
+    params?: ListPillarAllocationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
 export function useListPillarAllocations<TData = Awaited<ReturnType<typeof listPillarAllocations>>, TError = unknown>(
- workspaceId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>>, }
+ workspaceId: string,
+    params?: ListPillarAllocationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPillarAllocations>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListPillarAllocationsQueryOptions(workspaceId,options)
+  const queryOptions = getListPillarAllocationsQueryOptions(workspaceId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -119,3 +135,66 @@ export function useListPillarAllocations<TData = Awaited<ReturnType<typeof listP
 
 
 
+/**
+ * Replaces the targets from the current month onwards (effectiveFrom = first day of the current month in America/Sao_Paulo). Earlier competencies are left untouched. PUT rather than PATCH because the six targets are one indivisible set — they only mean anything if they add up to 100.
+
+ */
+export const updatePillarAllocations = (
+    workspaceId: string,
+    pillarAllocationsRequest: PillarAllocationsRequest,
+ ) => {
+      
+      
+      return apiFetch<PillarAllocation[]>(
+      {url: `/workspaces/${workspaceId}/pillar-allocations`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: pillarAllocationsRequest
+    },
+      );
+    }
+  
+
+
+export const getUpdatePillarAllocationsMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePillarAllocations>>, TError,{workspaceId: string;data: PillarAllocationsRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updatePillarAllocations>>, TError,{workspaceId: string;data: PillarAllocationsRequest}, TContext> => {
+
+const mutationKey = ['updatePillarAllocations'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePillarAllocations>>, {workspaceId: string;data: PillarAllocationsRequest}> = (props) => {
+          const {workspaceId,data} = props ?? {};
+
+          return  updatePillarAllocations(workspaceId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePillarAllocationsMutationResult = NonNullable<Awaited<ReturnType<typeof updatePillarAllocations>>>
+    export type UpdatePillarAllocationsMutationBody = PillarAllocationsRequest
+    export type UpdatePillarAllocationsMutationError = ErrorResponse
+
+    export const useUpdatePillarAllocations = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePillarAllocations>>, TError,{workspaceId: string;data: PillarAllocationsRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updatePillarAllocations>>,
+        TError,
+        {workspaceId: string;data: PillarAllocationsRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdatePillarAllocationsMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    
