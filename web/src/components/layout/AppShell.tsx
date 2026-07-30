@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Settings,
   Tags,
   Wallet,
   X,
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/accounts", labelKey: "nav.accounts", icon: Wallet },
   { to: "/cards", labelKey: "nav.cards", icon: CreditCard },
   { to: "/categories", labelKey: "nav.categories", icon: Tags },
+  { to: "/settings/pillars", labelKey: "nav.settings", icon: Settings },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

@@ -11,6 +11,7 @@ import CardStatementsPage from "@/features/cards/CardStatementsPage";
 import CategoriesPage from "@/features/categories/CategoriesPage";
 import TransactionsPage from "@/features/transactions/TransactionsPage";
 import DashboardPage from "@/features/dashboard/DashboardPage";
+import PillarSettingsPage from "@/features/settings/PillarSettingsPage";
 
 // No <BrowserRouter> here on purpose — it lives in main.tsx so tests can
 // swap in a <MemoryRouter> (see src/test/renderWithProviders.tsx) and drive
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/cards" element={<CardsPage />} />
             <Route path="/cards/:cardId/statements" element={<CardStatementsPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/settings/pillars" element={<PillarSettingsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
