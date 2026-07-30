@@ -66,7 +66,7 @@ public class WorkspaceDefaultsSeeder {
     private void seedPillarAllocations(Workspace workspace) {
         List<PillarAllocation> allocations = FIXED_TARGET_PERCENTS.entrySet().stream()
                 .map(entry -> PillarAllocation.builder()
-                        .id(new PillarAllocationId(workspace.getId(), entry.getKey()))
+                        .id(new PillarAllocationId(workspace.getId(), entry.getKey(), PillarAllocation.FLOOR_DATE))
                         .targetPercent(entry.getValue())
                         .build())
                 .toList();
