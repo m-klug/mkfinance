@@ -1,6 +1,8 @@
 package br.com.mkfinance.api.pillar;
 
 import br.com.mkfinance.domain.model.Pillar;
+import java.time.LocalDate;
 
-public record PillarAllocationResponse(Pillar pillar, int targetPercent) {
+/** Contract schema {@code PillarAllocation}. {@code effectiveFrom} is BE-6's versioning (V13). */
+public record PillarAllocationResponse(Pillar pillar, int targetPercent, LocalDate effectiveFrom) {
 }
