@@ -99,6 +99,19 @@ Lembrete relacionado: `jpa.hibernate.ddl-auto: validate` — todo campo novo de 
   - Novos códigos de erro: `PILLAR_TARGETS_MUST_SUM_100`, `RECURRENCE_NOT_FOUND`, `RECURRENCE_OCCURRENCE_NOT_FOUND`, `TAG_NAME_DUPLICATE`.
 - **Aceite**: `npm run api:generate` roda limpo e produz hooks + mocks para as tags novas; nenhum endpoint existente quebra de forma incompatível.
 
+#### ✅ CT-1 concluída — decisões de schema fechadas (vinculantes para as fichas seguintes)
+
+Executada em 30/07/2026. Verificado: `api:generate` limpo, `npm run build` ok, 74 testes verdes, `./mvnw compile` ok. O que o contrato decidiu além do que a ficha enunciava:
+
+1. **O calendário tem duas espécies de entrada, não três** — `STATEMENT_DUE` e `PENDING_TRANSACTION`. Como a materialização é lazy na leitura do mês, toda ocorrência de recorrência daquele mês **já é** uma transação pendente; listá-la também como "ocorrência" dobraria o mês. Quem nasceu de série carrega `recurrenceId`, e é assim que a FE-6 diferencia (badge, "editar a série"). `Transaction` também ganhou `recurrenceId` pelo mesmo motivo, para o extrato.
+2. **Agendamento explícito na regra**, não derivado da `startDate`: `dayOfMonth` (MONTHLY/YEARLY), `dayOfWeek` (WEEKLY), `monthOfYear` (YEARLY). Mudar o dia do aluguel não deve mexer na data de início da série. A obrigatoriedade condicional por frequência o OpenAPI não expressa — **valida no servidor e responde `VALIDATION_ERROR` com `fieldErrors`**, sem código de erro novo (a BE-7 não inventa códigos fora dos 4 da ficha).
+3. **`occurrenceDate` é o pivô do `scope`** em `PATCH`/`DELETE` de recorrência: obrigatório em `THIS_ONE` (é o que justifica `RECURRENCE_OCCURRENCE_NOT_FOUND`); em `THIS_AND_FUTURE` o default é a próxima ocorrência a partir de hoje, para o cliente não ter que calcular data.
+4. **Tag é o seu nome.** `TransactionRequest.tags` recebe **nomes** (o que não existe é criado na hora — é o que faz o autocomplete de texto livre funcionar sem round-trip); `Transaction.tags` devolve **objetos** `{id, name}`; o filtro `tags` do `GET /transactions` também é por nome, OR, case-insensitive. `tags` é **opcional** na resposta de propósito: torná-lo obrigatório quebraria a tipagem das fixtures existentes na hora. O servidor sempre manda (vazio quando não há).
+5. **Alvos de pilar usam `PUT`, não `PATCH`** — os seis alvos são um conjunto indivisível, só significam algo somando 100. ⚠️ **FE-5: o handler MSW é `http.put`** — a armadilha 5 da seção 6 vale ao contrário aqui, e `onUnhandledRequest: "bypass"` faria o teste falhar em silêncio.
+6. **`PillarAllocation.effectiveFrom`** (opcional) na resposta, para a tela dizer desde quando o número vale.
+
+Aberto para a BE-6/BE-8, sem impacto de contrato: `GET /export/transactions.csv` continua declarando só `from`/`to` embora a descrição prometa "os mesmos filtros de listTransactions" — divergência **pré-existente**, não introduzida aqui.
+
 ### BE-6 — Alocação: status de agregação + alvos versionados `[E6 · spring-boot-engineer]` (V13)
 
 - **Objetivo**: tornar os percentuais-alvo editáveis e versionados por competência, e corrigir a agregação do dashboard para refletir o **realizado**.
