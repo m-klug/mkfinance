@@ -18,6 +18,13 @@ import org.springframework.data.repository.query.Param;
  * the feature repositories of BE-3/BE-4, but they read those features' tables (R8 is preserved by the
  * mandatory {@code workspaceId} predicate on every query). Card purchases count on their
  * <em>purchase date</em> (R2 competency), not on when a statement was paid.
+ *
+ * <p>Every {@code Transaction}-backed query here (all but {@link #cardPurchasesByCategory}) also
+ * filters on {@code status = SETTLED} (BE-6, R5): a scheduled/pending row is "projected", not
+ * "realized", and recurrences (BE-7) generate pending rows by the dozen — without this predicate a
+ * whole month of unconfirmed bills would already read as spent on day one. {@code card_purchase} has
+ * no status column and is unaffected: a card purchase always counts on its purchase date (R2),
+ * regardless of when — or whether — its statement gets paid.
  */
 public interface DashboardAggregateRepository extends Repository<Transaction, UUID> {
 
@@ -28,6 +35,7 @@ public interface DashboardAggregateRepository extends Repository<Transaction, UU
             from Transaction t
             where t.workspaceId = :workspaceId
               and t.type = br.com.mkfinance.domain.model.TransactionType.INCOME
+              and t.status = br.com.mkfinance.domain.model.TransactionStatus.SETTLED
               and t.date between :from and :to
             """)
     long sumIncome(@Param("workspaceId") UUID workspaceId, @Param("from") LocalDate from, @Param("to") LocalDate to);
@@ -44,6 +52,7 @@ public interface DashboardAggregateRepository extends Repository<Transaction, UU
             where t.categoryId = c.id
               and t.workspaceId = :workspaceId
               and t.type = br.com.mkfinance.domain.model.TransactionType.EXPENSE
+              and t.status = br.com.mkfinance.domain.model.TransactionStatus.SETTLED
               and t.date between :from and :to
             group by t.categoryId, c.pillar, c.system
             """)
@@ -81,6 +90,7 @@ public interface DashboardAggregateRepository extends Repository<Transaction, UU
               and t.type = br.com.mkfinance.domain.model.TransactionType.TRANSFER
               and t.transferDirection = br.com.mkfinance.domain.model.TransferDirection.IN
               and t.contributionPillar is not null
+              and t.status = br.com.mkfinance.domain.model.TransactionStatus.SETTLED
               and t.date between :from and :to
             group by t.contributionPillar
             """)
