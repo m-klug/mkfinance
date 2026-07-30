@@ -217,6 +217,7 @@
     "accounts": "Contas",
     "cards": "Cartões",
     "categories": "Categorias",
+    "settings": "Pilares",
     "openMenu": "Abrir menu",
     "closeMenu": "Fechar menu"
   },
@@ -245,6 +246,18 @@
     "PLEASURES": "Prazeres",
     "FINANCIAL_FREEDOM": "Liberdade Financeira",
     "KNOWLEDGE": "Conhecimento"
+  },
+  "settings": {
+    "pillars": {
+      "title": "Configurações de pilares",
+      "subtitle": "Ajuste o percentual-alvo de cada pilar do método.",
+      "formTitle": "Percentuais-alvo",
+      "inForceSince": "Valores em vigor desde {{date}}.",
+      "effectiveFromWarning": "A alteração vale a partir do mês corrente em diante — meses fechados mantêm o percentual com que foram avaliados.",
+      "sumLabel": "Soma: {{sum}}%",
+      "sumError": "A soma dos seis pilares precisa ser 100%.",
+      "updated": "Percentuais-alvo atualizados."
+    }
   },
   "dashboard": {
     "month": {
@@ -314,6 +327,7 @@
     "CARD_ARCHIVED": "Este cartão está arquivado e não aceita novas compras.",
     "PAYMENT_EXCEEDS_REMAINING": "O valor excede o restante da fatura.",
     "INVITE_EXPIRED": "Este convite expirou ou já foi usado.",
-    "VALIDATION_ERROR": "Verifique os campos destacados."
+    "VALIDATION_ERROR": "Verifique os campos destacados.",
+    "PILLAR_TARGETS_MUST_SUM_100": "A soma dos seis pilares precisa ser 100%."
   }
 }

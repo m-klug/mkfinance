@@ -36,6 +36,16 @@ describe("App routes", () => {
     ).not.toBeInTheDocument();
   });
 
+  // FE-5 replaced the settings placeholder with the pillar targets screen.
+  it("renders the pillar settings screen inside the shell", async () => {
+    seedAuthenticatedSession();
+    renderWithProviders(<App />, { route: "/settings/pillars" });
+
+    expect(
+      await screen.findByRole("heading", { name: "Configurações de pilares" }),
+    ).toBeInTheDocument();
+  });
+
   it("redirects unknown routes to the dashboard", async () => {
     seedAuthenticatedSession();
     renderWithProviders(<App />, { route: "/nowhere" });
