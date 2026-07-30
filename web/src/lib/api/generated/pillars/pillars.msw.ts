@@ -27,7 +27,9 @@ import type {
 } from '../mKFinanceAPI.schemas';
 
 
-export const getListPillarAllocationsResponseMock = (): PillarAllocation[] => (Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({pillar: faker.helpers.arrayElement(Object.values(Pillar)), targetPercent: faker.number.int({min: 0, max: 100})})))
+export const getListPillarAllocationsResponseMock = (): PillarAllocation[] => (Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({pillar: faker.helpers.arrayElement(Object.values(Pillar)), targetPercent: faker.number.int({min: 0, max: 100}), effectiveFrom: faker.helpers.arrayElement([faker.date.past().toISOString().split('T')[0], undefined])})))
+
+export const getUpdatePillarAllocationsResponseMock = (): PillarAllocation[] => (Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({pillar: faker.helpers.arrayElement(Object.values(Pillar)), targetPercent: faker.number.int({min: 0, max: 100}), effectiveFrom: faker.helpers.arrayElement([faker.date.past().toISOString().split('T')[0], undefined])})))
 
 
 export const getListPillarAllocationsMockHandler = (overrideResponse?: PillarAllocation[] | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<PillarAllocation[]> | PillarAllocation[]), options?: RequestHandlerOptions) => {
@@ -41,6 +43,19 @@ export const getListPillarAllocationsMockHandler = (overrideResponse?: PillarAll
       })
   }, options)
 }
+
+export const getUpdatePillarAllocationsMockHandler = (overrideResponse?: PillarAllocation[] | ((info: Parameters<Parameters<typeof http.put>[1]>[0]) => Promise<PillarAllocation[]> | PillarAllocation[]), options?: RequestHandlerOptions) => {
+  return http.put('*/workspaces/:workspaceId/pillar-allocations', async (info) => {await delay(1000);
+  
+    return new HttpResponse(JSON.stringify(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getUpdatePillarAllocationsResponseMock()),
+      { status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+  }, options)
+}
 export const getPillarsMock = () => [
-  getListPillarAllocationsMockHandler()
+  getListPillarAllocationsMockHandler(),
+  getUpdatePillarAllocationsMockHandler()
 ]

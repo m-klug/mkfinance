@@ -14,7 +14,7 @@ export type ErrorResponseFieldErrorsItem = {
 };
 
 export interface ErrorResponse {
-  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
+  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; pillar targets — PILLAR_TARGETS_MUST_SUM_100; recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND; tags — TAG_NAME_DUPLICATE; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
  */
   code: string;
   params?: ErrorResponseParams;
@@ -110,6 +110,52 @@ export type MemberRole = typeof MemberRole[keyof typeof MemberRole];
 export const MemberRole = {
   OWNER: 'OWNER',
   MEMBER: 'MEMBER',
+} as const;
+
+/**
+ * MONTHLY is the case that matters (salary, rent, subscriptions); WEEKLY and YEARLY round it out. Deliberately not a cron expression — nothing in a personal budget needs one.
+
+ */
+export type RecurrenceFrequency = typeof RecurrenceFrequency[keyof typeof RecurrenceFrequency];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const RecurrenceFrequency = {
+  MONTHLY: 'MONTHLY',
+  WEEKLY: 'WEEKLY',
+  YEARLY: 'YEARLY',
+} as const;
+
+export type RecurrenceScope = typeof RecurrenceScope[keyof typeof RecurrenceScope];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const RecurrenceScope = {
+  THIS_ONE: 'THIS_ONE',
+  THIS_AND_FUTURE: 'THIS_AND_FUTURE',
+} as const;
+
+export type DayOfWeek = typeof DayOfWeek[keyof typeof DayOfWeek];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const DayOfWeek = {
+  MONDAY: 'MONDAY',
+  TUESDAY: 'TUESDAY',
+  WEDNESDAY: 'WEDNESDAY',
+  THURSDAY: 'THURSDAY',
+  FRIDAY: 'FRIDAY',
+  SATURDAY: 'SATURDAY',
+  SUNDAY: 'SUNDAY',
+} as const;
+
+export type CalendarEntryKind = typeof CalendarEntryKind[keyof typeof CalendarEntryKind];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const CalendarEntryKind = {
+  STATEMENT_DUE: 'STATEMENT_DUE',
+  PENDING_TRANSACTION: 'PENDING_TRANSACTION',
 } as const;
 
 export interface RegisterRequest {
@@ -247,6 +293,30 @@ export interface PillarAllocation {
    * @maximum 100
    */
   targetPercent: number;
+  /** First day of the competency this target started applying from. Lets the UI say since when the number has been in force; absent on requests.
+ */
+  effectiveFrom?: string;
+}
+
+export type PillarAllocationsRequestAllocationsItem = {
+  pillar: Pillar;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  targetPercent: number;
+};
+
+/**
+ * All six pillars at once. A subset is rejected — targets are only meaningful as a whole, and a missing pillar is indistinguishable from one the client forgot.
+
+ */
+export interface PillarAllocationsRequest {
+  /**
+   * @minItems 6
+   * @maxItems 6
+   */
+  allocations: PillarAllocationsRequestAllocationsItem[];
 }
 
 /**
@@ -291,6 +361,15 @@ export interface Transaction {
    * @nullable
    */
   contributionPillar?: TransactionContributionPillar;
+  /**
+   * The rule that materialized this row, when it came from a recurrence. The extrato uses it to badge the entry and to offer editing the whole series.
+
+   * @nullable
+   */
+  recurrenceId?: string | null;
+  /** Always sent by the server, empty when the transaction has none. Optional here only so that clients written before Phase 2 keep type-checking.
+ */
+  tags?: Tag[];
 }
 
 export type TransactionRequestType = typeof TransactionRequestType[keyof typeof TransactionRequestType];
@@ -314,6 +393,9 @@ export interface TransactionRequest {
   /** @nullable */
   note?: string | null;
   status?: TransactionStatus;
+  /** Tag names, not ids: a tag is its name, and typing one that does not exist yet creates it. Duplicates within the list are collapsed case-insensitively. Sending the field replaces the whole set; omitting it leaves the current tags alone.
+ */
+  tags?: string[];
 }
 
 export interface TransactionPage {
@@ -520,6 +602,166 @@ export interface StatementPaymentRequest {
   paymentDate: string;
 }
 
+export type RecurrenceType = typeof RecurrenceType[keyof typeof RecurrenceType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const RecurrenceType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * WEEKLY only.
+ * @nullable
+ */
+export type RecurrenceDayOfWeek = DayOfWeek | null;
+
+export interface Recurrence {
+  id: string;
+  type: RecurrenceType;
+  accountId: string;
+  categoryId: string;
+  /** @minimum 1 */
+  amountCents: number;
+  description: string;
+  /** @nullable */
+  note?: string | null;
+  frequency: RecurrenceFrequency;
+  /**
+   * MONTHLY and YEARLY. A day the month does not have falls on its last day — 31 becomes the 28th in February — instead of skipping the month.
+
+   * @minimum 1
+   * @maximum 31
+   * @nullable
+   */
+  dayOfMonth?: number | null;
+  /**
+   * WEEKLY only.
+   * @nullable
+   */
+  dayOfWeek?: RecurrenceDayOfWeek;
+  /**
+   * YEARLY only, paired with dayOfMonth.
+   * @minimum 1
+   * @maximum 12
+   * @nullable
+   */
+  monthOfYear?: number | null;
+  startDate: string;
+  /**
+   * Inclusive; null means open-ended. Set by a THIS_AND_FUTURE edit when it closes the rule.
+   * @nullable
+   */
+  endDate?: string | null;
+  /** A deactivated rule stops producing new occurrences but keeps the ones already materialized — turning off the subscription does not undo the months you paid.
+ */
+  active: boolean;
+}
+
+export type RecurrenceRequestType = typeof RecurrenceRequestType[keyof typeof RecurrenceRequestType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const RecurrenceRequestType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * @nullable
+ */
+export type RecurrenceRequestDayOfWeek = DayOfWeek | null;
+
+/**
+ * The scheduling fields required depend on frequency — dayOfMonth for MONTHLY, dayOfWeek for WEEKLY, dayOfMonth + monthOfYear for YEARLY. OpenAPI cannot express that conditional, so the server checks it and answers VALIDATION_ERROR with the offending field.
+
+ */
+export interface RecurrenceRequest {
+  type: RecurrenceRequestType;
+  accountId: string;
+  categoryId: string;
+  /** @minimum 1 */
+  amountCents: number;
+  /** @maxLength 255 */
+  description: string;
+  /** @nullable */
+  note?: string | null;
+  frequency: RecurrenceFrequency;
+  /**
+   * @minimum 1
+   * @maximum 31
+   * @nullable
+   */
+  dayOfMonth?: number | null;
+  /** @nullable */
+  dayOfWeek?: RecurrenceRequestDayOfWeek;
+  /**
+   * @minimum 1
+   * @maximum 12
+   * @nullable
+   */
+  monthOfYear?: number | null;
+  startDate: string;
+  /** @nullable */
+  endDate?: string | null;
+  active?: boolean;
+}
+
+export interface CalendarMonth {
+  month: string;
+  entries: CalendarEntry[];
+}
+
+/**
+ * IN for money expected, OUT for money owed; null when kind carries it already.
+ * @nullable
+ */
+export type CalendarEntryDirection = TransferDirection | null;
+
+export interface CalendarEntry {
+  date: string;
+  kind: CalendarEntryKind;
+  /** The transaction's description, or the card's name for a statement due date. */
+  description: string;
+  /** Always positive. What it means comes from kind and direction — the remaining balance of the statement for STATEMENT_DUE, the transaction amount otherwise.
+ */
+  amountCents: number;
+  /**
+   * IN for money expected, OUT for money owed; null when kind carries it already.
+   * @nullable
+   */
+  direction?: CalendarEntryDirection;
+  /** @nullable */
+  transactionId?: string | null;
+  /** @nullable */
+  statementId?: string | null;
+  /** @nullable */
+  cardId?: string | null;
+  /** @nullable */
+  accountId?: string | null;
+  /** @nullable */
+  categoryId?: string | null;
+  /**
+   * Set when this pending transaction came from a recurrence.
+   * @nullable
+   */
+  recurrenceId?: string | null;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+}
+
+export interface TagRequest {
+  /**
+   * Unique per workspace, compared case-insensitively; stored as typed.
+   * @maxLength 40
+   */
+  name: string;
+}
+
 export type DashboardSummaryExpenseByCategoryItem = {
   categoryId: string;
   pillar: Pillar;
@@ -545,8 +787,11 @@ export interface DashboardSummary {
 
 export type PillarAllocationReportPillarsItem = {
   pillar: Pillar;
+  /** The target in force during this month, not today's — editing the targets does not rewrite how a closed month was judged.
+ */
   targetPercent: number;
-  /** Expenses by competency + contributions of the pillar (R2, R9). */
+  /** Expenses by competency + contributions of the pillar (R2, R9), counting only SETTLED entries. Pending rows — which recurrences produce by the dozen — belong to the projected balance (R5), not to what the month actually consumed.
+ */
   spentCents: number;
   /**
    * spent ÷ income × 100; null when noIncome.
@@ -569,6 +814,11 @@ export interface PillarAllocationReport {
 export type UnauthorizedResponse = ErrorResponse;
 
 /**
+ * Malformed or inconsistent payload; see error code (VALIDATION_ERROR carries fieldErrors).
+ */
+export type BadRequestResponse = ErrorResponse;
+
+/**
  * Business rule violation; see error code.
  */
 export type ConflictResponse = ErrorResponse;
@@ -589,12 +839,37 @@ export type NotFoundResponse = ErrorResponse;
  */
 export type MonthParameter = string;
 
+/**
+ * Which part of the series the edit or deletion reaches.
+ */
+export type RecurrenceScopeParameter = RecurrenceScope;
+
+/**
+ * The occurrence the scope pivots on. Required for THIS_ONE (VALIDATION_ERROR without it); for THIS_AND_FUTURE it defaults to the next occurrence on or after today, so the change takes effect going forward without the client having to compute the date.
+
+ */
+export type OccurrenceDateParameter = string;
+
+/**
+ * Tag names; a transaction matches when it carries ANY of them (OR), narrowed further by the other filters. Compared case-insensitively, like everything else about tag names.
+
+ */
+export type TagsFilterParameter = string[];
+
 export type ListAccountsParams = {
 includeArchived?: boolean;
 };
 
 export type ListCategoriesParams = {
 type?: CategoryType;
+};
+
+export type ListPillarAllocationsParams = {
+/**
+ * Reference month YYYY-MM; defaults to current month in America/Sao_Paulo.
+ * @pattern ^\d{4}-\d{2}$
+ */
+month?: MonthParameter;
 };
 
 export type ListTransactionsParams = {
@@ -605,6 +880,11 @@ categoryId?: string;
 type?: TransactionType;
 status?: TransactionStatus;
 search?: string;
+/**
+ * Tag names; a transaction matches when it carries ANY of them (OR), narrowed further by the other filters. Compared case-insensitively, like everything else about tag names.
+
+ */
+tags?: TagsFilterParameter;
 page?: number;
 /**
  * @maximum 200
@@ -637,6 +917,45 @@ month?: MonthParameter;
 };
 
 export type GetPillarAllocationParams = {
+/**
+ * Reference month YYYY-MM; defaults to current month in America/Sao_Paulo.
+ * @pattern ^\d{4}-\d{2}$
+ */
+month?: MonthParameter;
+};
+
+export type ListRecurrencesParams = {
+/**
+ * Omit to list every rule, including the ones closed by a THIS_AND_FUTURE edit.
+ */
+active?: boolean;
+};
+
+export type UpdateRecurrenceParams = {
+/**
+ * Which part of the series the edit or deletion reaches.
+ */
+scope?: RecurrenceScopeParameter;
+/**
+ * The occurrence the scope pivots on. Required for THIS_ONE (VALIDATION_ERROR without it); for THIS_AND_FUTURE it defaults to the next occurrence on or after today, so the change takes effect going forward without the client having to compute the date.
+
+ */
+occurrenceDate?: OccurrenceDateParameter;
+};
+
+export type DeleteRecurrenceParams = {
+/**
+ * Which part of the series the edit or deletion reaches.
+ */
+scope?: RecurrenceScopeParameter;
+/**
+ * The occurrence the scope pivots on. Required for THIS_ONE (VALIDATION_ERROR without it); for THIS_AND_FUTURE it defaults to the next occurrence on or after today, so the change takes effect going forward without the client having to compute the date.
+
+ */
+occurrenceDate?: OccurrenceDateParameter;
+};
+
+export type GetCalendarParams = {
 /**
  * Reference month YYYY-MM; defaults to current month in America/Sao_Paulo.
  * @pattern ^\d{4}-\d{2}$
