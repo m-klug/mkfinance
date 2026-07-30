@@ -83,7 +83,7 @@ public class DashboardService {
             contributions.add(new ContributionEntry(row.pillar().toPillar(), row.amountCents()));
         }
 
-        return PillarAllocationCalculator.allocate(income, expenses, contributions, targets(workspaceId));
+        return PillarAllocationCalculator.allocate(income, expenses, contributions, targets(workspaceId, month));
     }
 
     /** The month summary, including the comparison with the previous month. */
@@ -111,9 +111,14 @@ public class DashboardService {
                 openStatements(workspaceId));
     }
 
-    private Map<Pillar, Integer> targets(UUID workspaceId) {
+    /**
+     * The targets in force for {@code month} (BE-6, V13) — never today's, so editing the targets in
+     * July does not rewrite how June was judged. The single seam between the versioned targets and
+     * the pure {@link PillarAllocationCalculator}, which only ever sees a plain {@code Map}.
+     */
+    private Map<Pillar, Integer> targets(UUID workspaceId, YearMonth month) {
         Map<Pillar, Integer> targets = new EnumMap<>(Pillar.class);
-        for (PillarAllocation allocation : pillarAllocationRepository.findByWorkspaceId(workspaceId)) {
+        for (PillarAllocation allocation : pillarAllocationRepository.findEffectiveAt(workspaceId, month.atDay(1))) {
             targets.put(allocation.getId().getPillar(), (int) allocation.getTargetPercent());
         }
         return targets;
