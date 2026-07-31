@@ -14,13 +14,14 @@ CREATE TABLE recurrence_rule (
     description   VARCHAR(255) NOT NULL,
     note          TEXT,
     frequency     VARCHAR(7)   NOT NULL CHECK (frequency IN ('MONTHLY', 'WEEKLY', 'YEARLY')),
-    -- MONTHLY and YEARLY; a day the month does not have falls on the month's last day.
-    day_of_month  SMALLINT     CHECK (day_of_month BETWEEN 1 AND 31),
+    -- MONTHLY and YEARLY; a day the month does not have falls on the month's last day. INTEGER (not
+    -- SMALLINT) to match the Integer field on RecurrenceRule/RecurrenceRequest/RecurrenceResponse.
+    day_of_month  INTEGER      CHECK (day_of_month BETWEEN 1 AND 31),
     -- WEEKLY only.
     day_of_week   VARCHAR(9)
         CHECK (day_of_week IN ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY')),
     -- YEARLY only, paired with day_of_month.
-    month_of_year SMALLINT     CHECK (month_of_year BETWEEN 1 AND 12),
+    month_of_year INTEGER      CHECK (month_of_year BETWEEN 1 AND 12),
     start_date    DATE         NOT NULL,
     -- Inclusive; NULL means open-ended. Set when a THIS_AND_FUTURE edit/delete closes the rule.
     end_date      DATE,
