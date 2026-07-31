@@ -20,9 +20,11 @@ import br.com.mkfinance.api.dashboard.PillarAllocationReportResponse;
 import br.com.mkfinance.api.transaction.TransactionRequest;
 import br.com.mkfinance.api.transaction.TransactionResponse;
 import br.com.mkfinance.api.transaction.TransferRequest;
+import br.com.mkfinance.api.transaction.TransferUpdateRequest;
 import br.com.mkfinance.domain.model.AccountType;
 import br.com.mkfinance.domain.model.ContributionPillar;
 import br.com.mkfinance.domain.model.Pillar;
+import br.com.mkfinance.domain.model.TransactionStatus;
 import br.com.mkfinance.domain.model.TransactionType;
 import br.com.mkfinance.support.ApiSession;
 import java.nio.charset.StandardCharsets;
@@ -127,6 +129,40 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
         assertThat(summary.openStatements()).hasSize(1);
         assertThat(summary.openStatements().get(0).totalCents()).isEqualTo(200_000L);
         assertThat(summary.openStatements().get(0).paidCents()).isEqualTo(120_000L);
+    }
+
+    @Test
+    @DisplayName("BE-6 regression: PENDING entries never move the allocation — only SETTLED counts (R5)")
+    void pendingEntriesDoNotMoveAllocation() {
+        AccountResponse checking = createAccount("Conta", AccountType.CHECKING);
+        AccountResponse investment = createAccount("Corretora", AccountType.INVESTMENT);
+        LocalDate day = LocalDate.of(2026, 9, 15);
+
+        // Only the SETTLED income should count.
+        income(checking, incomeCategory(), 500_000L, day);
+        // A PENDING income must not inflate the month's income (sumIncome).
+        pendingEntry(checking, incomeCategory(), TransactionType.INCOME, 1_000_000L, day);
+
+        // A PENDING expense must not move its pillar (expenseTransactionsByCategory).
+        pendingEntry(checking, expenseCategory(Pillar.PLEASURES), TransactionType.EXPENSE, 250_000L, day);
+
+        // A PENDING contribution must not move its pillar either (contributionsByPillar, R9).
+        TransactionResponse outgoing = aporte(checking, investment, 40_000L, ContributionPillar.GOALS, day);
+        session.patch(
+                path("/transfers/" + outgoing.id()),
+                new TransferUpdateRequest(
+                        null, 40_000L, day, "aporte", null, TransactionStatus.PENDING, ContributionPillar.GOALS),
+                TransactionResponse.class);
+
+        PillarAllocationReportResponse allocation = pillarAllocation("2026-09");
+        assertThat(allocation.incomeCents()).isEqualTo(500_000L);
+        assertPillar(allocation, Pillar.PLEASURES, 10, 0L, 0.0);
+        assertPillar(allocation, Pillar.GOALS, 20, 0L, 0.0);
+
+        // The same PENDING entries must not leak into the summary's income/expense either.
+        DashboardSummaryResponse summary = summary("2026-09");
+        assertThat(summary.incomeCents()).isEqualTo(500_000L);
+        assertThat(summary.expenseByCategory()).isEmpty();
     }
 
     @Test
@@ -258,12 +294,30 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
                 .getBody();
     }
 
-    private void aporte(
+    private TransactionResponse pendingEntry(
+            AccountResponse account, CategoryResponse category, TransactionType type, long amountCents, LocalDate date) {
+        return session.post(
+                        path("/transactions"),
+                        new TransactionRequest(
+                                account.id(),
+                                category.id(),
+                                type,
+                                amountCents,
+                                date,
+                                "pending entry",
+                                null,
+                                TransactionStatus.PENDING),
+                        TransactionResponse.class)
+                .getBody();
+    }
+
+    private TransactionResponse aporte(
             AccountResponse from, AccountResponse to, long amountCents, ContributionPillar pillar, LocalDate date) {
-        session.post(
-                path("/transfers"),
-                new TransferRequest(from.id(), to.id(), amountCents, date, "aporte", pillar),
-                TransactionResponse.class);
+        return session.post(
+                        path("/transfers"),
+                        new TransferRequest(from.id(), to.id(), amountCents, date, "aporte", pillar),
+                        TransactionResponse.class)
+                .getBody();
     }
 
     private void transfer(AccountResponse from, AccountResponse to, long amountCents, LocalDate date) {

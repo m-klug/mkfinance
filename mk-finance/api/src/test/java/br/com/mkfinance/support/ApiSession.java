@@ -43,6 +43,10 @@ public class ApiSession {
         return exchange(path, HttpMethod.PATCH, body, type);
     }
 
+    public <T> ResponseEntity<T> put(String path, Object body, Class<T> type) {
+        return exchange(path, HttpMethod.PUT, body, type);
+    }
+
     public <T> ResponseEntity<T> delete(String path, Class<T> type) {
         return exchange(path, HttpMethod.DELETE, null, type);
     }
