@@ -1,5 +1,6 @@
 package br.com.mkfinance.api.error;
 
+import br.com.mkfinance.application.recurrence.RecurrenceValidationException;
 import br.com.mkfinance.domain.exception.AppException;
 import br.com.mkfinance.domain.exception.ErrorCode;
 import jakarta.validation.ConstraintViolationException;
@@ -44,6 +45,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         List<FieldErrorDto> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
                 .map(fe -> new FieldErrorDto(fe.getField(), toMachineCode(fe.getCode())))
+                .toList();
+        return ResponseEntity.badRequest().body(new ErrorResponse(ErrorCode.VALIDATION_ERROR, null, fieldErrors));
+    }
+
+    /**
+     * The conditional scheduling validation OpenAPI cannot express (CT-1: which field a
+     * {@code RecurrenceRequest} requires depends on {@code frequency}) — reported the same way Bean
+     * Validation would be.
+     */
+    @ExceptionHandler(RecurrenceValidationException.class)
+    public ResponseEntity<ErrorResponse> handleRecurrenceValidation(RecurrenceValidationException ex) {
+        List<FieldErrorDto> fieldErrors = ex.getViolations().stream()
+                .map(violation -> new FieldErrorDto(violation.field(), violation.code()))
                 .toList();
         return ResponseEntity.badRequest().body(new ErrorResponse(ErrorCode.VALIDATION_ERROR, null, fieldErrors));
     }
