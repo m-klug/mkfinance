@@ -28,5 +28,7 @@ public record TransactionResponse(
          */
         TransferDirection transferDirection,
         /** Set on transfers into INVESTMENT/SAVINGS accounts (R9). */
-        ContributionPillar contributionPillar) {
+        ContributionPillar contributionPillar,
+        /** The rule that materialized this row, when it came from a recurrence (CT-1); null otherwise. */
+        UUID recurrenceId) {
 }

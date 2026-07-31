@@ -1,6 +1,8 @@
 package br.com.mkfinance.infrastructure.persistence;
 
 import br.com.mkfinance.domain.model.Transaction;
+import br.com.mkfinance.domain.model.TransactionStatus;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,6 +23,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
 
     /** Both legs of a mirrored transfer pair (R4) — used to keep edits/deletes atomic. */
     List<Transaction> findByTransferPairId(UUID transferPairId);
+
+    /** The calendar's "still-pending transactions" entries for a month (contract tag {@code calendar}). */
+    List<Transaction> findByWorkspaceIdAndStatusAndDateBetweenOrderByDateAsc(
+            UUID workspaceId, TransactionStatus status, LocalDate from, LocalDate to);
 
     /**
      * Whether this transaction is the debit side of a credit-card statement payment (R2), in which
