@@ -162,6 +162,18 @@ Hoje **nenhuma** das queries de `application/dashboard/DashboardAggregateReposit
 - **Regras críticas**: frequência mensal em dia inexistente (31 em fevereiro) cai no último dia do mês; desativar a regra não apaga ocorrências já materializadas; excluir a regra não apaga transações já efetivadas.
 - **Aceite**: testes de unidade da geração de datas (dia 31, ano bissexto, semanal cruzando mês, anual); materializar o mesmo mês duas vezes **não** duplica transações; `THIS_AND_FUTURE` não altera ocorrências passadas.
 
+#### ✅ E6 concluída (BE-6 · BE-7 · FE-5) — 30/07/2026
+
+Gate verde na `main` com as três frentes integradas: `./mvnw clean verify` 237 testes, `npm test` 79, `npm run build` e `docker compose config` ok. Reservas de Flyway respeitadas (V13 · V14–V15), zero sobreposição de arquivo entre as frentes de back.
+
+**⚠️ Pendência real herdada da BE-7 — a materialização NÃO está ligada ao extrato.**
+
+A ficha dizia "ao ler o mês (extrato ou calendário), as ocorrências faltantes nascem". A BE-7 ligou a materialização **só ao endpoint do calendário**, com uma justificativa boa: o `GET /transactions` filtra por `from`/`to`, um intervalo arbitrário sem noção de competência, e materializar sob um range ilimitado é exatamente o "escrever linhas até 2094" que o contrato evita. `TransactionController`/`TransactionService` também estavam fora da propriedade dela, então parar foi o comportamento certo.
+
+**Consequência de produto**: hoje uma recorrência só vira transação pendente depois que alguém abre o calendário daquele mês. Quem for direto ao extrato não vê o salário do mês. **Isso precisa ser resolvido na E7** — decidir entre (a) o extrato ganhar um modo "por competência" que dispara a materialização, (b) a FE-6 garantir que a navegação passe pelo calendário, ou (c) materializar sob range limitado quando `from`/`to` couberem em uma competência. **É decisão de produto, não de implementação — leve ao usuário antes de codar.** Enquanto não resolvido, o E2E da INT-2 ("confirmar recorrência") tem que abrir o calendário antes do extrato, senão passa por acidente.
+
+Outras duas decisões registradas, sem impacto de contrato: fechar regra por `THIS_AND_FUTURE` marca `active=false` além de gravar `end_date`; e payload com seis itens mas pilar duplicado/ausente responde `400 VALIDATION_ERROR` genérico, sem código de erro novo.
+
 ### BE-8 — Tags `[E7 · spring-boot-engineer]` (V16–V17)
 
 - **Objetivo**: tags livres e múltiplas por transação, filtráveis no extrato.
