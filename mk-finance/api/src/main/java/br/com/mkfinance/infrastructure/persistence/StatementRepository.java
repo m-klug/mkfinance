@@ -34,4 +34,14 @@ public interface StatementRepository extends JpaRepository<Statement, UUID> {
               and s.cardId in (select c.id from Card c where c.workspaceId = :workspaceId)
             """)
     Optional<Statement> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") UUID workspaceId);
+
+    /** Statements of the workspace due within {@code [from, to]} — the calendar's STATEMENT_DUE entries. */
+    @Query("""
+            select s from Statement s
+            where s.dueDate between :from and :to
+              and s.cardId in (select c.id from Card c where c.workspaceId = :workspaceId)
+            order by s.dueDate asc
+            """)
+    List<Statement> findByWorkspaceIdAndDueDateBetween(
+            @Param("workspaceId") UUID workspaceId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

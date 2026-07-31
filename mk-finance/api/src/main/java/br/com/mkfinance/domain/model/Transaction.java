@@ -99,6 +99,14 @@ public class Transaction {
     @Column(name = "contribution_pillar", length = 20)
     private ContributionPillar contributionPillar;
 
+    /**
+     * The {@link RecurrenceRule} that materialized this row, when it came from a recurrence (CT-1,
+     * V14__recurrences.sql). Null for every ordinary entry. The extrato and the calendar both use it
+     * to badge the row and offer editing the whole series.
+     */
+    @Column(name = "recurrence_id")
+    private UUID recurrenceId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
