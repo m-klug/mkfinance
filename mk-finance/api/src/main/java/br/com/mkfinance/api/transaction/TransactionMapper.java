@@ -68,7 +68,8 @@ public class TransactionMapper {
                 transaction.getStatus(),
                 transaction.getTransferPairId(),
                 transaction.getTransferDirection(),
-                contributionPillar);
+                contributionPillar,
+                transaction.getRecurrenceId());
     }
 
     public TransactionResponse toResponse(TransferPair pair) {
