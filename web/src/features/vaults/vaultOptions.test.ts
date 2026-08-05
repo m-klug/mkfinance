@@ -139,7 +139,7 @@ describe("clampPercent", () => {
 
 describe("vaultSelectOptions", () => {
   it("puts the literal unallocated option first, mapped from value=''", () => {
-    const options = vaultSelectOptions((key: string) => key, [reserveVault, tripVault]);
+    const options = vaultSelectOptions(fakeT, [reserveVault, tripVault]);
     expect(options[0]).toEqual({ value: "", label: "vaults.unallocatedOption" });
     expect(options.slice(1)).toEqual([
       { value: "vault-reserve", label: "Reserva" },
@@ -148,11 +148,7 @@ describe("vaultSelectOptions", () => {
   });
 
   it("drops archived vaults and an optionally excluded vault", () => {
-    const options = vaultSelectOptions(
-      (key: string) => key,
-      [reserveVault, tripVault, archivedVault],
-      "vault-reserve",
-    );
+    const options = vaultSelectOptions(fakeT, [reserveVault, tripVault, archivedVault], "vault-reserve");
     expect(options.map((option) => option.value)).toEqual(["", "vault-trip"]);
   });
 });
