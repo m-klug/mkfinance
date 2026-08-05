@@ -61,9 +61,19 @@ function readCookie(name: string): string | undefined {
 function buildQuery(params: Record<string, unknown>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null) {
-      search.append(key, String(value));
+    if (value === undefined || value === null) continue;
+    // Array params are `style: form, explode: true` in the contract — repeated keys, not one
+    // comma-joined value. String(array) would produce the latter, which happens to bind in Spring
+    // but silently swallows any value containing a comma.
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined && item !== null) {
+          search.append(key, String(item));
+        }
+      }
+      continue;
     }
+    search.append(key, String(value));
   }
   const query = search.toString();
   return query ? `?${query}` : "";
