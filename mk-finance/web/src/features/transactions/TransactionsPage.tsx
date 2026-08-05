@@ -43,9 +43,9 @@ import { TagsInput } from "@/features/transactions/TagsInput";
 import {
   categoryOptions,
   firstDayOfCurrentMonthIso,
+  lastDayOfCurrentMonthIso,
   lookupName,
   signedAmountCents,
-  todayIso,
   transactionTypeOptions,
 } from "@/features/transactions/transactionUtils";
 
@@ -67,10 +67,12 @@ export default function TransactionsPage() {
   const queryClient = useQueryClient();
   const workspaceId = useCurrentWorkspaceId();
 
-  // Defaults to the running month — the view a user wants 95% of the time.
+  // Defaults to the whole running month, not "up to today": a competency includes what is already
+  // scheduled inside it — a recurrence occurrence, a bill entered with "agendar como pendente" —
+  // and ending the window on today hid those rows even though they existed.
   const [filters, setFilters] = useState<Filters>(() => ({
     from: firstDayOfCurrentMonthIso(),
-    to: todayIso(),
+    to: lastDayOfCurrentMonthIso(),
     accountId: "",
     categoryId: "",
     type: "",
