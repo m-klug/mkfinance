@@ -52,9 +52,7 @@ export function VaultEntriesSheet({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("vaults.entriesTitle", { name: vault?.name ?? "" })}</DialogTitle>
-          <DialogDescription className="sr-only">
-            {t("vaults.entriesTitle", { name: vault?.name ?? "" })}
-          </DialogDescription>
+          <DialogDescription>{t("vaults.entriesSubtitle")}</DialogDescription>
         </DialogHeader>
 
         {isPending && <p className="text-muted-foreground">{t("common.loading")}</p>}
