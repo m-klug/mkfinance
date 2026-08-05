@@ -1,0 +1,450 @@
+# Plano de Desenvolvimento das Caixinhas — MK Finance
+
+> Plano operacional para execução **multi-agente** da fatia "Caixinhas", adiada da Fase 2 de propósito
+> (ver `DESENVOLVIMENTO-FASE2.md` §7 "Fora do escopo desta fase").
+> Gerado em 05/08/2026, com a Fase 2 fechada na `main` e a stack rodando self-hosted.
+> Sucede o `DESENVOLVIMENTO-FASE2.md` (E5–E8), que permanece como registro daquela fase.
+
+---
+
+## 0. Por que esta fatia existe
+
+Hoje uma conta de investimento é **um montante único** e o pilar do aporte vem de `Account.defaultContributionPillar`. Isso não distingue "R$ 6.000 de reserva de emergência" de "R$ 4.000 da viagem de 2027" dentro da mesma corretora, e trata o pilar como propriedade da **conta** quando ele é, na verdade, propriedade do **destino do dinheiro**.
+
+As caixinhas são subdivisões virtuais da conta: o saldo real continua um montante único derivado de `transaction`, mas se reparte logicamente entre caixinhas + uma fatia "não alocado". Isso **refina a regra 9** (o pilar do aporte passa a vir da caixinha de destino) e **absorve o conceito de "metas de economia"** do roadmap (valor-alvo + prazo + progresso).
+
+Foi adiada da Fase 2 porque mexe no mesmo motor de alocação que os alvos versionados da BE-6 — e as duas coisas não deviam andar juntas. Com a BE-6 estável em produção, a espera acabou.
+
+---
+
+## 1. Como executar este plano com agentes
+
+### 1.1 Personas (skills em `.claude/agents/`)
+
+| Persona | Responsabilidade nesta fatia |
+|---|---|
+| `java-architect` | Contrato OpenAPI (CT-2) e integração final (INT-3) |
+| `spring-boot-engineer` | Backend: BE-9, BE-10, BE-11 |
+| `react-specialist` | Frontend: FE-8, FE-9 |
+
+Cada ficha da seção 5 é executada por **um agente**, com o prompt contendo: a ficha completa, as convenções da seção 2, **o desenho da seção 4 na íntegra** e as armadilhas da seção 7.
+
+### 1.2 Regras de sincronização
+
+Idênticas às da Fase 2 (`DESENVOLVIMENTO-FASE2.md` §1.2) — repetidas aqui só nos pontos que mudam:
+
+1. **O contrato é o ponto único de sincronização.** CT-2 roda sozinha e primeiro; depois back e front correm em paralelo contra os mocks MSW gerados.
+2. **Mudança de contrato é exclusiva do `java-architect`.** Quem descobrir que precisa, PARA e registra o pedido — não edita.
+3. **Propriedade exclusiva de arquivos.** A tabela de donos está em cada ficha e é conferida na seção 5.4. **Frentes paralelas nunca compartilham arquivo** — foi a lição cara da Fase 2.
+4. **Migrações Flyway: V18–V19** — ver o aviso da seção 3.
+5. **Definition of Done**: código + testes locais verdes (`./mvnw verify` no back, requer Docker; `npm test && npm run build` no front) + chaves i18n + zero warning novo.
+6. **Commits incrementais desde o início.**
+
+### 1.3 Ordem de execução e paralelismo
+
+```
+E9: CT-2 ──┬── E10: BE-9 ──┬── E11: BE-10 ─┬── E12: INT-3
+(contrato,  │        FE-8 ──┘        BE-11 ─┤    (sequencial)
+ sozinha)   │                         FE-9 ─┘
+```
+
+Dentro de cada etapa as frentes rodam **em paralelo**. Uma etapa só começa quando o gate da anterior passou (seção 6).
+
+---
+
+## 2. Convenções obrigatórias
+
+**Herda integralmente a seção 2 do `DESENVOLVIMENTO-FASE2.md`** — dinheiro em `long`/centavos, `LocalDate` para data de negócio via `BusinessClock`, isolamento por workspace (regra 8) em toda query, erros como código de máquina em `ErrorResponse`, i18n sem string literal em JSX, Lombok nas entidades e `record` nos DTOs, `<select>` nativo de `components/form/fields.tsx`, sem relacionamento JPA (FKs são UUID escalares), regra de negócio pura em `domain/service/` como classe final estática, e **nunca editar `web/src/lib/api/generated/**`**.
+
+Duas convenções que esta fatia exercita mais do que as anteriores:
+
+- **Toda aritmética de dinheiro nova nasce como classe pura testável sem Spring**, com a invariante assertada antes de retornar — no molde de `InstallmentSplitter.assertSumMatches`. São três nesta fatia: `VaultBalanceCalculator`, `VaultGoalCalculator`, `YieldDistributor`.
+- **Saldo nunca é materializado.** `AccountBalanceService` agrega no banco e soma em Java a partir de buckets; o saldo da caixinha faz igual. Campo de saldo em tabela é regressão, não otimização.
+
+---
+
+## 3. Etapas
+
+| Etapa | Frentes | Persona | Pré-requisito |
+|---|---|---|---|
+| **E9 — Contrato** | CT-2 (sequencial) | java-architect | Fase 2 fechada |
+| **E10 — Caixinha & tela** | BE-9 · FE-8 | spring-boot-engineer, react-specialist | Gate E9 |
+| **E11 — Aporte, rendimento & diálogos** | BE-10 · BE-11 · FE-9 | spring-boot-engineer ×2, react-specialist | Gate E10 |
+| **E12 — Integração** | INT-3 (sequencial) | java-architect | Gate E11 |
+
+### ⚠️ Reserva Flyway — esta fatia usa V18 e V19
+
+**BE-9 → V18 (`vault`) e V19 (`vault_entry`). Nenhuma outra ficha cria migração.**
+
+A máxima aplicada hoje é **V17**. `spring.flyway.out-of-order` **não está habilitado** e há banco de produção migrado: migração com versão menor que a máxima faz o Flyway falhar a validação no boot. Os buracos de V3–V6, V8 e V10–V12 são **permanentes**.
+
+Lembrete: `jpa.hibernate.ddl-auto: validate` — campo novo de entidade sem migração correspondente derruba a aplicação no boot.
+
+---
+
+## 4. Desenho — decisões fechadas, vinculantes para todas as fichas
+
+> Esta seção é o coração do plano. Nenhuma ficha decide nada aqui de novo; todas executam o que está escrito.
+
+### 4.0 Decisões de produto (fechadas com o usuário em 05/08/2026)
+
+| Decisão | Escolha |
+|---|---|
+| Escopo | Núcleo **+ meta (valor-alvo/prazo, projeção linear) + remanejo entre caixinhas + rendimento distribuível** |
+| Caixinha obrigatória? | **Opcional.** Conta sem caixinha funciona exatamente como hoje. Ganhou a primeira caixinha não-arquivada, o aporte nela passa a exigir uma. **Nada migra em produção, nenhuma caixinha automática** |
+| UI | **Detalhe da conta**, rota `/accounts/:accountId/vaults`, no molde de `/cards/:cardId/statements`. Sem item novo no menu |
+| Rendimento conta como receita? | **Não.** Categoria de sistema — sobe saldo e caixinha, aparece no extrato, fica fora do tile "receitas do mês" e do denominador da R10 |
+
+A escolha do rendimento tem precedente **verificado no código**: `DashboardService.summary` monta o tile de despesas a partir de `expenseByCategory`, que descarta `systemCategory` — exatamente como a alocação faz. Categoria de sistema já é invisível para os dois. O rendimento herda esse tratamento, mantendo **uma única definição de receita** para que tile e denominador nunca discordem.
+
+### 4.1 Saldo da caixinha → livro-razão único `vault_entry`
+
+Três fontes de movimento não cabem numa coluna `vault_id` na `transaction`: aporte/resgate **é** transação (1:1), remanejo **não é** transação (0:2) e rendimento é **1 transação para N caixinhas** (1:N). Um razão único resolve os três e mantém o saldo **derivado por agregação no banco**, como `AccountBalanceService` já faz via `aggregateBalanceBuckets`.
+
+**A decisão que evita drift:** a linha de aporte/resgate **não duplica valor nem status** da transação — `amount_cents` fica `NULL` e significa *"espelhe o valor assinado da transação"*, reusando `BalanceCalculator.signedAmountCents` **literalmente**. Consequência prática: `TransferService.update` pode mudar valor, data e status à vontade **sem tocar no razão**, e apagar a transação limpa o razão pelo `ON DELETE CASCADE` — a mesma disciplina que a V17 usa em `transaction_tag`. Só remanejo e rendimento carregam valor próprio, porque não têm transação 1:1.
+
+### 4.2 PENDING vs SETTLED
+
+A caixinha espelha a conta: `balanceCents` (SETTLED) e `projectedBalanceCents` (SETTLED+PENDING).
+
+**Remanejo não tem status e entra nos dois.** Não é dinheiro a confirmar com o banco — é reclassificação contábil que já aconteceu no instante em que foi registrada. Não existe "remanejo pendente".
+
+A identidade **`Σ caixinhas + não alocado = saldo da conta`** vale nos dois níveis, por construção.
+
+### 4.3 "Não alocado" → calculado, nunca linha
+
+`unallocatedCents = account.balanceCents − Σ vault.balanceCents` (idem projetado).
+
+Uma caixinha "não alocado" real precisaria de nome e pilar — e o ponto dela é ser dinheiro que **ainda não escolheu pilar**. Além disso teria de ser criada por migração em contas antigas e mantida em sincronia em todo caminho de escrita. Calculada, a identidade é verdadeira por definição.
+
+Duas guardas, propositalmente assimétricas:
+
+| Situação | Tratamento |
+|---|---|
+| Uma **caixinha** ficaria negativa | **Bloqueado** — `VAULT_INSUFFICIENT_BALANCE` (409, `params: {vaultId, availableCents}`), via `VaultBalanceService.assertNotOverdrawn(vaultId)` chamado **ao fim** de toda mutação que toca a caixinha. Como lê o pós-estado do razão, funciona igual para qualquer caminho de escrita |
+| **Não alocado** ficaria negativo | **Só exibido** (fatia vermelha + "R$ X a descoberto"). Bloquear acoplaria *todo* caminho de escrita do app à feature — despesa direta na conta, pagamento de fatura debitando ela, edição do `initialBalanceCents`. O app já exibe saldo de conta negativo em vez de proibir |
+
+Movimento PENDING não derruba o saldo corrente, então nunca é bloqueado na criação — é bloqueado **no settle**, pela mesma chamada.
+
+### 4.4 Resolução do pilar — a regra completa
+
+`TransferService.resolveContributionPillar` ganha o argumento `Vault destinationVault`:
+
+| Destino | `vaultId` | Resultado |
+|---|---|---|
+| Não é INVESTMENT/SAVINGS | qualquer | `requested != null` → `INVALID_CONTRIBUTION_PILLAR` (**inalterado**); `vaultId != null` → `VAULT_NOT_FOUND`; pilar `null` |
+| INV/SAV **sem** caixinha ativa | ausente | **Comportamento de hoje, bit a bit**: `requested ?? fromPillar(account.default)`; se `null` → `CONTRIBUTION_PILLAR_REQUIRED` |
+| INV/SAV **sem** caixinha ativa | presente | `VAULT_NOT_FOUND` |
+| INV/SAV **com** caixinha ativa | ausente | `VAULT_REQUIRED` (400) |
+| INV/SAV **com** caixinha ativa | arquivada | `VAULT_ARCHIVED` (409) |
+| INV/SAV **com** caixinha ativa | presente, sem pilar explícito | pilar = `vault.contributionPillar` |
+| INV/SAV **com** caixinha ativa | presente, pilar **igual** ao da caixinha | **aceito** |
+| INV/SAV **com** caixinha ativa | presente, pilar **diferente** | `VAULT_PILLAR_CONFLICT` (400) |
+
+Aceitar "pilar igual" não é frouxidão: o front devolve o `contributionPillar` que leu da resposta, e transformar um round-trip idêntico em erro quebraria a edição sem nada ter mudado.
+
+`hasVaults` = **existe caixinha não-arquivada** naquela conta.
+
+**Resgate também exige caixinha.** Hoje `create` só inspeciona o destino; agora a **origem** também: se a conta de origem tem caixinha, a perna OUT exige `fromVaultId`. Por isso `TransferRequest` ganha **dois** campos: `fromVaultId` e `toVaultId`.
+
+**No `update`**: `vaultId` re-aponta a caixinha da **perna endereçada**, simétrico ao `accountId`, que já move só a perna editada. Omitido, **carrega a caixinha atual adiante enquanto a perna continuar na mesma conta**; se `accountId` moveu a perna, a caixinha antiga é descartada (pertence à conta antiga) e a regra roda do zero contra o novo destino. É a mesma frase que já existe ("mover para conta corrente derruba o pilar"), um nível mais fundo. `contributionPillar` no update vira **advisório**: conflita → `VAULT_PILLAR_CONFLICT`; igual ou omitido → a caixinha manda.
+
+**Onde o razão é escrito:** `TransferService` **não** ganha segunda responsabilidade. Nasce `application/vault/VaultLinkService` com `link` / `relink` / `unlink`, e `TransferService` depende dele. A dependência é unidirecional (`transaction → vault`); o pacote `vault` só conhece seus próprios repositórios, então não há ciclo.
+
+### 4.5 Rendimento
+
+**Como é lançado**: transação **INCOME** na conta, sob **categoria de sistema** "Rendimento de investimentos", criada lazy no molde exato de `application/card/StatementPaymentCategoryProvider` (find-or-create com `uq_category_system_name` da V9 arbitrando a corrida). Endpoint dedicado que cria a transação e as N linhas de razão numa transação só.
+
+INCOME e não tipo novo porque **o dinheiro realmente entrou** — o saldo tem de subir. Tipo novo obrigaria mexer em `BalanceCalculator.signedAmountCents`, `TransactionType`, `ck_transaction_category` e no extrato: regressão gratuita.
+
+**Não consome pilar.** Aporte consome pilar porque é dinheiro que o usuário *direcionou* da renda dele; rendimento é dinheiro que o mercado deu — nada foi alocado. Sendo INCOME (nunca TRANSFER), `contributionsByPillar` jamais o enxerga e **`PillarAllocationCalculator` não muda uma linha**.
+
+**Rateio pro-rata, maior resto (Hamilton)** em `domain/service/YieldDistributor`:
+
+```
+base_i  = saldo CURRENT da caixinha i na data do rendimento; base_i <= 0 → excluída
+share_i = floor(total * base_i / Σbase)
+sobra   = total − Σ share_i            // 0 <= sobra < nº de caixinhas
+```
+
+A sobra é distribuída **um centavo por caixinha**, em ordem decrescente de resto fracionário; empate desempata por `base_i` maior, depois `name` (case-insensitive), depois `id` — determinístico e testável. Se `Σbase == 0`, o rendimento é lançado **sem nenhuma linha de razão** e cai inteiro no não alocado: honesto, não inventa alocação.
+
+Termina com o mesmo `assertSumMatches` de `InstallmentSplitter`. **A sobra vai para o maior resto, e não para a última** como no `InstallmentSplitter` — lá as partes são iguais e "última" é arbitrário; aqui as partes são proporcionais e o maior resto é o critério justo. **Documentar a diferença no javadoc**, senão alguém "uniformiza" depois e quebra a justiça do rateio.
+
+### 4.6 Meta e projeção linear
+
+Regra pura em `domain/service/VaultGoalCalculator`, no molde de `RecurrenceScheduler`. **A API devolve pronto**; o front só formata e desenha a barra — precedente `PillarAllocationCalculator.Report`, e `today` em `America/Sao_Paulo` é assunto de servidor.
+
+- `remaining = max(0, target − current)`
+- `progressPercent = current * 100.0 / target`, **não capado** — mesma escolha de `actualPercent`, que deixa o cliente destacar o estouro
+- `monthsRemaining = MONTHS.between(YearMonth(today), YearMonth(targetDate)) + 1`, piso 0 — conta a competência corrente, semântica do app
+- `monthlyNeeded = ceilDiv(remaining, monthsRemaining)` — **teto**, senão pagar o sugerido todo mês fica centavos curto
+- `status` ∈ `IN_PROGRESS` | `REACHED` | `OVERDUE`:
+  - **Vencida**: `monthsRemaining = 0`, `monthlyNeeded = remaining` (tudo, agora) — **não `null`**; o cliente não deve precisar de caso especial para dizer "faltam R$ X, prazo vencido"
+  - **Batida**: `remaining = 0`, `monthlyNeeded = 0`, barra cheia, para de cobrar
+  - **Sem prazo** (meta de valor sem data, válida): `monthsRemaining` e `monthlyNeeded` `null`, status ∈ {IN_PROGRESS, REACHED}
+- Javadoc explicita **projeção linear, sem rentabilidade** — o simulador de renda fixa é Fase 3
+
+### 4.7 Arquivar e excluir
+
+Espelha `Account` (flag `archived`, recusa exclusão com histórico):
+
+- `DELETE /vaults/{id}` → `VAULT_HAS_ENTRIES` (409) se existe qualquer `vault_entry`; senão exclusão física
+- `POST /vaults/{id}/archive` → `VAULT_NOT_EMPTY` (409) se saldo ≠ 0 em qualquer dos dois níveis
+
+Exigir vazia para arquivar tem motivo: caixinha arquivada **com saldo** teria de continuar aparecendo na composição (o dinheiro está lá) e ainda contaria para `hasVaults`, prendendo o usuário num estado sem saída — todo aporte exigiria caixinha e nenhuma seria selecionável. Exigindo vazia, arquivar a última **de fato** devolve a conta ao modo sem caixinha.
+
+**O remanejo aceita cada lado nulo, significando "não alocado"** — e é isso que torna a feature usável:
+
+| from | to | Significado |
+|---|---|---|
+| A | B | remanejo clássico entre caixinhas da mesma conta |
+| A | `null` | devolve ao não alocado (é assim que se esvazia a última caixinha) |
+| `null` | A | **aloca saldo pré-existente da conta numa caixinha** |
+| `null` | `null` | 400 `VALIDATION_ERROR` + `fieldErrors` |
+
+A terceira linha é **obrigatória para a feature existir**: sem ela, quem já tem R$ 50 mil na conta não consegue reparti-los sem inventar transferências falsas. Com ela, o onboarding é: cria as caixinhas → aloca o saldo existente.
+
+### 4.8 Consequência conhecida — não é bug, é a regra
+
+**Resgatar de uma caixinha não devolve o pilar.** O resgate é a perna OUT, e perna OUT tem `contributionPillar` sempre nulo — comportamento do MVP, preservado de propósito: o aporte consumiu o pilar na competência em que aconteceu, e competência fechada não se reescreve (mesma doutrina da V13). Idem trocar o pilar de uma caixinha: vale de frente pra frente, não reescreve aportes já lançados.
+
+---
+
+## 5. Fichas de tarefa
+
+### CT-2 — Contrato das Caixinhas `[E9 · java-architect, sequencial]`
+
+- **Objetivo**: fechar em `mk-finance/contracts/openapi.yaml` toda a superfície de API das caixinhas, destravando back e front em paralelo.
+- **Dono de**: `mk-finance/contracts/openapi.yaml`, `domain/exception/ErrorCode.java`, `domain/exception/AppException.java`.
+- **Escopo** — tag nova `vaults` (após `tags`, antes de `export`):
+
+| Método + path | operationId |
+|---|---|
+| `GET /workspaces/{ws}/accounts/{accountId}/vaults` | `listVaults` → **`VaultComposition`** (a composição inteira num request), query `includeArchived` (default false) |
+| `POST /workspaces/{ws}/accounts/{accountId}/vaults` | `createVault` → 201 `Vault` |
+| `PATCH /workspaces/{ws}/vaults/{vaultId}` | `updateVault` |
+| `POST /workspaces/{ws}/vaults/{vaultId}/archive` | `archiveVault` |
+| `DELETE /workspaces/{ws}/vaults/{vaultId}` | `deleteVault` → 204 |
+| `GET /workspaces/{ws}/vaults/{vaultId}/entries` | `listVaultEntries` (extrato da caixinha, `from`/`to`, mais recente primeiro) |
+| `POST /workspaces/{ws}/vaults/reallocations` | `reallocateVault` |
+| `DELETE /workspaces/{ws}/vaults/reallocations/{id}` | `deleteVaultReallocation` (apaga o grupo inteiro) |
+| `POST /workspaces/{ws}/accounts/{accountId}/vault-yields` | `createVaultYield` → devolve o rateio aplicado |
+
+  - **Schemas novos**: `Vault`, `VaultGoal`, `VaultGoalStatus`, `VaultRequest`, `VaultComposition`, `VaultEntry`, `VaultEntrySource`, `VaultReallocationRequest`/`VaultReallocation`, `VaultYieldRequest`/`VaultYield`.
+  - **Schemas alterados**: `TransferRequest` (+`fromVaultId`, `+toVaultId`), `TransferUpdateRequest` (+`vaultId`), `Transaction` (+`vaultId`, para o badge no extrato), `Account` (+`hasVaults`, para o diálogo saber sem N requests), `components/parameters` (+`vaultId`, `+reallocationId`).
+  - **Códigos de erro** (constante + factory + bloco no comentário de `ErrorResponse.code`): `VAULT_NOT_FOUND` 404 · `VAULT_REQUIRED` 400 · `VAULT_PILLAR_CONFLICT` 400 · `VAULT_ACCOUNT_MISMATCH` 400 · `VAULT_INSUFFICIENT_BALANCE` 409 · `VAULT_NAME_DUPLICATE` 409 · `VAULT_NOT_EMPTY` 409 · `VAULT_HAS_ENTRIES` 409 · `VAULT_ARCHIVED` 409 · `VAULT_REALLOCATION_NOT_FOUND` 404.
+  - Rendimento **não** tem endpoint de exclusão: é transação INCOME, apagada por `DELETE /transactions/{id}`, e o cascade limpa o razão.
+  - Remanejo com os dois lados nulos usa `VALIDATION_ERROR` + `fieldErrors` — obrigatoriedade condicional que o OpenAPI não expressa (decisão 2 da CT-1).
+- **Aceite**: `npm run api:generate` limpo, produzindo hooks + mocks MSW da tag `vaults`; `npm run build` e `./mvnw compile` verdes; nenhum endpoint existente quebra de forma incompatível.
+
+### BE-9 — Caixinha, razão, saldo e meta `[E10 · spring-boot-engineer]` (V18–V19)
+
+- **Objetivo**: a caixinha existir, ter saldo correto e ter meta.
+- **Dono de**: `domain/model/Vault*`, `domain/service/{VaultBalanceCalculator, VaultGoalCalculator}`, `application/vault/**` (exceto os arquivos de yield), `api/vault/**`, `infrastructure/persistence/Vault*`, V18–V19, **e o campo `hasVaults` em `AccountResponse`/`AccountMapper`** (exceção de propriedade registrada aqui).
+- **Não toca**: `application/transaction/**`, `application/dashboard/**`.
+- **Passos**:
+  1. V18 + V19 (DDL na seção 5.5) e entidades `Vault`, `VaultEntry`, enums `VaultEntrySource`, `VaultGoalStatus`.
+  2. **`VaultBalanceCalculator` + teste unitário ANTES de qualquer repositório** — a aritmética primeiro, e a identidade `Σ + não alocado = conta` assertada dentro dela.
+  3. Repositórios com as três agregações (seção 5.5) + `VaultBalanceService`, expondo `assertNotOverdrawn(vaultId)`.
+  4. `VaultService`: CRUD, arquivar, excluir, validação de nome duplicado e de tipo de conta (só INVESTMENT/SAVINGS) + controller.
+  5. `VaultGoalCalculator` + teste + a meta na resposta.
+  6. `VaultReallocationService`, **incluindo os lados nulos** (§4.7).
+  7. Testes de integração + `hasVaults`.
+- **Aceite**: composição fecha a identidade em cenário com aporte SETTLED, aporte PENDING e remanejo; arquivar/excluir respeitam §4.7.
+
+### FE-8 — Tela de caixinhas `[E10 · react-specialist]`
+
+- **Objetivo**: a tela de composição da conta, com metas e remanejo.
+- **Dono de**: `web/src/features/vaults/**`, `web/src/App.tsx`, `web/src/features/accounts/**`, `web/src/mocks/handlers.ts`, `web/src/test/financeFixtures.ts`, namespace `vaults` do i18n.
+- Desenvolve contra MSW; **não espera a BE-9**.
+- **Passos**:
+  1. Rota `/accounts/:accountId/vaults` + esqueleto da página a partir do molde de `CardStatementsPage` (cabeçalho com nome/saldo da conta e `<Link>` de volta). **Sem item novo no menu**; a entrada é uma ação "Caixinhas" na linha de `AccountsPage`, só para INVESTMENT/SAVINGS.
+  2. Listagem + `VaultCompositionCard` (barra empilhada, fatia "não alocado", **negativa em vermelho**).
+  3. `VaultFormDialog` — `TextField` (nome), `SelectField` nativo (pilar), `MoneyField` (valor-alvo), data (prazo), cor.
+  4. `VaultGoalBar` — **só renderiza números vindos da API**, não recalcula.
+  5. `VaultReallocateDialog` — origem/destino com a opção literal "Não alocado" (`value=""`).
+  6. `VaultEntriesSheet` — extrato da caixinha.
+  7. `vaultOptions.ts` (helpers puros), fixtures determinísticas, testes co-localizados, chaves i18n.
+- **Aceite**: `npm test && npm run build` verdes; nenhuma string literal em JSX.
+
+### BE-10 — Aporte e resgate por caixinha `[E11 · spring-boot-engineer]`
+
+- **Objetivo**: o pilar do aporte passar a vir da caixinha.
+- **Dono de**: `application/transaction/{TransferService, TransferInput, TransferUpdateInput}`, `api/transaction/**`.
+- **Passos**:
+  1. `resolveContributionPillar` com `Vault` — **a matriz do §4.4 inteira**.
+  2. `create` inspecionando origem **e** destino; escrita do link **depois** do flush das pernas.
+  3. `update` (re-apontar caixinha/conta, §4.4).
+  4. `delete` (chamar `unlink` **antes** de apagar) e `settle` (`assertNotOverdrawn`).
+  5. `vaultId` na `TransactionResponse`, por lookup em lote no molde de `TagService.tagsOf(Collection)`.
+  6. `VaultContributionIntegrationTest` cobrindo a matriz inteira.
+- **Regra dura**: **nenhum teste existente de `TransferIntegrationTest` pode ser editado.** Se algum quebrar, a regra está errada — não o teste.
+
+### BE-11 — Rendimento distribuível `[E11 · spring-boot-engineer]`
+
+- **Objetivo**: lançar o rendimento do mês rateado entre as caixinhas.
+- **Dono de**: `domain/service/YieldDistributor`, `application/vault/{VaultYieldService, VaultYieldCategoryProvider}`, `api/vault/VaultYield*`, `application/dashboard/DashboardAggregateRepository`.
+- **Não toca `PillarAllocationCalculator`** — rendimento é INCOME e nunca chega lá.
+- **Passos**:
+  1. `YieldDistributor` + teste exaustivo: soma exata, empates, base zero, caixinha com saldo negativo excluída.
+  2. Categoria de sistema lazy, cópia estrutural de `StatementPaymentCategoryProvider`.
+  3. `VaultYieldService` + controller.
+  4. **`sumIncome` passa a juntar `Category` e filtrar `c.system = false`** — rodar `DashboardIntegrationTest` **antes** de mudar e diffar os números.
+  5. Teste de integração ponta a ponta do rendimento.
+
+### FE-9 — Aporte com caixinha nos diálogos `[E11 · react-specialist]`
+
+- **Dono de**: `web/src/features/transactions/**`, chaves `transactions.*` e `error.*` do i18n.
+- **Passos**:
+  1. Selects de caixinha de origem/destino no modo transferência, condicionados a `account.hasVaults`.
+  2. **Quando há caixinha, o pilar vira texto derivado, não campo editável** — ele vem da caixinha.
+  3. Badge da caixinha na linha do extrato.
+  4. Rendimento acionável a partir da tela de caixinhas — **importa o dialog da FE-8, não edita**.
+  5. Testes com `server.use(...)` local, **sem tocar `mocks/handlers.ts`** (é da FE-8).
+
+### INT-3 — Integração & gate `[E12 · java-architect, sequencial]`
+
+- **Passos**: `npm run api:generate` e conferência contrato × springdoc `/v3/api-docs`; gate completo (seção 6); estender `web/e2e/smoke.spec.ts` com o roteiro da seção 8; conferir i18n sem chave faltando; **revisar que o diff de `BalanceCalculator.java` e de `aggregateBalanceBuckets` é vazio**.
+- **Aceite**: gate verde; E2E verde; a identidade da §4.2 confere à mão na stack real.
+
+### 5.4 Verificação de colisão de arquivos (lição da Fase 2)
+
+| Arquivo | Único dono |
+|---|---|
+| `openapi.yaml`, `ErrorCode.java`, `AppException.java` | CT-2 |
+| `TransferService.java` e cia., `api/transaction/**` | BE-10 |
+| `DashboardAggregateRepository.java` | BE-11 |
+| `application/vault/**` | BE-9 — exceto os arquivos de yield, que são de BE-11 e só existem na E11, com a BE-9 já fechada pelo gate |
+| `AccountResponse`, `AccountMapper` | BE-9 |
+| `App.tsx`, `mocks/handlers.ts`, `financeFixtures.ts`, `features/accounts/**` | FE-8 |
+| `features/transactions/**` | FE-9 |
+| `i18n/common.json` | subárvores **disjuntas** — `vaults` é da FE-8; `transactions`/`error` são da FE-9. Merge limpo |
+
+### 5.5 DDL e agregações (BE-9)
+
+**`V18__vault.sql`**
+```sql
+CREATE TABLE vault (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id        UUID         NOT NULL REFERENCES workspace (id),
+    account_id          UUID         NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+    name                VARCHAR(120) NOT NULL,
+    contribution_pillar VARCHAR(20)  NOT NULL
+        CHECK (contribution_pillar IN ('GOALS', 'FINANCIAL_FREEDOM')),
+    target_amount_cents BIGINT       CHECK (target_amount_cents > 0),
+    target_date         DATE,
+    color               VARCHAR(7),
+    archived            BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ,
+    -- valor-alvo sem prazo é válido; prazo sem valor-alvo não tem do que calcular progresso
+    CONSTRAINT ck_vault_goal CHECK (target_date IS NULL OR target_amount_cents IS NOT NULL)
+);
+CREATE INDEX ix_vault_workspace ON vault (workspace_id);
+CREATE INDEX ix_vault_account   ON vault (account_id);
+-- único por CONTA, não por workspace: "Reserva" pode existir na corretora e na poupança
+CREATE UNIQUE INDEX ux_vault_account_name_ci ON vault (account_id, lower(name));
+```
+
+**`V19__vault_entry.sql`**
+```sql
+CREATE TABLE vault_entry (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id    UUID        NOT NULL REFERENCES workspace (id),
+    vault_id        UUID        NOT NULL REFERENCES vault (id) ON DELETE CASCADE,
+    source          VARCHAR(12) NOT NULL
+        CHECK (source IN ('CONTRIBUTION','WITHDRAWAL','YIELD','REALLOCATION')),
+    transaction_id  UUID        REFERENCES transaction (id) ON DELETE CASCADE,
+    amount_cents    BIGINT      CHECK (amount_cents <> 0),  -- NULL = espelha a transação
+    reallocation_id UUID,                                    -- agrupa as 2 pernas do remanejo
+    date            DATE,                                    -- só REALLOCATION
+    description     VARCHAR(255),                            -- só REALLOCATION
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_vault_entry_source CHECK (
+        CASE source
+            WHEN 'REALLOCATION' THEN transaction_id IS NULL AND amount_cents IS NOT NULL
+                                 AND reallocation_id IS NOT NULL AND date IS NOT NULL
+            WHEN 'YIELD'        THEN transaction_id IS NOT NULL AND amount_cents IS NOT NULL
+                                 AND reallocation_id IS NULL AND date IS NULL
+            ELSE                     transaction_id IS NOT NULL AND amount_cents IS NULL
+                                 AND reallocation_id IS NULL AND date IS NULL
+        END
+    )
+);
+CREATE INDEX ix_vault_entry_workspace    ON vault_entry (workspace_id);
+CREATE INDEX ix_vault_entry_vault        ON vault_entry (vault_id);
+CREATE INDEX ix_vault_entry_transaction  ON vault_entry (transaction_id);
+CREATE INDEX ix_vault_entry_reallocation ON vault_entry (reallocation_id);
+-- uma transferência tem no máximo UMA caixinha por perna; parcial porque rendimento é N linhas
+CREATE UNIQUE INDEX ux_vault_entry_mirror ON vault_entry (transaction_id) WHERE amount_cents IS NULL;
+```
+
+**As três agregações** — todas `GROUP BY`, custo plano, mescladas em memória como em `AccountBalanceService`:
+
+| # | Predicado | Fonte do valor | Fonte do status |
+|---|---|---|---|
+| A | `source IN ('CONTRIBUTION','WITHDRAWAL')` | `tx.amountCents` via `BalanceCalculator.signedAmountCents` | `tx.status` |
+| B | `source = 'YIELD'` | `ve.amountCents` (já assinado) | `tx.status` |
+| C | `source = 'REALLOCATION'` | `ve.amountCents` (já assinado) | sempre SETTLED |
+
+---
+
+## 6. Gates de verificação entre etapas
+
+```bash
+cd mk-finance/api && ./mvnw verify          # exige Docker (Testcontainers)
+cd mk-finance/web && npm test && npm run build
+POSTGRES_PASSWORD=x docker compose -f mk-finance/docker/docker-compose.yml config -q
+```
+
+Gate adicional por etapa — **E9**: `npm run api:generate` limpo, sem edição manual em `generated/**`. **E10**: a identidade `Σ caixinhas + não alocado = saldo da conta` confere nos dois níveis, com aporte PENDING no cenário. **E11**: os 261 testes anteriores verdes **sem edição**, e o rateio de uma quantia indivisível somando exato. **E12**: aceite do INT-3.
+
+---
+
+## 7. Armadilhas
+
+Herdadas (`DESENVOLVIMENTO-FASE2.md` §6): worktree nasce do commit em que a sessão começou (rebase antes de codar); agente longo cai e `SendMessage` retoma; `npm install` no checkout principal antes do gate após merge que adiciona deps; `npm run build` (não só `npm test`) após merge de duas frentes de front; orval gera `PATCH`, não `PUT`; `setQueryData(key, undefined)` é no-op no v5; **`git push` está bloqueado — só o usuário**.
+
+Específicas desta fatia:
+
+1. **`sumIncome` é o único risco real no motor.** É o denominador da R10 **e** o tile de receitas. BE-11 diffa os números do `DashboardIntegrationTest` antes e depois; alteração de valor em teste que não envolva categoria de sistema é bug.
+2. **`PillarAllocationCalculator` não muda** — `ContributionEntry` já recebe o pilar resolvido. Diff nesse arquivo no INT-3 significa que alguém resolveu no lugar errado.
+3. **`contributionsByPillar` não muda** — continua lendo `t.contributionPillar` da perna IN; só quem preenche mudou.
+4. **`BalanceCalculator.java` e `aggregateBalanceBuckets` não podem mudar.** Caixinha não é conta. O razão **reusa** `signedAmountCents`, não reescreve.
+5. **`TransferService.link` é um balé de três `saveAndFlush`** — a linha do razão só entra depois que a transação existe (FK). Escrever antes = `DataIntegrityViolationException` intermitente.
+6. **`TransferService.delete` anula `transfer_pair_id`, flusha, e só então apaga** — chame `unlink` **antes**, senão o cascade deixa uma `VaultEntry` obsoleta no persistence context da mesma transação.
+7. **A sobra do rateio vai para o maior resto**, não para a última como no `InstallmentSplitter`. Documentar no javadoc.
+8. **`vaultId` + `contributionPillar` iguais devem ser aceitos**, não recusados — o front faz round-trip do valor lido.
+9. **MSW**: os mocks do orval são faker aleatório com 1s de delay — fixtures próprias, sempre.
+
+---
+
+## 8. Roteiro de verificação ponta a ponta
+
+Cada passo prova uma decisão da seção 4:
+
+1. Conta INVESTMENT, R$ 10.000, default `FINANCIAL_FREEDOM`. Aporte de R$ 500 → **funciona como hoje** (retrocompat, §4.4).
+2. Criar "Reserva" (FINANCIAL_FREEDOM) e "Viagem 2027" (GOALS, alvo R$ 12.000, prazo 12 meses).
+3. `/accounts/:id/vaults` mostra **R$ 10.500 não alocado**, caixinhas em zero (identidade, §4.3).
+4. Remanejo `null → Reserva` R$ 6.000 e `null → Viagem` R$ 4.000. Não alocado = R$ 500, **nenhum saldo de conta mudou** (onboarding, §4.7).
+5. Aporte sem `vaultId` → **`VAULT_REQUIRED`**.
+6. Aporte na "Viagem" com pilar `FINANCIAL_FREEDOM` → **`VAULT_PILLAR_CONFLICT`**. Sem pilar → aceito, e o dashboard mostra **GOALS +500** — a prova de que o pilar migrou para a caixinha.
+7. Meta da "Viagem": 4.500/12.000 = 37,5%, "faltam R$ 625,00/mês" (§4.6).
+8. Resgate de R$ 8.000 da "Reserva" (saldo 6.000) → **`VAULT_INSUFFICIENT_BALANCE`** com `availableCents: 600000`.
+9. Aporte PENDING de R$ 1.000: `balanceCents` não muda, `projectedBalanceCents` sobe (§4.2).
+10. Rendimento de R$ 100,01 com bases 6.000/4.500 → R$ 57,15 + R$ 42,86 = **exatamente 10001**. Saldo da conta sobe; **tile "receitas do mês" não muda** (§4.5).
+11. `DELETE` da transação do rendimento → as duas linhas do razão somem sozinhas (cascade, §4.1).
+12. `PATCH` do aporte de R$ 500 → R$ 700: caixinha vira R$ 4.700 **sem nenhuma escrita no razão** — o teste que prova o `amount_cents NULL` (§4.1).
+13. Arquivar "Reserva" com saldo → **`VAULT_NOT_EMPTY`**; esvaziar e arquivar → passa; excluir "Viagem" → **`VAULT_HAS_ENTRIES`** (§4.7).
+14. Arquivadas as duas, novo aporte volta a aceitar **sem `vaultId`**, usando o default da conta — a porta de saída existe.
+
+---
+
+## 9. Fora do escopo desta fatia
+
+- **Rentabilidade na projeção da meta** — a projeção é linear. O simulador de renda fixa é Fase 3 e é ele que trará indexadores, IR regressivo e IOF.
+- **Caixinha em conta corrente/dinheiro** — só INVESTMENT/SAVINGS, coerente com a regra 9.
+- **Vincular compra de ação a uma caixinha** — é Fase 5, na absorção do app `IR/`.
+- **Patrimônio consolidado por caixinha** — Fase 4.
+- **Bloquear "não alocado" negativo** — decisão consciente da §4.3.
