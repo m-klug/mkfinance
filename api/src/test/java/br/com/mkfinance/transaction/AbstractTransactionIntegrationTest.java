@@ -26,11 +26,13 @@ abstract class AbstractTransactionIntegrationTest extends AbstractIntegrationTes
     protected void register() {
         session = newSession();
         session.primeCsrf();
+        // A short, fixed prefix rather than getClass().getSimpleName(): the email's local part is
+        // capped at 64 chars (RFC 5321, enforced by Hibernate's @Email), and a longer test class name
+        // plus the UUID can silently exceed it — see AbstractCalendarIntegrationTest/AbstractCardIntegrationTest
+        // for the same convention.
         CurrentUserResponse user = session.post(
                         "/auth/register",
-                        new RegisterRequest(
-                                "Tester", getClass().getSimpleName() + "+" + UUID.randomUUID() + "@example.com",
-                                "s3cr3t-password"),
+                        new RegisterRequest("Tester", "tx+" + UUID.randomUUID() + "@example.com", "s3cr3t-password"),
                         CurrentUserResponse.class)
                 .getBody();
         workspaceId = user.workspaces().get(0).id();
