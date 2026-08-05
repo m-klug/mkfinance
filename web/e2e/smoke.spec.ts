@@ -167,9 +167,11 @@ test("phase 2: pillar targets, recurrence settle and tag filter", async ({ page 
   await fillMoney(page, "recurrence-amount", SALARY);
   await recurrenceDialog.locator("#recurrence-description").fill("Salário recorrente");
   await recurrenceDialog.locator("#recurrence-frequency").selectOption("MONTHLY");
-  // Day 1 so the occurrence always lands on or before today, inside the extrato's
-  // default window — the point here is settling it, not the window itself.
-  await recurrenceDialog.locator("#recurrence-day-of-month").fill("1");
+  // The LAST day of the month on purpose: on any day but the 31st this occurrence is
+  // in the future, so it only reaches the screen because the extrato now opens on the
+  // whole competency instead of stopping at today. With the old default this line is
+  // what makes the test fail.
+  await recurrenceDialog.locator("#recurrence-day-of-month").fill(String(lastOfMonth.getDate()));
   await recurrenceDialog.locator("#recurrence-start-date").fill(iso(firstOfMonth));
   await recurrenceDialog.getByRole("button", { name: "Salvar" }).click();
   await expect(recurrenceDialog).toBeHidden();
@@ -180,9 +182,9 @@ test("phase 2: pillar targets, recurrence settle and tag filter", async ({ page 
   await expect(page.getByText("Salário recorrente").first()).toBeVisible();
 
   // --- The extrato materialized it as PENDING; settle it in one click (R5) ---
+  // No filter is touched here on purpose: the row has to be visible in the view the
+  // extrato opens on, which is the whole point of the fix.
   await page.getByRole("link", { name: "Lançamentos" }).click();
-  await page.locator("#filter-from").fill(iso(firstOfMonth));
-  await page.locator("#filter-to").fill(iso(lastOfMonth));
   const pendingRow = page.getByRole("row", { name: /Salário recorrente/ }).first();
   await expect(pendingRow).toBeVisible();
   await pendingRow.getByRole("button", { name: /^Efetivar/ }).click();
