@@ -34,6 +34,7 @@ import {
   type TransferUpdateRequest,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { categoryOptions } from "@/features/transactions/transactionUtils";
+import { TagsInput } from "@/features/transactions/TagsInput";
 import {
   contributionPillarOptions,
   isContributionAccount,
@@ -58,6 +59,7 @@ interface FormState {
   note: string;
   status: TransactionStatus;
   contributionPillar: string;
+  tags: string[];
 }
 
 function toFormState(transaction: Transaction): FormState {
@@ -71,6 +73,9 @@ function toFormState(transaction: Transaction): FormState {
     status: transaction.status,
     contributionPillar:
       transaction.contributionPillar ?? ContributionPillar.FINANCIAL_FREEDOM,
+    // Transaction.tags is optional in the generated type only so pre-Phase 2
+    // clients keep type-checking — the server always sends it (empty when none).
+    tags: transaction.tags?.map((tag) => tag.name) ?? [],
   };
 }
 
@@ -173,6 +178,9 @@ export function TransactionFormDialog({
       description: form.description.trim(),
       note: form.note.trim() || null,
       status: form.status,
+      // Always sent (even empty) so clearing every tag here actually clears
+      // them server-side — omitting the field would leave the old set as-is.
+      tags: form.tags,
     };
 
     updateMutation.mutate(
@@ -265,6 +273,15 @@ export function TransactionFormDialog({
             value={form.note}
             onChange={(event) => setForm({ ...form, note: event.target.value })}
           />
+          {!isTransfer && (
+            <TagsInput
+              id="transaction-tags"
+              label={t("transactions.tags")}
+              workspaceId={workspaceId}
+              value={form.tags}
+              onChange={(tags) => setForm({ ...form, tags })}
+            />
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t("common.cancel")}

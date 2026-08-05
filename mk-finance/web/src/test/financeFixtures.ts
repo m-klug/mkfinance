@@ -13,6 +13,7 @@ import {
   type Category,
   type Statement,
   type StatementDetail,
+  type Tag,
   type Transaction,
   type TransactionPage,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
@@ -113,6 +114,24 @@ export const pendingExpense: Transaction = {
   status: TransactionStatus.PENDING,
 };
 
+// BE-8: Transaction.tags is optional in the generated type only so
+// pre-Phase-2 fixtures keep type-checking — the server always sends it.
+export const groceriesTag: Tag = { id: "tag-groceries", name: "mercado" };
+export const urgentTag: Tag = { id: "tag-urgent", name: "urgente" };
+export const defaultTags: Tag[] = [groceriesTag, urgentTag];
+
+export const taggedExpense: Transaction = {
+  id: "tx-tagged",
+  accountId: checkingAccount.id,
+  categoryId: groceriesCategory.id,
+  type: TransactionType.EXPENSE,
+  amountCents: 8000,
+  date: "2026-07-12",
+  description: "Compra marcada",
+  status: TransactionStatus.SETTLED,
+  tags: [groceriesTag, urgentTag],
+};
+
 export const creditCard: Card = {
   id: "card-nubank",
   name: "Nubank",
@@ -188,16 +207,25 @@ interface FinanceHandlerOptions {
   accounts?: Account[];
   categories?: Category[];
   transactions?: Transaction[];
+  /** Workspace tags, source of the autocomplete (useListTags). */
+  tags?: Tag[];
 }
 
 /**
- * Read handlers for the three lists every FE-2 screen depends on. Pass to
+ * Read handlers for the lists every FE-2/FE-7 screen depends on. Pass to
  * `server.use(...)`; add write handlers per test to assert payloads.
+ *
+ * The transactions handler applies the `tags` query filter for real (OR
+ * match by name, case-insensitive — apiFetch serializes the array as a
+ * single comma-joined value, mirroring how Spring binds List<String> query
+ * params), so tests can assert the list actually narrows instead of only
+ * capturing the query string.
  */
 export function financeReadHandlers({
   accounts = defaultAccounts,
   categories = defaultCategories,
   transactions = [],
+  tags = defaultTags,
 }: FinanceHandlerOptions = {}) {
   return [
     http.get("*/workspaces/:workspaceId/accounts", ({ request }) => {
@@ -207,9 +235,16 @@ export function financeReadHandlers({
       );
     }),
     http.get("*/workspaces/:workspaceId/categories", () => HttpResponse.json(categories)),
-    http.get("*/workspaces/:workspaceId/transactions", () =>
-      HttpResponse.json(transactionPage(transactions)),
-    ),
+    http.get("*/workspaces/:workspaceId/tags", () => HttpResponse.json(tags)),
+    http.get("*/workspaces/:workspaceId/transactions", ({ request }) => {
+      const tagsParam = new URL(request.url).searchParams.get("tags");
+      if (!tagsParam) return HttpResponse.json(transactionPage(transactions));
+      const wanted = tagsParam.split(",").map((name) => name.trim().toLowerCase());
+      const filtered = transactions.filter((transaction) =>
+        (transaction.tags ?? []).some((tag) => wanted.includes(tag.name.toLowerCase())),
+      );
+      return HttpResponse.json(transactionPage(filtered));
+    }),
   ];
 }
 

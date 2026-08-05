@@ -39,6 +39,7 @@ import {
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { QuickTransactionDialog } from "@/features/transactions/QuickTransactionDialog";
 import { TransactionFormDialog } from "@/features/transactions/TransactionFormDialog";
+import { TagsInput } from "@/features/transactions/TagsInput";
 import {
   categoryOptions,
   firstDayOfCurrentMonthIso,
@@ -58,6 +59,7 @@ interface Filters {
   type: string;
   status: string;
   search: string;
+  tags: string[];
 }
 
 export default function TransactionsPage() {
@@ -74,6 +76,7 @@ export default function TransactionsPage() {
     type: "",
     status: "",
     search: "",
+    tags: [],
   }));
   const [page, setPage] = useState(0);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -99,6 +102,7 @@ export default function TransactionsPage() {
     type: (filters.type as TransactionType) || undefined,
     status: (filters.status as TransactionStatus) || undefined,
     search: filters.search.trim() || undefined,
+    tags: filters.tags.length > 0 ? filters.tags : undefined,
     page,
     size: PAGE_SIZE,
   };
@@ -167,62 +171,76 @@ export default function TransactionsPage() {
       </div>
 
       <Card>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <TextField
-            id="filter-from"
-            label={t("transactions.filterFrom")}
-            type="date"
-            value={filters.from}
-            onChange={(event) => updateFilter("from", event.target.value)}
-          />
-          <TextField
-            id="filter-to"
-            label={t("transactions.filterTo")}
-            type="date"
-            value={filters.to}
-            onChange={(event) => updateFilter("to", event.target.value)}
-          />
-          <SelectField
-            id="filter-account"
-            label={t("transactions.account")}
-            placeholder={t("transactions.allAccounts")}
-            options={accounts.map((account) => ({ value: account.id, label: account.name }))}
-            value={filters.accountId}
-            onChange={(event) => updateFilter("accountId", event.target.value)}
-          />
-          <SelectField
-            id="filter-category"
-            label={t("transactions.category")}
-            placeholder={t("transactions.allCategories")}
-            options={categoryOptions(categories)}
-            value={filters.categoryId}
-            onChange={(event) => updateFilter("categoryId", event.target.value)}
-          />
-          <SelectField
-            id="filter-type"
-            label={t("transactions.type")}
-            placeholder={t("transactions.allTypes")}
-            options={transactionTypeOptions(t)}
-            value={filters.type}
-            onChange={(event) => updateFilter("type", event.target.value)}
-          />
-          <SelectField
-            id="filter-status"
-            label={t("transactions.status")}
-            placeholder={t("transactions.allStatuses")}
-            options={[
-              { value: TransactionStatus.SETTLED, label: t("transactionStatus.SETTLED") },
-              { value: TransactionStatus.PENDING, label: t("transactionStatus.PENDING") },
-            ]}
-            value={filters.status}
-            onChange={(event) => updateFilter("status", event.target.value)}
-          />
+        <CardContent className="flex flex-col gap-4">
+          {/* Date range, account and category share the top row — the four
+              fields a user reaches for first. Type/status/tags sit below;
+              tags gets a double column because it is a chip input, not a
+              single-line control. Free-text search moves to its own
+              full-width row instead of squeezing into the grid. */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <TextField
+              id="filter-from"
+              label={t("transactions.filterFrom")}
+              type="date"
+              value={filters.from}
+              onChange={(event) => updateFilter("from", event.target.value)}
+            />
+            <TextField
+              id="filter-to"
+              label={t("transactions.filterTo")}
+              type="date"
+              value={filters.to}
+              onChange={(event) => updateFilter("to", event.target.value)}
+            />
+            <SelectField
+              id="filter-account"
+              label={t("transactions.account")}
+              placeholder={t("transactions.allAccounts")}
+              options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+              value={filters.accountId}
+              onChange={(event) => updateFilter("accountId", event.target.value)}
+            />
+            <SelectField
+              id="filter-category"
+              label={t("transactions.category")}
+              placeholder={t("transactions.allCategories")}
+              options={categoryOptions(categories)}
+              value={filters.categoryId}
+              onChange={(event) => updateFilter("categoryId", event.target.value)}
+            />
+            <SelectField
+              id="filter-type"
+              label={t("transactions.type")}
+              placeholder={t("transactions.allTypes")}
+              options={transactionTypeOptions(t)}
+              value={filters.type}
+              onChange={(event) => updateFilter("type", event.target.value)}
+            />
+            <SelectField
+              id="filter-status"
+              label={t("transactions.status")}
+              placeholder={t("transactions.allStatuses")}
+              options={[
+                { value: TransactionStatus.SETTLED, label: t("transactionStatus.SETTLED") },
+                { value: TransactionStatus.PENDING, label: t("transactionStatus.PENDING") },
+              ]}
+              value={filters.status}
+              onChange={(event) => updateFilter("status", event.target.value)}
+            />
+            <TagsInput
+              id="filter-tags"
+              label={t("transactions.tags")}
+              fieldClassName="sm:col-span-2"
+              workspaceId={workspaceId}
+              value={filters.tags}
+              onChange={(tags) => updateFilter("tags", tags)}
+            />
+          </div>
           <TextField
             id="filter-search"
             label={t("transactions.search")}
             type="search"
             autoComplete="off"
-            fieldClassName="lg:col-span-2"
             value={filters.search}
             onChange={(event) => updateFilter("search", event.target.value)}
           />
@@ -252,7 +270,21 @@ export default function TransactionsPage() {
                 {transactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>{formatDate(transaction.date)}</TableCell>
-                    <TableCell className="font-medium">{transaction.description}</TableCell>
+                    <TableCell className="font-medium">
+                      {transaction.description}
+                      {transaction.tags && transaction.tags.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {transaction.tags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground"
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>{lookupName(accounts, transaction.accountId) ?? "—"}</TableCell>
                     <TableCell>
                       {transaction.type === TransactionType.TRANSFER

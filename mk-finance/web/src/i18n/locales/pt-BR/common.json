@@ -110,6 +110,7 @@
     "status": "Situação",
     "schedulePending": "Agendar como pendente",
     "search": "Buscar na descrição",
+    "tags": "Tags",
     "filterFrom": "De",
     "filterTo": "Até",
     "allAccounts": "Todas as contas",
@@ -147,6 +148,11 @@
       "CONTRIBUTION": "Aporte",
       "CARD": "Cartão"
     }
+  },
+  "tags": {
+    "addPlaceholder": "Adicionar tag e pressionar Enter",
+    "remove": "Remover tag {{name}}",
+    "suggestions": "Sugestões de tags"
   },
   "cards": {
     "new": "Novo cartão",
