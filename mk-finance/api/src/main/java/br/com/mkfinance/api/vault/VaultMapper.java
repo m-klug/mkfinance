@@ -3,6 +3,8 @@ package br.com.mkfinance.api.vault;
 import br.com.mkfinance.application.common.BusinessClock;
 import br.com.mkfinance.application.vault.VaultInput;
 import br.com.mkfinance.application.vault.VaultLedgerLine;
+import br.com.mkfinance.application.vault.VaultReallocationInput;
+import br.com.mkfinance.application.vault.VaultReallocationResult;
 import br.com.mkfinance.domain.model.Vault;
 import br.com.mkfinance.domain.service.BalanceCalculator.Balance;
 import br.com.mkfinance.domain.service.VaultBalanceCalculator.Composition;
@@ -79,6 +81,18 @@ public class VaultMapper {
                 composition.unallocatedCents(),
                 composition.projectedUnallocatedCents(),
                 vaultResponses);
+    }
+
+    public VaultReallocationInput toInput(VaultReallocationRequest request) {
+        return new VaultReallocationInput(
+                request.fromVaultId(), request.toVaultId(), request.amountCents(), request.date(),
+                request.description());
+    }
+
+    public VaultReallocationResponse toResponse(VaultReallocationResult result) {
+        return new VaultReallocationResponse(
+                result.id(), result.accountId(), result.fromVaultId(), result.toVaultId(), result.amountCents(),
+                result.date(), result.description());
     }
 
     public VaultEntryResponse toEntryResponse(VaultLedgerLine line) {
