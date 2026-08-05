@@ -261,7 +261,13 @@ mês inteiro              (2026-08-01..2026-08-31): 1 ocorrência(s)
 
 A ocorrência **é materializada** — a BE-8 fez sua parte. Mas o `TransactionsPage` monta o filtro com `to = todayIso()`, então o salário do dia 25 existe no banco e **não aparece** na tela que o usuário abre. O objetivo declarado da decisão ("quem for direto ao extrato não vê o salário") continua não cumprido, agora por outro motivo.
 
-Correção candidata: `to` passa a ser o último dia do mês corrente em `features/transactions/TransactionsPage.tsx`. É uma linha, **mas muda a semântica do extrato** de "o que aconteceu" para "o que aconteceu + o previsto do mês", e por isso é decisão do usuário, não minha. Fora do escopo desta INT-2, que para no gate.
+**✅ RESOLVIDO em 05/08/2026 — decisão do usuário: corrigir o default na causa.** `to` passa a ser o último dia do mês corrente (`lastDayOfCurrentMonthIso`, em `transactionUtils.ts`).
+
+O enquadramento que decidiu a escolha: **não era um problema das recorrências, era um bug pré-existente do MVP.** O `QuickTransactionDialog` já tinha "Agendar como pendente" — uma conta agendada para o dia 20 já sumia do extrato exatamente do mesmo jeito. As recorrências só tornaram o buraco frequente o bastante para aparecer. As alternativas consideradas (bloco "a confirmar" no extrato, ou no dashboard) tratavam o sintoma construindo superfície nova por cima de um default que continuaria errado, e deixariam o agendamento manual invisível.
+
+Efeito colateral aceito: o extrato passa a mostrar a competência inteira, realizado + previsto, e como a ordenação é por data decrescente o previsto aparece no topo. Pendente já tem coluna de situação e botão de efetivar, então não se confunde com realizado; e o filtro "Todas as situações" continua disponível para quem quiser só o histórico.
+
+O teste que trava o comportamento foi conferido por mutação: devolvendo `hoje` no lugar do fim do mês, ele falha. O default anterior nunca teve teste — o teste de filtros existente afirmava `from` e nunca `to`, que é precisamente por que a regressão passou despercebida.
 
 ---
 
