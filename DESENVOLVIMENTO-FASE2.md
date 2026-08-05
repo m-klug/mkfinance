@@ -219,6 +219,21 @@ Outras duas decisões registradas, sem impacto de contrato: fechar regra por `TH
 - **i18n**: grupo `tags.*` + chaves de filtro em `transactions.*`.
 - **Aceite**: criar transação com 2 tags; filtrar por tag reduz a lista; limpar o filtro restaura; testes cobrindo atribuição e filtro.
 
+#### ✅ E7 concluída (BE-8 · FE-6 · FE-7) — 30/07/2026
+
+Gate verde na `main`: `./mvnw clean verify` **261 testes**, `npm test` **97**, `npm run build` e `docker compose config` ok. Migrações V16–V17 aplicadas; faixas respeitadas. Único arquivo disputado entre as frentes de front (`common.json`) mergeou **sem conflito** — as chaves foram inseridas em regiões distintas. Verificado à parte que o JSON resultante não tem chave de topo duplicada, coisa que o `JSON.parse` engoliria calado.
+
+**Duas lacunas fechadas na integração, ambas minhas:**
+
+1. **A CT-1 declarou 404 no `PATCH`/`DELETE /tags/{tagId}` sem definir código de erro.** A BE-8 criou `TAG_NOT_FOUND` cruzando a fronteira de `domain/exception/**` e avisou — estava certa, o contrato é que estava incompleto. Lista de códigos atualizada, cliente regerado.
+2. **`TAG_NAME_DUPLICATE` não tinha tradução**, caindo no `UNKNOWN_ERROR` genérico. Era o único erro de tag que o usuário consegue corrigir sozinho. `TAG_NOT_FOUND` fica deliberadamente sem chave, como os demais `*_NOT_FOUND`.
+
+**Correção de infra compartilhada feita por mim, escalada pela FE-7:** `buildQuery` em `lib/api/fetcher.ts` serializava array com `String(value)` (`tags=a,b`) enquanto o contrato declara `explode: true` (`tags=a&tags=b`). Ligava no Spring por acidente e engoliria qualquer valor com vírgula.
+
+**Limitação conhecida da FE-6, não é bug**: o diálogo de escopo aparece sempre que `startDate <= hoje`, porque a API não expõe "esta regra já materializou". Nunca deixa de perguntar quando deveria; pode perguntar a mais. Resolver exigiria campo novo no `Recurrence` — fase futura.
+
+**Sugestão registrada e não implementada**: usar `Transaction.recurrenceId` para exibir badge de recorrência na linha do extrato.
+
 ### INT-2 — Integração & gate da Fase 2 `[E8 · java-architect, sequencial]`
 
 - **Objetivo**: fechar a fase contra a stack real já implantada.
