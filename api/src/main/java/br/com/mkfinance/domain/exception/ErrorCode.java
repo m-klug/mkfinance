@@ -91,6 +91,44 @@ public final class ErrorCode {
      */
     public static final String TAG_NOT_FOUND = "TAG_NOT_FOUND";
 
+    // vaults / caixinhas (BE-9..BE-11)
+    /** Unknown id, another workspace's, another account's — or a vault sent to an account that has none. */
+    public static final String VAULT_NOT_FOUND = "VAULT_NOT_FOUND";
+    /**
+     * The account has vaults, so the transfer leg has to say which one. Only ever raised once the
+     * first vault exists: an account without vaults keeps resolving the pillar from its own default,
+     * exactly as before the Caixinhas.
+     */
+    public static final String VAULT_REQUIRED = "VAULT_REQUIRED";
+    /**
+     * An explicit contributionPillar disagreeing with the destination vault's. With vaults the
+     * pillar is the vault's to decide (R9), so this is a contradiction, not a preference. An
+     * identical value is accepted — the client echoes back what it read.
+     */
+    public static final String VAULT_PILLAR_CONFLICT = "VAULT_PILLAR_CONFLICT";
+    /** Reallocation between vaults of different accounts; money would have to leave the account to do that. */
+    public static final String VAULT_ACCOUNT_MISMATCH = "VAULT_ACCOUNT_MISMATCH";
+    /**
+     * The movement would leave the vault negative. A vault is a claim on money that is actually
+     * there, so unlike the unallocated slice — which the rest of the app can push negative without
+     * ever knowing vaults exist — this one is refused rather than displayed.
+     */
+    public static final String VAULT_INSUFFICIENT_BALANCE = "VAULT_INSUFFICIENT_BALANCE";
+    /** Vault names are unique per account, compared case-insensitively. */
+    public static final String VAULT_NAME_DUPLICATE = "VAULT_NAME_DUPLICATE";
+    /**
+     * Archiving a vault that still holds money. It would have to keep showing in the composition and
+     * would still make contributions require a vault, with none selectable — a corner with no way
+     * out. Emptying it first is the way, and archiving the last one restores the account's pre-vault
+     * behaviour.
+     */
+    public static final String VAULT_NOT_EMPTY = "VAULT_NOT_EMPTY";
+    /** Deleting a vault that has ledger history. Archive it instead — the history stays true. */
+    public static final String VAULT_HAS_ENTRIES = "VAULT_HAS_ENTRIES";
+    /** Contributing to or reallocating into an archived vault. */
+    public static final String VAULT_ARCHIVED = "VAULT_ARCHIVED";
+    public static final String VAULT_REALLOCATION_NOT_FOUND = "VAULT_REALLOCATION_NOT_FOUND";
+
     // generic
     public static final String VALIDATION_ERROR = "VALIDATION_ERROR";
     public static final String DATA_INTEGRITY_VIOLATION = "DATA_INTEGRITY_VIOLATION";

@@ -14,7 +14,7 @@ export type ErrorResponseFieldErrorsItem = {
 };
 
 export interface ErrorResponse {
-  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; pillar targets — PILLAR_TARGETS_MUST_SUM_100; recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND; tags — TAG_NAME_DUPLICATE, TAG_NOT_FOUND; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
+  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; pillar targets — PILLAR_TARGETS_MUST_SUM_100; recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND; tags — TAG_NAME_DUPLICATE, TAG_NOT_FOUND; vaults — VAULT_NOT_FOUND, VAULT_REQUIRED, VAULT_PILLAR_CONFLICT, VAULT_ACCOUNT_MISMATCH, VAULT_INSUFFICIENT_BALANCE, VAULT_NAME_DUPLICATE, VAULT_NOT_EMPTY, VAULT_HAS_ENTRIES, VAULT_ARCHIVED, VAULT_REALLOCATION_NOT_FOUND; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
  */
   code: string;
   params?: ErrorResponseParams;
@@ -158,6 +158,31 @@ export const CalendarEntryKind = {
   PENDING_TRANSACTION: 'PENDING_TRANSACTION',
 } as const;
 
+/**
+ * What put the line in the vault's ledger. CONTRIBUTION and WITHDRAWAL mirror a transfer leg, YIELD is one share of a distributed yield, and REALLOCATION is money moved between vaults (or to and from the unallocated slice) without any transaction at all.
+
+ */
+export type VaultEntrySource = typeof VaultEntrySource[keyof typeof VaultEntrySource];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const VaultEntrySource = {
+  CONTRIBUTION: 'CONTRIBUTION',
+  WITHDRAWAL: 'WITHDRAWAL',
+  YIELD: 'YIELD',
+  REALLOCATION: 'REALLOCATION',
+} as const;
+
+export type VaultGoalStatus = typeof VaultGoalStatus[keyof typeof VaultGoalStatus];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const VaultGoalStatus = {
+  IN_PROGRESS: 'IN_PROGRESS',
+  REACHED: 'REACHED',
+  OVERDUE: 'OVERDUE',
+} as const;
+
 export interface RegisterRequest {
   /** @maxLength 120 */
   name: string;
@@ -222,6 +247,9 @@ export interface Account {
   /** @nullable */
   icon?: string | null;
   archived: boolean;
+  /** The account has at least one non-archived vault, so contributions into it must name one and defaultContributionPillar no longer decides — the destination vault does. Always sent by the server; optional here only so that clients written before the Caixinhas slice keep type-checking, and absent reads as false, which is the pre-vault behaviour.
+ */
+  hasVaults?: boolean;
 }
 
 /**
@@ -362,6 +390,12 @@ export interface Transaction {
    */
   contributionPillar?: TransactionContributionPillar;
   /**
+   * The vault this leg went into or came out of, when the account has vaults. The extrato badges the row with it; it is also what tells a contribution's pillar where it came from, since with vaults the pillar is the vault's, not the account's.
+
+   * @nullable
+   */
+  vaultId?: string | null;
+  /**
    * The rule that materialized this row, when it came from a recurrence. The extrato uses it to badge the entry and to offer editing the whole series.
 
    * @nullable
@@ -406,7 +440,8 @@ export interface TransactionPage {
 }
 
 /**
- * Only when destination is INVESTMENT/SAVINGS; defaults to the account's default pillar.
+ * Only when destination is INVESTMENT/SAVINGS. With no vault on the destination it defaults to the account's default pillar, exactly as before. With a vault it must either be omitted or match the vault's pillar — disagreeing answers VAULT_PILLAR_CONFLICT, because with vaults the pillar is the vault's to decide.
+
  * @nullable
  */
 export type TransferRequestContributionPillar = ContributionPillar | null;
@@ -420,10 +455,23 @@ export interface TransferRequest {
   /** @maxLength 255 */
   description: string;
   /**
-   * Only when destination is INVESTMENT/SAVINGS; defaults to the account's default pillar.
+   * Only when destination is INVESTMENT/SAVINGS. With no vault on the destination it defaults to the account's default pillar, exactly as before. With a vault it must either be omitted or match the vault's pillar — disagreeing answers VAULT_PILLAR_CONFLICT, because with vaults the pillar is the vault's to decide.
+
    * @nullable
    */
   contributionPillar?: TransferRequestContributionPillar;
+  /**
+   * Which vault the money leaves. Required (VAULT_REQUIRED) when the source account has vaults, refused (VAULT_NOT_FOUND) when it has none.
+
+   * @nullable
+   */
+  fromVaultId?: string | null;
+  /**
+   * Which vault receives the contribution, and therefore which pillar it consumes (R9). Required (VAULT_REQUIRED) when the destination account has vaults, refused (VAULT_NOT_FOUND) when it has none.
+
+   * @nullable
+   */
+  toVaultId?: string | null;
 }
 
 /**
@@ -433,7 +481,7 @@ export interface TransferRequest {
 export type TransferUpdateRequestStatus = TransactionStatus | null;
 
 /**
- * Re-targets the contribution (R9). Omit to keep whichever pillar the transfer already carries. Only meaningful when the destination account is INVESTMENT/SAVINGS; sending it for any other destination answers INVALID_CONTRIBUTION_PILLAR.
+ * Re-targets the contribution (R9). Omit to keep whichever pillar the transfer already carries. Only meaningful when the destination account is INVESTMENT/SAVINGS; sending it for any other destination answers INVALID_CONTRIBUTION_PILLAR. Once the destination has a vault it becomes advisory: the vault decides, and a value that disagrees with it answers VAULT_PILLAR_CONFLICT.
 
  * @nullable
  */
@@ -463,11 +511,17 @@ export interface TransferUpdateRequest {
    */
   status?: TransferUpdateRequestStatus;
   /**
-   * Re-targets the contribution (R9). Omit to keep whichever pillar the transfer already carries. Only meaningful when the destination account is INVESTMENT/SAVINGS; sending it for any other destination answers INVALID_CONTRIBUTION_PILLAR.
+   * Re-targets the contribution (R9). Omit to keep whichever pillar the transfer already carries. Only meaningful when the destination account is INVESTMENT/SAVINGS; sending it for any other destination answers INVALID_CONTRIBUTION_PILLAR. Once the destination has a vault it becomes advisory: the vault decides, and a value that disagrees with it answers VAULT_PILLAR_CONFLICT.
 
    * @nullable
    */
   contributionPillar?: TransferUpdateRequestContributionPillar;
+  /**
+   * Re-points the leg being edited at another vault, mirroring what accountId does for the account. Omit to carry the current vault forward — unless accountId moved the leg to a different account, in which case the old vault belongs to the old account and the rule runs afresh against the new one.
+
+   * @nullable
+   */
+  vaultId?: string | null;
 }
 
 export interface Card {
@@ -762,6 +816,194 @@ export interface TagRequest {
   name: string;
 }
 
+/**
+ * Present exactly when targetAmountCents is set.
+ * @nullable
+ */
+export type VaultGoalProperty = VaultGoal | null;
+
+export interface Vault {
+  id: string;
+  accountId: string;
+  name: string;
+  /** The pillar a contribution into this vault consumes (R9). This is the refinement the Caixinhas bring: the pillar belongs to where the money is going, not to the account holding it, so one brokerage account can feed GOALS and FINANCIAL_FREEDOM at once.
+ */
+  contributionPillar: ContributionPillar;
+  /**
+   * The goal's amount. Null means the vault just holds money, with nothing to reach.
+   * @minimum 1
+   * @nullable
+   */
+  targetAmountCents?: number | null;
+  /**
+   * Deadline. Only meaningful with targetAmountCents; a date alone has nothing to project.
+   * @nullable
+   */
+  targetDate?: string | null;
+  /** @nullable */
+  color?: string | null;
+  archived: boolean;
+  /** Settled entries only (R5) — mirrors what balanceCents means on an account. */
+  balanceCents: number;
+  /** Settled and pending. Reallocations have no status and count in both: they are not money waiting to clear a bank, they are a reclassification that already happened.
+ */
+  projectedBalanceCents: number;
+  /**
+   * Present exactly when targetAmountCents is set.
+   * @nullable
+   */
+  goal?: VaultGoalProperty;
+}
+
+/**
+ * Computed by the server so every client shows the same number. The projection is linear — it does not model returns; the fixed-income simulator is a later phase.
+
+ */
+export interface VaultGoal {
+  targetAmountCents: number;
+  /** @nullable */
+  targetDate?: string | null;
+  /** What is still missing, floored at zero. */
+  remainingCents: number;
+  /** current ÷ target × 100, deliberately not capped at 100 — the client decides how to celebrate an overshoot, same as with the pillar allocation's actualPercent.
+ */
+  progressPercent: number;
+  /**
+   * Counting the current competency, floored at zero. Null only when there is no deadline.
+
+   * @minimum 0
+   * @nullable
+   */
+  monthsRemaining?: number | null;
+  /**
+   * remaining ÷ monthsRemaining, rounded up so that paying it every month actually gets there. Zero once the goal is reached, and the whole remainder when the deadline has passed — never null just because the date is behind us; null only without a deadline.
+
+   * @nullable
+   */
+  monthlyNeededCents?: number | null;
+  status: VaultGoalStatus;
+}
+
+export interface VaultRequest {
+  /**
+   * Unique per account, compared case-insensitively.
+   * @maxLength 120
+   */
+  name: string;
+  contributionPillar: ContributionPillar;
+  /**
+   * @minimum 1
+   * @nullable
+   */
+  targetAmountCents?: number | null;
+  /**
+   * Sending it without targetAmountCents answers VALIDATION_ERROR.
+   * @nullable
+   */
+  targetDate?: string | null;
+  /** @nullable */
+  color?: string | null;
+}
+
+/**
+ * How the account's single balance splits up. Σ vaults + unallocated = the account balance, at both the settled and the projected level, by construction.
+
+ */
+export interface VaultComposition {
+  accountId: string;
+  balanceCents: number;
+  projectedBalanceCents: number;
+  /** Sum of the vaults' settled balances. */
+  allocatedCents: number;
+  /** Account balance − allocated: money that has not picked a vault, and therefore has not picked a pillar. It can go negative — spending straight from the account, or paying a statement with it, does not know about vaults — and that is shown rather than blocked, the same way a negative account balance is shown.
+ */
+  unallocatedCents: number;
+  projectedUnallocatedCents: number;
+  vaults: Vault[];
+}
+
+export interface VaultEntry {
+  id: string;
+  vaultId: string;
+  date: string;
+  description: string;
+  /** Signed — negative when money left the vault. Unlike everywhere else in this API. */
+  amountCents: number;
+  source: VaultEntrySource;
+  /** Taken from the transaction behind it; always SETTLED for a reallocation. */
+  status: TransactionStatus;
+  /**
+   * Null exactly for REALLOCATION, which moves no money in or out of the account.
+   * @nullable
+   */
+  transactionId?: string | null;
+  /**
+   * Groups the two sides of a reallocation, or the single side when the other is unallocated.
+   * @nullable
+   */
+  reallocationId?: string | null;
+}
+
+export interface VaultReallocationRequest {
+  /**
+   * Null means the unallocated slice — this is how existing account money enters a vault.
+   * @nullable
+   */
+  fromVaultId?: string | null;
+  /**
+   * Null means the unallocated slice — this is how a vault is emptied before archiving.
+   * @nullable
+   */
+  toVaultId?: string | null;
+  /** @minimum 1 */
+  amountCents: number;
+  date: string;
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  description?: string | null;
+}
+
+export interface VaultReallocation {
+  id: string;
+  accountId: string;
+  /** @nullable */
+  fromVaultId?: string | null;
+  /** @nullable */
+  toVaultId?: string | null;
+  amountCents: number;
+  date: string;
+  /** @nullable */
+  description?: string | null;
+}
+
+export interface VaultYieldRequest {
+  /** @minimum 1 */
+  amountCents: number;
+  date: string;
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  description?: string | null;
+}
+
+export type VaultYieldSharesItem = {
+  vaultId: string;
+  amountCents: number;
+};
+
+export interface VaultYield {
+  /** The INCOME transaction that was booked; delete it to undo the whole yield. */
+  transactionId: string;
+  amountCents: number;
+  date: string;
+  /** The split actually applied, proportional to each vault's settled balance. The shares always add up to amountCents exactly — the leftover cents go to the largest remainders. Empty when no vault held a positive balance, in which case the whole yield lands in the unallocated slice rather than being invented into some vault.
+ */
+  shares: VaultYieldSharesItem[];
+}
+
 export type DashboardSummaryExpenseByCategoryItem = {
   categoryId: string;
   pillar: Pillar;
@@ -961,6 +1203,18 @@ export type GetCalendarParams = {
  * @pattern ^\d{4}-\d{2}$
  */
 month?: MonthParameter;
+};
+
+export type ListVaultsParams = {
+/**
+ * Archived vaults are always empty, so they are hidden unless asked for.
+ */
+includeArchived?: boolean;
+};
+
+export type ListVaultEntriesParams = {
+from?: string;
+to?: string;
 };
 
 export type ExportTransactionsCsvParams = {
