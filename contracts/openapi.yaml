@@ -1043,7 +1043,7 @@ components:
             STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY;
             pillar targets — PILLAR_TARGETS_MUST_SUM_100;
             recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND;
-            tags — TAG_NAME_DUPLICATE;
+            tags — TAG_NAME_DUPLICATE, TAG_NOT_FOUND;
             generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
         params:
           type: object

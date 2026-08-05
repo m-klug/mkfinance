@@ -424,6 +424,7 @@
     "VALIDATION_ERROR": "Verifique os campos destacados.",
     "PILLAR_TARGETS_MUST_SUM_100": "A soma dos seis pilares precisa ser 100%.",
     "RECURRENCE_NOT_FOUND": "Esta recorrência não foi encontrada.",
-    "RECURRENCE_OCCURRENCE_NOT_FOUND": "Essa data não corresponde a uma ocorrência desta série."
+    "RECURRENCE_OCCURRENCE_NOT_FOUND": "Essa data não corresponde a uma ocorrência desta série.",
+    "TAG_NAME_DUPLICATE": "Já existe uma tag com esse nome."
   }
 }
