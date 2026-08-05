@@ -1,14 +1,20 @@
 package br.com.mkfinance.api.transaction;
 
+import br.com.mkfinance.application.tag.TagService;
 import br.com.mkfinance.application.transaction.TransactionFilter;
 import br.com.mkfinance.application.transaction.TransactionService;
+import br.com.mkfinance.domain.model.Tag;
+import br.com.mkfinance.domain.model.Transaction;
 import br.com.mkfinance.domain.model.TransactionStatus;
 import br.com.mkfinance.domain.model.TransactionType;
 import br.com.mkfinance.infrastructure.security.WorkspaceContext;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -41,6 +47,7 @@ public class TransactionController {
 
     private final TransactionService transactionService;
     private final TransactionMapper mapper;
+    private final TagService tagService;
     private final WorkspaceContext workspaceContext;
 
     @GetMapping
@@ -53,19 +60,24 @@ public class TransactionController {
             @RequestParam(required = false) TransactionType type,
             @RequestParam(required = false) TransactionStatus status,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) List<String> tags,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        TransactionFilter filter = new TransactionFilter(from, to, accountId, categoryId, type, status, search);
+        TransactionFilter filter = new TransactionFilter(from, to, accountId, categoryId, type, status, search, tags);
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE));
-        return mapper.toPageResponse(transactionService.list(workspaceContext.getWorkspaceId(), filter, pageable));
+        Page<Transaction> result = transactionService.list(workspaceContext.getWorkspaceId(), filter, pageable);
+        Map<UUID, List<Tag>> tagsByTransaction =
+                tagService.tagsOf(result.getContent().stream().map(Transaction::getId).toList());
+        return mapper.toPageResponse(result, tagsByTransaction);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponse create(
             @PathVariable UUID workspaceId, @Valid @RequestBody TransactionRequest request) {
-        return mapper.toResponse(
-                transactionService.create(workspaceContext.getWorkspaceId(), mapper.toInput(request)));
+        Transaction transaction =
+                transactionService.create(workspaceContext.getWorkspaceId(), mapper.toInput(request));
+        return mapper.toResponse(transaction, tagService.tagsOf(transaction.getId()));
     }
 
     @PatchMapping("/{transactionId}")
@@ -73,8 +85,9 @@ public class TransactionController {
             @PathVariable UUID workspaceId,
             @PathVariable UUID transactionId,
             @Valid @RequestBody TransactionRequest request) {
-        return mapper.toResponse(
-                transactionService.update(workspaceContext.getWorkspaceId(), transactionId, mapper.toInput(request)));
+        Transaction transaction = transactionService.update(
+                workspaceContext.getWorkspaceId(), transactionId, mapper.toInput(request));
+        return mapper.toResponse(transaction, tagService.tagsOf(transaction.getId()));
     }
 
     @DeleteMapping("/{transactionId}")
@@ -86,6 +99,7 @@ public class TransactionController {
     /** Efetivar em um clique (R5). */
     @PostMapping("/{transactionId}/settle")
     public TransactionResponse settle(@PathVariable UUID workspaceId, @PathVariable UUID transactionId) {
-        return mapper.toResponse(transactionService.settle(workspaceContext.getWorkspaceId(), transactionId));
+        Transaction transaction = transactionService.settle(workspaceContext.getWorkspaceId(), transactionId);
+        return mapper.toResponse(transaction, tagService.tagsOf(transaction.getId()));
     }
 }

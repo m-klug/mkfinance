@@ -143,6 +143,7 @@ public class RecurrenceRuleService {
                 occurrenceDate,
                 input.description(),
                 input.note(),
+                null,
                 null);
         transactionService.update(rule.getWorkspaceId(), occurrence.getTransactionId(), txInput);
         return rule;
