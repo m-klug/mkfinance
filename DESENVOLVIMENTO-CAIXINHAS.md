@@ -280,6 +280,17 @@ Gate verde: `api:generate` gerou `lib/api/generated/vaults/` com `useListVaults`
   7. `vaultOptions.ts` (helpers puros), fixtures determinísticas, testes co-localizados, chaves i18n.
 - **Aceite**: `npm test && npm run build` verdes; nenhuma string literal em JSX.
 
+#### ✅ FE-8 concluída — 05/08/2026 (merge `5383232`, 8 commits incrementais)
+
+`npm test` **128/128** (os 98 anteriores intactos, sem edição, + 17 de `vaultOptions.test.ts` e 13 de `VaultsPage.test.tsx`) e `npm run build` verdes, conferidos na `main` após o merge. Nenhuma dependência npm nova — a armadilha do `npm install` não se aplica a este merge.
+
+**Duas lacunas que a FE-8 revelou e que a FE-9 herda** (estavam no plano, não na execução):
+
+1. **Os códigos `VAULT_*` não têm chave em `error.*`.** O namespace `error` é da FE-9 pela tabela 5.4, então a FE-8 corretamente não o tocou. Até lá, todo erro de caixinha cai no fallback genérico de `translateApiError` — seguro, mas mudo: "nome já usado" e "saldo insuficiente" saem como "algo deu errado". **A FE-9 é obrigada a preencher as 10 chaves**, e `VAULT_INSUFFICIENT_BALANCE` e `VAULT_NOT_EMPTY` devem usar os `params` (`availableCents`, `balanceCents`) que a CT-2 colocou neles — o valor existe justamente para a mensagem poder dizer *quanto*.
+2. **`VaultYieldDialog` não existe.** A seção 4 deste plano listava o arquivo sob `features/vaults/`, mas os passos da ficha FE-8 não o incluíam — inconsistência minha, não da execução. **Resolvido: o `VaultYieldDialog` passa a ser da FE-9**, que o cria em `features/vaults/`. Não há colisão porque a FE-8 está fechada e mergeada antes da E11 começar; a regra da tabela 5.4 vale para frentes *simultâneas*.
+
+Decisões que a FE-8 tomou sozinha e ficam valendo: o extrato usa o `Dialog` existente (não há primitivo `Sheet` em `components/ui/` e criar um não era da alçada da ficha); as strings da ação "Caixinhas" na `AccountsPage` vivem em `vaults.accountAction` em vez de `accounts.*`, para não invadir namespace alheio; `contributionPillarOptions` foi reaproveitado de `accountOptions.ts` em vez de duplicado; e o campo de prazo só aparece quando há valor-alvo, evitando na origem o estado que o servidor rejeitaria.
+
 ### BE-10 — Aporte e resgate por caixinha `[E11 · spring-boot-engineer]`
 
 - **Objetivo**: o pilar do aporte passar a vir da caixinha.
@@ -312,8 +323,9 @@ Gate verde: `api:generate` gerou `lib/api/generated/vaults/` com `useListVaults`
   1. Selects de caixinha de origem/destino no modo transferência, condicionados a `account.hasVaults`.
   2. **Quando há caixinha, o pilar vira texto derivado, não campo editável** — ele vem da caixinha.
   3. Badge da caixinha na linha do extrato.
-  4. Rendimento acionável a partir da tela de caixinhas — **importa o dialog da FE-8, não edita**.
-  5. Testes com `server.use(...)` local, **sem tocar `mocks/handlers.ts`** (é da FE-8).
+  4. **Cria** `features/vaults/VaultYieldDialog.tsx` (com prévia do rateio) e o aciona a partir da `VaultsPage` — a FE-8 não o fez, ver a nota do fecho dela. Sem colisão: a FE-8 já está mergeada quando a E11 começa.
+  5. **As 10 chaves `error.VAULT_*`**, usando os `params` de `VAULT_INSUFFICIENT_BALANCE` e `VAULT_NOT_EMPTY` para dizer quanto falta. Hoje esses erros caem no fallback genérico.
+  6. Testes com `server.use(...)` local, **sem tocar `mocks/handlers.ts`** (é da FE-8).
 
 ### INT-3 — Integração & gate `[E12 · java-architect, sequencial]`
 
