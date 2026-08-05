@@ -101,7 +101,7 @@ Lembrete relacionado: `jpa.hibernate.ddl-auto: validate` — todo campo novo de 
 
 #### ✅ CT-1 concluída — decisões de schema fechadas (vinculantes para as fichas seguintes)
 
-Executada em 30/07/2026. Verificado: `api:generate` limpo, `npm run build` ok, 74 testes verdes, `./mvnw compile` ok. O que o contrato decidiu além do que a ficha enunciava:
+Executada em 04/08/2026. Verificado: `api:generate` limpo, `npm run build` ok, 74 testes verdes, `./mvnw compile` ok. O que o contrato decidiu além do que a ficha enunciava:
 
 1. **O calendário tem duas espécies de entrada, não três** — `STATEMENT_DUE` e `PENDING_TRANSACTION`. Como a materialização é lazy na leitura do mês, toda ocorrência de recorrência daquele mês **já é** uma transação pendente; listá-la também como "ocorrência" dobraria o mês. Quem nasceu de série carrega `recurrenceId`, e é assim que a FE-6 diferencia (badge, "editar a série"). `Transaction` também ganhou `recurrenceId` pelo mesmo motivo, para o extrato.
 2. **Agendamento explícito na regra**, não derivado da `startDate`: `dayOfMonth` (MONTHLY/YEARLY), `dayOfWeek` (WEEKLY), `monthOfYear` (YEARLY). Mudar o dia do aluguel não deve mexer na data de início da série. A obrigatoriedade condicional por frequência o OpenAPI não expressa — **valida no servidor e responde `VALIDATION_ERROR` com `fieldErrors`**, sem código de erro novo (a BE-7 não inventa códigos fora dos 4 da ficha).
@@ -162,11 +162,11 @@ Hoje **nenhuma** das queries de `application/dashboard/DashboardAggregateReposit
 - **Regras críticas**: frequência mensal em dia inexistente (31 em fevereiro) cai no último dia do mês; desativar a regra não apaga ocorrências já materializadas; excluir a regra não apaga transações já efetivadas.
 - **Aceite**: testes de unidade da geração de datas (dia 31, ano bissexto, semanal cruzando mês, anual); materializar o mesmo mês duas vezes **não** duplica transações; `THIS_AND_FUTURE` não altera ocorrências passadas.
 
-#### ✅ E6 concluída (BE-6 · BE-7 · FE-5) — 30/07/2026
+#### ✅ E6 concluída (BE-6 · BE-7 · FE-5) — 04/08/2026
 
 Gate verde na `main` com as três frentes integradas: `./mvnw clean verify` 237 testes, `npm test` 79, `npm run build` e `docker compose config` ok. Reservas de Flyway respeitadas (V13 · V14–V15), zero sobreposição de arquivo entre as frentes de back.
 
-**Item do gate E6 conscientemente adiado**: a *reconferência à mão* do cenário canônico da E3 após a mudança para SETTLED-only **não foi feita** — decisão do usuário em 30/07/2026 de empurrá-la para a **INT-2**, que já sobe a stack real para validar as migrações contra dump de produção. O que existe hoje é cobertura automatizada (`DashboardIntegrationTest.canonicalAllocationAndSummary` verde, mais teste de que editar alvo em julho não mexe em junho). A E6 fecha com este item **reconhecidamente pendente, não mascarado**.
+**Item do gate E6 conscientemente adiado**: a *reconferência à mão* do cenário canônico da E3 após a mudança para SETTLED-only **não foi feita** — decisão do usuário em 04/08/2026 de empurrá-la para a **INT-2**, que já sobe a stack real para validar as migrações contra dump de produção. O que existe hoje é cobertura automatizada (`DashboardIntegrationTest.canonicalAllocationAndSummary` verde, mais teste de que editar alvo em julho não mexe em junho). A E6 fecha com este item **reconhecidamente pendente, não mascarado**.
 
 **⚠️ Pendência real herdada da BE-7 — a materialização NÃO está ligada ao extrato.**
 
@@ -174,7 +174,7 @@ A ficha dizia "ao ler o mês (extrato ou calendário), as ocorrências faltantes
 
 **Consequência de produto**: hoje uma recorrência só vira transação pendente depois que alguém abre o calendário daquele mês. Quem for direto ao extrato não vê o salário do mês.
 
-**✅ RESOLVIDO — decisão do usuário em 30/07/2026: o extrato materializa por competência.** O `GET /transactions` passa a materializar as competências que a janela `from`/`to` tocar, **exigindo janela limitada**; consulta sem janela (ou com janela absurda) não materializa nada, que é como se evita o "escrever linhas até 2094". A recorrência passa a aparecer onde quer que o usuário olhe, cumprindo o que a Fase 2 prometeu: a ocorrência nasce como pendente para confirmar com 1 clique.
+**✅ RESOLVIDO — decisão do usuário em 04/08/2026: o extrato materializa por competência.** O `GET /transactions` passa a materializar as competências que a janela `from`/`to` tocar, **exigindo janela limitada**; consulta sem janela (ou com janela absurda) não materializa nada, que é como se evita o "escrever linhas até 2094". A recorrência passa a aparecer onde quer que o usuário olhe, cumprindo o que a Fase 2 prometeu: a ocorrência nasce como pendente para confirmar com 1 clique.
 
 **Alocação**: este trabalho vai para a **BE-8**, não para uma ficha nova. Motivo de engenharia, não de conveniência — ele mexe em `TransactionService`/`TransactionSpecifications`, exatamente os arquivos que a BE-8 já toca para o filtro de tags. Duas fichas paralelas ali brigariam pelo mesmo arquivo. **Sem mudança de contrato**: materializar na leitura é mudança de comportamento, não de forma. Em particular, **não** mexa nos defaults de `from`/`to` do `listTransactions` — isso sim seria mudança de contrato e quebraria a listagem existente.
 
@@ -219,7 +219,7 @@ Outras duas decisões registradas, sem impacto de contrato: fechar regra por `TH
 - **i18n**: grupo `tags.*` + chaves de filtro em `transactions.*`.
 - **Aceite**: criar transação com 2 tags; filtrar por tag reduz a lista; limpar o filtro restaura; testes cobrindo atribuição e filtro.
 
-#### ✅ E7 concluída (BE-8 · FE-6 · FE-7) — 30/07/2026
+#### ✅ E7 concluída (BE-8 · FE-6 · FE-7) — 04/08/2026
 
 Gate verde na `main`: `./mvnw clean verify` **261 testes**, `npm test` **97**, `npm run build` e `docker compose config` ok. Migrações V16–V17 aplicadas; faixas respeitadas. Único arquivo disputado entre as frentes de front (`common.json`) mergeou **sem conflito** — as chaves foram inseridas em regiões distintas. Verificado à parte que o JSON resultante não tem chave de topo duplicada, coisa que o `JSON.parse` engoliria calado.
 
@@ -239,6 +239,25 @@ Gate verde na `main`: `./mvnw clean verify` **261 testes**, `npm test` **97**, `
 - **Objetivo**: fechar a fase contra a stack real já implantada.
 - **Passos**: `npm run api:generate` e conferência contrato × springdoc `/v3/api-docs`; rodar o gate completo (seção 5); **a reconferência à mão do cenário canônico da E3 pós-SETTLED-only, herdada do gate E6 e adiada até aqui**; estender `web/e2e/smoke.spec.ts` com editar alvos → confirmar recorrência → filtrar por tag; conferir i18n sem chave faltando; validar as migrações V13+ contra um **dump restaurado do banco de produção** (é o único jeito de provar que o backfill do `effective_from` e a troca de PK funcionam com dados reais).
 - **Aceite**: gate verde; E2E verde; migrações aplicam limpo sobre o dump de produção; dashboard do mês corrente confere após a mudança para SETTLED-only.
+
+#### INT-2 em execução — 04/08/2026
+
+**Validação de migração: dump de produção dispensado, com justificativa.** O `V2__seed.sql` não semeia `pillar_allocation` e o Flyway roda no boot dos testes, antes de qualquer registro — logo o `UPDATE` de backfill da V13 sempre pegou **zero linha** nos 261 testes. O risco não era "dados reais", era "quaisquer dados". Coberto por `api/src/test/manual/migration-with-existing-data.sh`, que aplica V1/V2/V7/V9, insere dois workspaces com os 6 alvos cada, conta, categoria e transações, e só então roda V13→V17 (9 verificações verdes). Cobre melhor do que um dump de banco pouco usado cobriria, e sem envolver dado real.
+
+**Reconferência à mão do cenário canônico: FEITA**, via HTTP contra a stack real (`canonical.sh`, no scratchpad da sessão). Os seis pilares batem os números da E3 (30/0/8/15/20/2 sobre renda de R$ 5.000), `PENDING` não move a alocação, editar alvos hoje não reescreve março, e soma ≠ 100 responde 400. Contrato × springdoc: **49 endpoints, casamento exato por path+método nos dois sentidos**.
+
+**⚠️ ACHADO — a decisão da materialização no extrato ficou pela metade.**
+
+Medido na stack real com uma recorrência mensal no dia 25, hoje sendo 04/08:
+
+```
+janela padrão do extrato (2026-08-01..2026-08-04): 0 ocorrência(s)
+mês inteiro              (2026-08-01..2026-08-31): 1 ocorrência(s)
+```
+
+A ocorrência **é materializada** — a BE-8 fez sua parte. Mas o `TransactionsPage` monta o filtro com `to = todayIso()`, então o salário do dia 25 existe no banco e **não aparece** na tela que o usuário abre. O objetivo declarado da decisão ("quem for direto ao extrato não vê o salário") continua não cumprido, agora por outro motivo.
+
+Correção candidata: `to` passa a ser o último dia do mês corrente em `features/transactions/TransactionsPage.tsx`. É uma linha, **mas muda a semântica do extrato** de "o que aconteceu" para "o que aconteceu + o previsto do mês", e por isso é decisão do usuário, não minha. Fora do escopo desta INT-2, que para no gate.
 
 ---
 
