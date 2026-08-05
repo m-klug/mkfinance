@@ -12,11 +12,14 @@ import {
   defaultCategories,
   financeReadHandlers,
   groceriesCategory,
+  groceriesTag,
   investmentAccount,
   pendingExpense,
   settledExpense,
   streamingCategory,
+  taggedExpense,
   transactionPage,
+  urgentTag,
 } from "@/test/financeFixtures";
 import {
   ContributionPillar,
@@ -264,6 +267,71 @@ describe("TransactionsPage", () => {
     expect(updates[0]).toMatchObject({
       amountCents: 120000,
       contributionPillar: ContributionPillar.FINANCIAL_FREEDOM,
+    });
+  });
+
+  // BE-8/FE-7: tags in the extrato.
+  it("shows the tags assigned to a transaction in its row", async () => {
+    server.use(...financeReadHandlers({ transactions: [taggedExpense] }));
+    renderPage();
+
+    const row = (await screen.findByText(taggedExpense.description)).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(within(row).getByText(groceriesTag.name)).toBeInTheDocument();
+    expect(within(row).getByText(urgentTag.name)).toBeInTheDocument();
+  });
+
+  it("assigns tags to a transaction from the edit dialog", async () => {
+    const updates: TransactionRequest[] = [];
+    server.use(
+      ...financeReadHandlers({ transactions: [taggedExpense] }),
+      http.patch("*/workspaces/:workspaceId/transactions/:transactionId", async ({ request }) => {
+        updates.push((await request.json()) as TransactionRequest);
+        return HttpResponse.json(taggedExpense);
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: `Editar ${taggedExpense.description}` }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(groceriesTag.name)).toBeInTheDocument();
+    expect(within(dialog).getByText(urgentTag.name)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByLabelText(`Remover tag ${urgentTag.name}`));
+    await user.type(within(dialog).getByLabelText("Tags"), "viagem{Enter}");
+    await user.click(within(dialog).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(updates).toHaveLength(1));
+    expect(updates[0].tags).toEqual([groceriesTag.name, "viagem"]);
+  });
+
+  it("filters by tag and restores the full list when the filter is cleared", async () => {
+    server.use(
+      ...financeReadHandlers({ transactions: [settledExpense, taggedExpense] }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText(settledExpense.description);
+    await screen.findByText(taggedExpense.description);
+
+    await user.type(screen.getByLabelText("Tags"), `${groceriesTag.name}{Enter}`);
+
+    await waitFor(() => {
+      expect(screen.queryByText(settledExpense.description)).not.toBeInTheDocument();
+      expect(screen.getByText(taggedExpense.description)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByLabelText(`Remover tag ${groceriesTag.name}`));
+
+    await waitFor(() => {
+      expect(screen.getByText(settledExpense.description)).toBeInTheDocument();
+      expect(screen.getByText(taggedExpense.description)).toBeInTheDocument();
     });
   });
 });
