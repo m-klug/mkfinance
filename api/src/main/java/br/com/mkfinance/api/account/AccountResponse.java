@@ -16,5 +16,12 @@ public record AccountResponse(
         ContributionPillar defaultContributionPillar,
         String color,
         String icon,
-        boolean archived) {
+        boolean archived,
+        /**
+         * The account has at least one non-archived vault (BE-9, DESENVOLVIMENTO-CAIXINHAS.md §4.4)
+         * — contributions into it must then name one, and {@code defaultContributionPillar} no
+         * longer decides. Always sent by the server; {@code !hasVaults} is the correct
+         * pre-Caixinhas-compatible check on the client.
+         */
+        boolean hasVaults) {
 }
