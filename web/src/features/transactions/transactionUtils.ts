@@ -28,6 +28,18 @@ export function firstDayOfCurrentMonthIso(): string {
   return toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1));
 }
 
+/**
+ * The extrato's default window ends here, not on today: a competency is the whole month, and
+ * anything already scheduled inside it — a recurrence occurrence, a bill entered with "agendar como
+ * pendente" — is part of what the month looks like. Ending the window on today hid those rows even
+ * though they existed, which also made the recurrence materialization (BE-8) pointless from the
+ * extrato's side. Day 0 of the next month is the last day of this one.
+ */
+export function lastDayOfCurrentMonthIso(): string {
+  const now = new Date();
+  return toIsoDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+}
+
 export function activeAccounts(accounts: Account[]): Account[] {
   return accounts.filter((account) => !account.archived);
 }

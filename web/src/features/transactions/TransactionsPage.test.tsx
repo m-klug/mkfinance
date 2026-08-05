@@ -140,6 +140,29 @@ describe("TransactionsPage", () => {
     });
   });
 
+  it("opens on the whole current month, not only up to today", async () => {
+    const queries: URLSearchParams[] = [];
+    server.use(listHandlerCapturing(queries));
+    renderPage();
+
+    await screen.findByText(settledExpense.description);
+
+    const now = new Date();
+    const pad = (value: number) => `${value}`.padStart(2, "0");
+    const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    // Day 0 of the next month is the last day of this one.
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    const first = queries[0];
+    expect(first.get("from")).toBe(`${month}-01`);
+    // The window has to cover the rest of the month: an occurrence a recurrence
+    // materialized for the 25th, or a bill entered with "agendar como pendente",
+    // exists in the database and must not be hidden by the default filter. Ending
+    // on today is the regression this guards against.
+    expect(first.get("to")).toBe(`${month}-${pad(lastDay)}`);
+    expect(first.get("to")! >= `${month}-${pad(now.getDate())}`).toBe(true);
+  });
+
   it("edits a transaction from the prefilled dialog", async () => {
     const updates: TransactionRequest[] = [];
     server.use(
