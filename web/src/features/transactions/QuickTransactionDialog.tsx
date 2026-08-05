@@ -52,6 +52,7 @@ import {
   categoryOptions,
   todayIso,
 } from "@/features/transactions/transactionUtils";
+import { TagsInput } from "@/features/transactions/TagsInput";
 import { INSTALLMENT_COUNTS, splitInstallments } from "@/features/cards/cardOptions";
 
 // The things a user can register from anywhere in the app. A contribution
@@ -89,6 +90,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
   const [categoryId, setCategoryId] = useState("");
   const [cardId, setCardId] = useState("");
   const [installmentCount, setInstallmentCount] = useState(1);
+  const [tags, setTags] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   // Null means "follow the destination account default" (R9).
   const [pillarOverride, setPillarOverride] = useState<ContributionPillar | null>(null);
@@ -128,6 +130,9 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
 
   const isTransferLike = mode === "TRANSFER" || mode === "CONTRIBUTION";
   const isCardMode = mode === "CARD";
+  // Tags live only on plain income/expense entries (BE-8 scope: transfers and
+  // card purchases carry no tags field in the contract).
+  const supportsTags = mode === "EXPENSE" || mode === "INCOME";
   const destinationAccounts = mode === "CONTRIBUTION" ? contributionAccounts : accounts;
 
   // Preview mirrors the backend split: the cent remainder rides the last
@@ -147,6 +152,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     setDate(todayIso());
     setCategoryId("");
     setInstallmentCount(1);
+    setTags([]);
     setPillarOverride(null);
     setPending(false);
     setErrors({});
@@ -281,6 +287,9 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
       date,
       description: description.trim(),
       status: pending ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+      // Optional and off the critical path (≤5-interaction target) — an empty
+      // list here is equivalent to omitting the field on a brand-new entry.
+      tags,
     };
     createTransaction.mutate({ workspaceId, data }, { onSuccess, onError });
   }
@@ -408,6 +417,16 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                 </div>
               )}
             </>
+          )}
+
+          {supportsTags && (
+            <TagsInput
+              id="quick-tags"
+              label={t("transactions.tags")}
+              workspaceId={workspaceId}
+              value={tags}
+              onChange={setTags}
+            />
           )}
 
           {isTransferLike && isContribution && (
