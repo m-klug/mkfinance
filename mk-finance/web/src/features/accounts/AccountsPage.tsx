@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Archive, Pencil, Plus } from "lucide-react";
+import { Archive, PiggyBank, Pencil, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ import { AccountType, type Account } from "@/lib/api/generated/mKFinanceAPI.sche
 import { AccountFormDialog } from "@/features/accounts/AccountFormDialog";
 import {
   effectiveBalanceCents,
+  isContributionAccount,
   projectedBalanceCents,
 } from "@/features/accounts/accountOptions";
 
@@ -171,6 +173,18 @@ export default function AccountsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {isContributionAccount(account) && (
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t("vaults.accountAction", { name: account.name })}
+                          >
+                            <Link to={`/accounts/${account.id}/vaults`}>
+                              <PiggyBank className="size-4" />
+                            </Link>
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon-sm"

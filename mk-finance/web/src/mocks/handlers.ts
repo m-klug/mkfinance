@@ -10,6 +10,7 @@ import { getStatementsMock } from "@/lib/api/generated/statements/statements.msw
 import { getTagsMock } from "@/lib/api/generated/tags/tags.msw";
 import { getTransactionsMock } from "@/lib/api/generated/transactions/transactions.msw";
 import { getTransfersMock } from "@/lib/api/generated/transfers/transfers.msw";
+import { getVaultsMock } from "@/lib/api/generated/vaults/vaults.msw";
 import { getWorkspacesMock } from "@/lib/api/generated/workspaces/workspaces.msw";
 import {
   MemberRole,
@@ -99,6 +100,7 @@ export const handlers = [
   ...getTagsMock(),
   ...getTransactionsMock(),
   ...getTransfersMock(),
+  ...getVaultsMock(),
   ...getDashboardMock(),
   ...getExportMock(),
 ];
