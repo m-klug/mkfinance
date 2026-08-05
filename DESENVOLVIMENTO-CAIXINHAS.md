@@ -238,6 +238,18 @@ A terceira linha é **obrigatória para a feature existir**: sem ela, quem já t
   - Remanejo com os dois lados nulos usa `VALIDATION_ERROR` + `fieldErrors` — obrigatoriedade condicional que o OpenAPI não expressa (decisão 2 da CT-1).
 - **Aceite**: `npm run api:generate` limpo, produzindo hooks + mocks MSW da tag `vaults`; `npm run build` e `./mvnw compile` verdes; nenhum endpoint existente quebra de forma incompatível.
 
+#### ✅ CT-2 concluída — 05/08/2026 (branch `feat/ct-2-contrato-caixinhas`, commit `d0e3e1e`)
+
+Gate verde: `api:generate` gerou `lib/api/generated/vaults/` com `useListVaults`, `useListVaultEntries` e os 7 hooks de mutação + mocks MSW; `npm run build`, `npm test` **98/98** e `./mvnw compile` passaram. As 10 constantes estão em `ErrorCode` com o *porquê* de cada uma no javadoc, e as factories em `AppException` — `vaultInsufficientBalance(vaultId, availableCents)` e `vaultNotEmpty(balanceCents)` levam params para o cliente poder dizer *quanto* falta em vez de só recusar.
+
+**Decisões que a CT-2 fechou além da ficha — vinculantes para as fichas seguintes:**
+
+1. **`listVaults` devolve `VaultComposition`, não uma lista.** A fatia "não alocado" e os dois totais vêm calculados do servidor. O cliente **nunca soma dinheiro** para descobrir o que sobrou, e a identidade da §4.2 chega pronta e já conferida. A BE-9 é responsável por isso ser verdade.
+2. **`Account.hasVaults` e `Transaction.vaultId` são opcionais, não obrigatórios** — precedente do `tags` da Fase 2. O modo de falha de um cliente antigo é ler `undefined`, que cai **exatamente no comportamento pré-caixinhas** em vez de quebrar. `!account.hasVaults` é a checagem correta no front.
+3. **`VaultEntry.amountCents` é assinado** (negativo = saiu da caixinha) — a única exceção na API, onde todo valor é positivo e o sinal vem do tipo. Está documentado no schema; o razão precisa do sinal porque as quatro fontes não têm um "tipo" comum de onde derivá-lo.
+4. **`VaultGoal.monthlyNeededCents` nunca é `null` por prazo vencido** — é o restante inteiro. `null` só quando não há prazo. Poupa o cliente de um caso especial para dizer "faltam R$ X, prazo vencido".
+5. **`createVault` responde `VALIDATION_ERROR`** (não um código próprio) para conta que não é INVESTMENT/SAVINGS — é validação de payload contra o estado do recurso, mesmo tratamento do remanejo com os dois lados nulos.
+
 ### BE-9 — Caixinha, razão, saldo e meta `[E10 · spring-boot-engineer]` (V18–V19)
 
 - **Objetivo**: a caixinha existir, ter saldo correto e ter meta.
