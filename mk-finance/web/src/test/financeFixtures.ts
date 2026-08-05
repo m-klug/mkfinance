@@ -237,9 +237,9 @@ export function financeReadHandlers({
     http.get("*/workspaces/:workspaceId/categories", () => HttpResponse.json(categories)),
     http.get("*/workspaces/:workspaceId/tags", () => HttpResponse.json(tags)),
     http.get("*/workspaces/:workspaceId/transactions", ({ request }) => {
-      const tagsParam = new URL(request.url).searchParams.get("tags");
-      if (!tagsParam) return HttpResponse.json(transactionPage(transactions));
-      const wanted = tagsParam.split(",").map((name) => name.trim().toLowerCase());
+      const tagsParam = new URL(request.url).searchParams.getAll("tags");
+      if (tagsParam.length === 0) return HttpResponse.json(transactionPage(transactions));
+      const wanted = tagsParam.map((name) => name.trim().toLowerCase());
       const filtered = transactions.filter((transaction) =>
         (transaction.tags ?? []).some((tag) => wanted.includes(tag.name.toLowerCase())),
       );
