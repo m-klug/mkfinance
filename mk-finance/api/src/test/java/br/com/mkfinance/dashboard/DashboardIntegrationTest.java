@@ -289,7 +289,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
             AccountResponse account, CategoryResponse category, TransactionType type, long amountCents, LocalDate date) {
         return session.post(
                         path("/transactions"),
-                        new TransactionRequest(account.id(), category.id(), type, amountCents, date, "entry", null, null),
+                        new TransactionRequest(account.id(), category.id(), type, amountCents, date, "entry", null, null, null),
                         TransactionResponse.class)
                 .getBody();
     }
@@ -306,7 +306,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
                                 date,
                                 "pending entry",
                                 null,
-                                TransactionStatus.PENDING),
+                                TransactionStatus.PENDING, null),
                         TransactionResponse.class)
                 .getBody();
     }
