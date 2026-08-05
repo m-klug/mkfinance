@@ -213,7 +213,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
 
         String text = new String(inRange, StandardCharsets.UTF_8);
         assertThat(text).contains(";"); // Excel BR separator
-        assertThat(text).contains("date;type;direction;description;category;account;amount;status;note");
+        assertThat(text).contains("date;type;direction;description;category;account;amount;status;note;tags");
         assertThat(text).contains("5000,00"); // income amount, comma decimal
         // Two transactions in range → header + 2 data lines.
         assertThat(nonEmptyLines(text)).hasSize(3);
