@@ -240,7 +240,11 @@ Gate verde na `main`: `./mvnw clean verify` **261 testes**, `npm test` **97**, `
 - **Passos**: `npm run api:generate` e conferência contrato × springdoc `/v3/api-docs`; rodar o gate completo (seção 5); **a reconferência à mão do cenário canônico da E3 pós-SETTLED-only, herdada do gate E6 e adiada até aqui**; estender `web/e2e/smoke.spec.ts` com editar alvos → confirmar recorrência → filtrar por tag; conferir i18n sem chave faltando; validar as migrações V13+ contra um **dump restaurado do banco de produção** (é o único jeito de provar que o backfill do `effective_from` e a troca de PK funcionam com dados reais).
 - **Aceite**: gate verde; E2E verde; migrações aplicam limpo sobre o dump de produção; dashboard do mês corrente confere após a mudança para SETTLED-only.
 
-#### INT-2 em execução — 04/08/2026
+#### ✅ INT-2 concluída — 04/08/2026 · Fase 2 fechada
+
+Gate final na `main`: `./mvnw clean verify` **261 testes**, `npm test` **97**, `npm run build`, `docker compose config` e **E2E 2/2 verdes** contra a stack real. `npm run api:generate` roda limpo e **não produz diff** — contrato e cliente em sincronia. Varredura de i18n: zero chave faltando em 77 arquivos, e os mapas enum→rótulo (`pillar`, `recurrenceFrequency`, `dayOfWeek`, `calendarEntryKind`, `transactionStatus`, `statementStatus`, `accountType`) cobrem todos os valores dos enums do contrato.
+
+**Escopo**: parou no gate por decisão do usuário. O deploy no self-host é passo dele, à parte — inclusive porque a mudança para SETTLED-only altera números já visíveis hoje, retroativamente para qualquer mês com transação pendente.
 
 **Validação de migração: dump de produção dispensado, com justificativa.** O `V2__seed.sql` não semeia `pillar_allocation` e o Flyway roda no boot dos testes, antes de qualquer registro — logo o `UPDATE` de backfill da V13 sempre pegou **zero linha** nos 261 testes. O risco não era "dados reais", era "quaisquer dados". Coberto por `api/src/test/manual/migration-with-existing-data.sh`, que aplica V1/V2/V7/V9, insere dois workspaces com os 6 alvos cada, conta, categoria e transações, e só então roda V13→V17 (9 verificações verdes). Cobre melhor do que um dump de banco pouco usado cobriria, e sem envolver dado real.
 
