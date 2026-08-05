@@ -71,8 +71,12 @@ public interface VaultEntryRepository extends JpaRepository<VaultEntry, UUID> {
     /** Every ledger row mirroring this transaction, mirror or yield share alike — used by delete cascade helpers. */
     List<VaultEntry> findByTransactionId(UUID transactionId);
 
-    /** Both legs of a reallocation group — DELETE undoes them together (contract). */
-    List<VaultEntry> findByReallocationId(UUID reallocationId);
+    /**
+     * Both legs of a reallocation group — DELETE undoes them together (contract). Scoped by
+     * workspace (R8): {@code reallocationId} is an opaque grouping value, not a lookup key another
+     * workspace's rows could never share by accident, but every by-id read still filters explicitly.
+     */
+    List<VaultEntry> findByReallocationIdAndWorkspaceId(UUID reallocationId, UUID workspaceId);
 
     /**
      * Every row of a vault's own ledger (contract {@code listVaultEntries}), unsorted and
