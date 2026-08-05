@@ -31,5 +31,9 @@ mk-finance/docker/jar.txt
 # Claude Code machine-local settings (agents/ and launch.json ARE tracked)
 .claude/settings.local.json
 
+# Lock de sessão do Claude Code — guarda pid e sessionId da máquina local.
+# Foi versionado por engano no 4ef57ce; nunca deve voltar.
+**/.claude/scheduled_tasks.lock
+
 # worktrees temporários dos agentes
 .claude/worktrees/
