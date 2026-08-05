@@ -3,6 +3,8 @@ package br.com.mkfinance.api.vault;
 import br.com.mkfinance.application.transaction.AccountBalanceService;
 import br.com.mkfinance.application.vault.VaultBalanceService;
 import br.com.mkfinance.application.vault.VaultLedgerService;
+import br.com.mkfinance.application.vault.VaultReallocationResult;
+import br.com.mkfinance.application.vault.VaultReallocationService;
 import br.com.mkfinance.application.vault.VaultService;
 import br.com.mkfinance.domain.model.Vault;
 import br.com.mkfinance.domain.service.BalanceCalculator.Balance;
@@ -39,6 +41,7 @@ public class VaultController {
     private final VaultService vaultService;
     private final VaultBalanceService vaultBalanceService;
     private final VaultLedgerService vaultLedgerService;
+    private final VaultReallocationService vaultReallocationService;
     private final AccountBalanceService accountBalanceService;
     private final VaultMapper mapper;
     private final WorkspaceContext workspaceContext;
@@ -101,5 +104,22 @@ public class VaultController {
         return vaultLedgerService.listEntries(vaultId, from, to).stream()
                 .map(mapper::toEntryResponse)
                 .toList();
+    }
+
+    /** Either side may be null, meaning the unallocated slice (§4.7) — both null is VALIDATION_ERROR. */
+    @PostMapping("/vaults/reallocations")
+    @ResponseStatus(HttpStatus.CREATED)
+    public VaultReallocationResponse reallocate(
+            @PathVariable UUID workspaceId, @Valid @RequestBody VaultReallocationRequest request) {
+        VaultReallocationResult result =
+                vaultReallocationService.create(workspaceContext.getWorkspaceId(), mapper.toInput(request));
+        return mapper.toResponse(result);
+    }
+
+    /** Undoes both sides at once — a half-undone reallocation would not add up. */
+    @DeleteMapping("/vaults/reallocations/{reallocationId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteReallocation(@PathVariable UUID workspaceId, @PathVariable UUID reallocationId) {
+        vaultReallocationService.delete(workspaceContext.getWorkspaceId(), reallocationId);
     }
 }
