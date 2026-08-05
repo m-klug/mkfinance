@@ -23,6 +23,7 @@ tags:
   - name: recurrences
   - name: calendar
   - name: tags
+  - name: vaults
   - name: export
 
 paths:
@@ -890,6 +891,196 @@ paths:
         '204': { description: Deleted. }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /workspaces/{workspaceId}/accounts/{accountId}/vaults:
+    get:
+      tags: [vaults]
+      operationId: listVaults
+      description: >
+        The account's whole composition in one request: every vault plus the unallocated slice.
+        Vaults never hold money of their own — the account balance is still a single amount derived
+        from transactions, and this splits it logically (R9, Caixinhas).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/accountId' }
+        - name: includeArchived
+          in: query
+          description: Archived vaults are always empty, so they are hidden unless asked for.
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Composition of the account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VaultComposition' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [vaults]
+      operationId: createVault
+      description: >
+        Only INVESTMENT/SAVINGS accounts take vaults (R9) — anything else answers
+        VALIDATION_ERROR. Creating the first non-archived vault on an account makes every later
+        contribution into it require one; until then the account behaves exactly as before.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/accountId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VaultRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vault' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/vaults/{vaultId}:
+    patch:
+      tags: [vaults]
+      operationId: updateVault
+      description: >
+        Changing contributionPillar applies from here on — contributions already booked keep the
+        pillar they consumed, since a closed competency is never rewritten (same doctrine as the
+        versioned pillar targets).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/vaultId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VaultRequest' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vault' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [vaults]
+      operationId: deleteVault
+      description: VAULT_HAS_ENTRIES when anything was ever booked to it; archive it instead.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/vaultId' }
+      responses:
+        '204': { description: Deleted. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/vaults/{vaultId}/archive:
+    post:
+      tags: [vaults]
+      operationId: archiveVault
+      description: >
+        VAULT_NOT_EMPTY unless both balances are zero. An archived vault holding money would still
+        have to show up in the composition and would still make contributions require a vault, with
+        none selectable — so emptying it first is the way out, and archiving the last one returns
+        the account to its no-vault behaviour.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/vaultId' }
+      responses:
+        '200':
+          description: Archived.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vault' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/vaults/{vaultId}/entries:
+    get:
+      tags: [vaults]
+      operationId: listVaultEntries
+      description: The vault's own ledger, most recent first — what went in and out, and why.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/vaultId' }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/VaultEntry' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /workspaces/{workspaceId}/vaults/reallocations:
+    post:
+      tags: [vaults]
+      operationId: reallocateVault
+      description: >
+        Moves money between vaults of the same account. No account balance changes and no pillar is
+        consumed — the money already consumed its pillar when it arrived. Either side may be null,
+        meaning the unallocated slice: null → vault is how pre-existing account money gets split
+        into vaults in the first place, and vault → null is how the last vault is emptied.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VaultReallocationRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VaultReallocation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/vaults/reallocations/{reallocationId}:
+    delete:
+      tags: [vaults]
+      operationId: deleteVaultReallocation
+      description: Undoes both sides at once; a half-undone reallocation would not add up.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/reallocationId' }
+      responses:
+        '204': { description: Deleted. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/accounts/{accountId}/vault-yields:
+    post:
+      tags: [vaults]
+      operationId: createVaultYield
+      description: >
+        Books the period's investment yield on the account and splits it across the vaults in
+        proportion to their settled balances. It is an INCOME transaction under a system category:
+        the money really did arrive, so the balance rises and the entry shows in the extrato — but
+        it consumes no pillar (nothing was allocated, the market gave it) and stays out of the
+        month's income, which is the denominator every pillar percentage is measured against (R10).
+        Delete it through DELETE /transactions/{transactionId}; the split goes with it.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/accountId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VaultYieldRequest' }
+      responses:
+        '201':
+          description: Booked, with the split that was applied.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VaultYield' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /workspaces/{workspaceId}/export/transactions.csv:
     get:
       tags: [export]
@@ -956,6 +1147,16 @@ components:
       schema: { type: string, format: uuid }
     tagId:
       name: tagId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    vaultId:
+      name: vaultId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    reallocationId:
+      name: reallocationId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1044,6 +1245,9 @@ components:
             pillar targets — PILLAR_TARGETS_MUST_SUM_100;
             recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND;
             tags — TAG_NAME_DUPLICATE, TAG_NOT_FOUND;
+            vaults — VAULT_NOT_FOUND, VAULT_REQUIRED, VAULT_PILLAR_CONFLICT, VAULT_ACCOUNT_MISMATCH,
+            VAULT_INSUFFICIENT_BALANCE, VAULT_NAME_DUPLICATE, VAULT_NOT_EMPTY, VAULT_HAS_ENTRIES,
+            VAULT_ARCHIVED, VAULT_REALLOCATION_NOT_FOUND;
             generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
         params:
           type: object
@@ -1099,6 +1303,16 @@ components:
     CalendarEntryKind:
       type: string
       enum: [STATEMENT_DUE, PENDING_TRANSACTION]
+    VaultEntrySource:
+      type: string
+      description: >
+        What put the line in the vault's ledger. CONTRIBUTION and WITHDRAWAL mirror a transfer leg,
+        YIELD is one share of a distributed yield, and REALLOCATION is money moved between vaults
+        (or to and from the unallocated slice) without any transaction at all.
+      enum: [CONTRIBUTION, WITHDRAWAL, YIELD, REALLOCATION]
+    VaultGoalStatus:
+      type: string
+      enum: [IN_PROGRESS, REACHED, OVERDUE]
 
     RegisterRequest:
       type: object
@@ -1172,6 +1386,13 @@ components:
         color: { type: string, nullable: true, example: '#16A34A' }
         icon: { type: string, nullable: true }
         archived: { type: boolean }
+        hasVaults:
+          type: boolean
+          description: >
+            The account has at least one non-archived vault, so contributions into it must name one
+            and defaultContributionPillar no longer decides — the destination vault does. Always
+            sent by the server; optional here only so that clients written before the Caixinhas
+            slice keep type-checking, and absent reads as false, which is the pre-vault behaviour.
 
     AccountRequest:
       type: object
@@ -1273,6 +1494,14 @@ components:
           allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
           nullable: true
           description: Set on transfer legs into INVESTMENT/SAVINGS accounts (R9).
+        vaultId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            The vault this leg went into or came out of, when the account has vaults. The extrato
+            badges the row with it; it is also what tells a contribution's pillar where it came
+            from, since with vaults the pillar is the vault's, not the account's.
         recurrenceId:
           type: string
           format: uuid
@@ -1334,7 +1563,26 @@ components:
         contributionPillar:
           allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
           nullable: true
-          description: Only when destination is INVESTMENT/SAVINGS; defaults to the account's default pillar.
+          description: >
+            Only when destination is INVESTMENT/SAVINGS. With no vault on the destination it
+            defaults to the account's default pillar, exactly as before. With a vault it must
+            either be omitted or match the vault's pillar — disagreeing answers
+            VAULT_PILLAR_CONFLICT, because with vaults the pillar is the vault's to decide.
+        fromVaultId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Which vault the money leaves. Required (VAULT_REQUIRED) when the source account has
+            vaults, refused (VAULT_NOT_FOUND) when it has none.
+        toVaultId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Which vault receives the contribution, and therefore which pillar it consumes (R9).
+            Required (VAULT_REQUIRED) when the destination account has vaults, refused
+            (VAULT_NOT_FOUND) when it has none.
 
     TransferUpdateRequest:
       type: object
@@ -1364,7 +1612,18 @@ components:
           description: >
             Re-targets the contribution (R9). Omit to keep whichever pillar the transfer already
             carries. Only meaningful when the destination account is INVESTMENT/SAVINGS; sending it
-            for any other destination answers INVALID_CONTRIBUTION_PILLAR.
+            for any other destination answers INVALID_CONTRIBUTION_PILLAR. Once the destination has
+            a vault it becomes advisory: the vault decides, and a value that disagrees with it
+            answers VAULT_PILLAR_CONFLICT.
+        vaultId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Re-points the leg being edited at another vault, mirroring what accountId does for the
+            account. Omit to carry the current vault forward — unless accountId moved the leg to a
+            different account, in which case the old vault belongs to the old account and the rule
+            runs afresh against the new one.
 
     Card:
       type: object
@@ -1616,6 +1875,219 @@ components:
           type: string
           maxLength: 40
           description: Unique per workspace, compared case-insensitively; stored as typed.
+
+    Vault:
+      type: object
+      required: [id, accountId, name, contributionPillar, archived, balanceCents, projectedBalanceCents]
+      properties:
+        id: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        name: { type: string }
+        contributionPillar:
+          allOf: [{ $ref: '#/components/schemas/ContributionPillar' }]
+          description: >
+            The pillar a contribution into this vault consumes (R9). This is the refinement the
+            Caixinhas bring: the pillar belongs to where the money is going, not to the account
+            holding it, so one brokerage account can feed GOALS and FINANCIAL_FREEDOM at once.
+        targetAmountCents:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 1
+          description: The goal's amount. Null means the vault just holds money, with nothing to reach.
+        targetDate:
+          type: string
+          format: date
+          nullable: true
+          description: Deadline. Only meaningful with targetAmountCents; a date alone has nothing to project.
+        color: { type: string, nullable: true, example: '#16A34A' }
+        archived: { type: boolean }
+        balanceCents:
+          type: integer
+          format: int64
+          description: Settled entries only (R5) — mirrors what balanceCents means on an account.
+        projectedBalanceCents:
+          type: integer
+          format: int64
+          description: >
+            Settled and pending. Reallocations have no status and count in both: they are not money
+            waiting to clear a bank, they are a reclassification that already happened.
+        goal:
+          allOf: [{ $ref: '#/components/schemas/VaultGoal' }]
+          nullable: true
+          description: Present exactly when targetAmountCents is set.
+
+    VaultGoal:
+      type: object
+      required: [targetAmountCents, remainingCents, progressPercent, status]
+      description: >
+        Computed by the server so every client shows the same number. The projection is linear —
+        it does not model returns; the fixed-income simulator is a later phase.
+      properties:
+        targetAmountCents: { type: integer, format: int64 }
+        targetDate: { type: string, format: date, nullable: true }
+        remainingCents:
+          type: integer
+          format: int64
+          description: What is still missing, floored at zero.
+        progressPercent:
+          type: number
+          format: double
+          description: >
+            current ÷ target × 100, deliberately not capped at 100 — the client decides how to
+            celebrate an overshoot, same as with the pillar allocation's actualPercent.
+        monthsRemaining:
+          type: integer
+          nullable: true
+          description: >
+            Counting the current competency, floored at zero. Null only when there is no deadline.
+          minimum: 0
+        monthlyNeededCents:
+          type: integer
+          format: int64
+          nullable: true
+          description: >
+            remaining ÷ monthsRemaining, rounded up so that paying it every month actually gets
+            there. Zero once the goal is reached, and the whole remainder when the deadline has
+            passed — never null just because the date is behind us; null only without a deadline.
+        status: { $ref: '#/components/schemas/VaultGoalStatus' }
+
+    VaultRequest:
+      type: object
+      required: [name, contributionPillar]
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          description: Unique per account, compared case-insensitively.
+        contributionPillar: { $ref: '#/components/schemas/ContributionPillar' }
+        targetAmountCents:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 1
+        targetDate:
+          type: string
+          format: date
+          nullable: true
+          description: Sending it without targetAmountCents answers VALIDATION_ERROR.
+        color: { type: string, nullable: true }
+
+    VaultComposition:
+      type: object
+      required: [accountId, balanceCents, projectedBalanceCents, allocatedCents, unallocatedCents, projectedUnallocatedCents, vaults]
+      description: >
+        How the account's single balance splits up. Σ vaults + unallocated = the account balance,
+        at both the settled and the projected level, by construction.
+      properties:
+        accountId: { type: string, format: uuid }
+        balanceCents: { type: integer, format: int64 }
+        projectedBalanceCents: { type: integer, format: int64 }
+        allocatedCents:
+          type: integer
+          format: int64
+          description: Sum of the vaults' settled balances.
+        unallocatedCents:
+          type: integer
+          format: int64
+          description: >
+            Account balance − allocated: money that has not picked a vault, and therefore has not
+            picked a pillar. It can go negative — spending straight from the account, or paying a
+            statement with it, does not know about vaults — and that is shown rather than blocked,
+            the same way a negative account balance is shown.
+        projectedUnallocatedCents: { type: integer, format: int64 }
+        vaults:
+          type: array
+          items: { $ref: '#/components/schemas/Vault' }
+
+    VaultEntry:
+      type: object
+      required: [id, vaultId, date, description, amountCents, source, status]
+      properties:
+        id: { type: string, format: uuid }
+        vaultId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        description: { type: string }
+        amountCents:
+          type: integer
+          format: int64
+          description: Signed — negative when money left the vault. Unlike everywhere else in this API.
+        source: { $ref: '#/components/schemas/VaultEntrySource' }
+        status:
+          allOf: [{ $ref: '#/components/schemas/TransactionStatus' }]
+          description: Taken from the transaction behind it; always SETTLED for a reallocation.
+        transactionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null exactly for REALLOCATION, which moves no money in or out of the account.
+        reallocationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Groups the two sides of a reallocation, or the single side when the other is unallocated.
+
+    VaultReallocationRequest:
+      type: object
+      required: [amountCents, date]
+      properties:
+        fromVaultId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null means the unallocated slice — this is how existing account money enters a vault.
+        toVaultId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null means the unallocated slice — this is how a vault is emptied before archiving.
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        date: { type: string, format: date }
+        description: { type: string, maxLength: 255, nullable: true }
+
+    VaultReallocation:
+      type: object
+      required: [id, accountId, amountCents, date]
+      properties:
+        id: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        fromVaultId: { type: string, format: uuid, nullable: true }
+        toVaultId: { type: string, format: uuid, nullable: true }
+        amountCents: { type: integer, format: int64 }
+        date: { type: string, format: date }
+        description: { type: string, nullable: true }
+
+    VaultYieldRequest:
+      type: object
+      required: [amountCents, date]
+      properties:
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        date: { type: string, format: date }
+        description: { type: string, maxLength: 255, nullable: true }
+
+    VaultYield:
+      type: object
+      required: [transactionId, amountCents, date, shares]
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+          description: The INCOME transaction that was booked; delete it to undo the whole yield.
+        amountCents: { type: integer, format: int64 }
+        date: { type: string, format: date }
+        shares:
+          type: array
+          description: >
+            The split actually applied, proportional to each vault's settled balance. The shares
+            always add up to amountCents exactly — the leftover cents go to the largest remainders.
+            Empty when no vault held a positive balance, in which case the whole yield lands in the
+            unallocated slice rather than being invented into some vault.
+          items:
+            type: object
+            required: [vaultId, amountCents]
+            properties:
+              vaultId: { type: string, format: uuid }
+              amountCents: { type: integer, format: int64 }
 
     DashboardSummary:
       type: object

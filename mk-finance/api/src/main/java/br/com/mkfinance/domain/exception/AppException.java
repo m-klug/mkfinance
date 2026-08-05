@@ -1,6 +1,7 @@
 package br.com.mkfinance.domain.exception;
 
 import java.util.Map;
+import java.util.UUID;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
@@ -182,5 +183,56 @@ public class AppException extends RuntimeException {
 
     public static AppException tagNotFound() {
         return of(ErrorCode.TAG_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException vaultNotFound() {
+        return of(ErrorCode.VAULT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException vaultRequired() {
+        return of(ErrorCode.VAULT_REQUIRED, HttpStatus.BAD_REQUEST);
+    }
+
+    public static AppException vaultPillarConflict() {
+        return of(ErrorCode.VAULT_PILLAR_CONFLICT, HttpStatus.BAD_REQUEST);
+    }
+
+    public static AppException vaultAccountMismatch() {
+        return of(ErrorCode.VAULT_ACCOUNT_MISMATCH, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * @param availableCents what the vault actually holds, so the client can say how much short the
+     *     movement is instead of just refusing it
+     */
+    public static AppException vaultInsufficientBalance(UUID vaultId, long availableCents) {
+        return of(
+                ErrorCode.VAULT_INSUFFICIENT_BALANCE,
+                HttpStatus.CONFLICT,
+                Map.of("vaultId", vaultId, "availableCents", availableCents));
+    }
+
+    public static AppException vaultNameDuplicate(String name) {
+        return of(ErrorCode.VAULT_NAME_DUPLICATE, HttpStatus.CONFLICT, Map.of("name", name));
+    }
+
+    /**
+     * @param balanceCents what is still in the vault, so the client can offer to move exactly that
+     *     much out before archiving
+     */
+    public static AppException vaultNotEmpty(long balanceCents) {
+        return of(ErrorCode.VAULT_NOT_EMPTY, HttpStatus.CONFLICT, Map.of("balanceCents", balanceCents));
+    }
+
+    public static AppException vaultHasEntries() {
+        return of(ErrorCode.VAULT_HAS_ENTRIES, HttpStatus.CONFLICT);
+    }
+
+    public static AppException vaultArchived() {
+        return of(ErrorCode.VAULT_ARCHIVED, HttpStatus.CONFLICT);
+    }
+
+    public static AppException vaultReallocationNotFound() {
+        return of(ErrorCode.VAULT_REALLOCATION_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 }
