@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import LoginPage from "@/features/auth/LoginPage";
 import RegisterPage from "@/features/auth/RegisterPage";
 import AccountsPage from "@/features/accounts/AccountsPage";
+import VaultsPage from "@/features/vaults/VaultsPage";
 import CardsPage from "@/features/cards/CardsPage";
 import CardStatementsPage from "@/features/cards/CardStatementsPage";
 import CategoriesPage from "@/features/categories/CategoriesPage";
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
+            <Route path="/accounts/:accountId/vaults" element={<VaultsPage />} />
             <Route path="/cards" element={<CardsPage />} />
             <Route path="/cards/:cardId/statements" element={<CardStatementsPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
