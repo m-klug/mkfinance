@@ -114,3 +114,107 @@ test("register through dashboard: the canonical happy path", async ({ page }) =>
   // balance panel renders the account.
   await expect(page.getByText("Conta Corrente").first()).toBeVisible();
 });
+
+// INT-2 — the Phase 2 surface end to end: edit the pillar targets, let a
+// recurrence materialize into a pending entry and settle it in one click, then
+// tag a transaction and filter the extrato by that tag. Same real stack, no MSW.
+test("phase 2: pillar targets, recurrence settle and tag filter", async ({ page }) => {
+  const email = uniqueEmail();
+
+  await page.goto("/register");
+  await page.locator("#register-name").fill("Phase Two Tester");
+  await page.locator("#register-email").fill(email);
+  await page.locator("#register-password").fill("password123");
+  await page.getByRole("button", { name: "Criar conta", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
+
+  await page.getByRole("link", { name: "Contas" }).click();
+  await page.getByRole("button", { name: "Nova conta" }).click();
+  await page.locator("#account-name").fill("Conta Corrente");
+  await page.locator("#account-type").selectOption("CHECKING");
+  await page.getByRole("dialog").getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByRole("cell", { name: "Conta Corrente", exact: true })).toBeVisible();
+
+  // --- Edit the pillar targets (BE-6 + FE-5) ---
+  await page.getByRole("link", { name: "Pilares" }).click();
+  await expect(page.getByRole("heading", { name: "Configurações de pilares" })).toBeVisible();
+
+  // Move 5 points from PLEASURES to KNOWLEDGE; the sum stays 100 so save unlocks.
+  await page.locator("#pillar-target-PLEASURES").fill("5");
+  await page.locator("#pillar-target-KNOWLEDGE").fill("10");
+  await expect(page.getByText("Soma: 100%")).toBeVisible();
+  await page.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByText("Percentuais-alvo atualizados.")).toBeVisible();
+
+  // A sum other than 100 must block the submit — the client guard, with the
+  // server rule (PILLAR_TARGETS_MUST_SUM_100) still the authority behind it.
+  await page.locator("#pillar-target-KNOWLEDGE").fill("40");
+  await expect(page.getByRole("button", { name: "Salvar" })).toBeDisabled();
+  await page.locator("#pillar-target-KNOWLEDGE").fill("10");
+
+  // --- Create a monthly recurrence starting today (BE-7 + FE-6) ---
+  const today = new Date();
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  await page.getByRole("link", { name: "Recorrências" }).click();
+  await page.getByRole("button", { name: "Nova recorrência" }).click();
+  const recurrenceDialog = page.getByRole("dialog");
+  await recurrenceDialog.locator("#recurrence-type").selectOption("INCOME");
+  await recurrenceDialog.locator("#recurrence-account").selectOption({ label: "Conta Corrente" });
+  await recurrenceDialog.locator("#recurrence-category").selectOption({ index: 1 });
+  await fillMoney(page, "recurrence-amount", SALARY);
+  await recurrenceDialog.locator("#recurrence-description").fill("Salário recorrente");
+  await recurrenceDialog.locator("#recurrence-frequency").selectOption("MONTHLY");
+  // Day 1 so the occurrence always lands on or before today, inside the extrato's
+  // default window — the point here is settling it, not the window itself.
+  await recurrenceDialog.locator("#recurrence-day-of-month").fill("1");
+  await recurrenceDialog.locator("#recurrence-start-date").fill(iso(firstOfMonth));
+  await recurrenceDialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(recurrenceDialog).toBeHidden();
+  await expect(page.getByText("Salário recorrente").first()).toBeVisible();
+
+  // --- The calendar shows the occurrence (read-only view, FE-6) ---
+  await page.getByRole("link", { name: "Calendário" }).click();
+  await expect(page.getByText("Salário recorrente").first()).toBeVisible();
+
+  // --- The extrato materialized it as PENDING; settle it in one click (R5) ---
+  await page.getByRole("link", { name: "Lançamentos" }).click();
+  await page.locator("#filter-from").fill(iso(firstOfMonth));
+  await page.locator("#filter-to").fill(iso(lastOfMonth));
+  const pendingRow = page.getByRole("row", { name: /Salário recorrente/ }).first();
+  await expect(pendingRow).toBeVisible();
+  await pendingRow.getByRole("button", { name: /^Efetivar/ }).click();
+  await expect(page.getByText("Lançamento efetivado.")).toBeVisible();
+
+  // --- Tag a transaction and filter by it (BE-8 + FE-7) ---
+  // The extrato renders its own "Novo lançamento" besides the one in the header.
+  await page.getByRole("main").getByRole("button", { name: "Novo lançamento" }).click();
+  const quickDialog = page.getByRole("dialog");
+  await fillMoney(page, "quick-amount", "12345");
+  await page.locator("#quick-description").fill("Mercado da esquina");
+  await page.locator("#quick-category").selectOption({ index: 1 });
+  await quickDialog.getByPlaceholder("Adicionar tag e pressionar Enter").fill("mercado");
+  await quickDialog.getByPlaceholder("Adicionar tag e pressionar Enter").press("Enter");
+  await quickDialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(quickDialog).toBeHidden();
+
+  // Row-level assertions: a description matches several cells (the description
+  // itself, and the action cell's "Editar <description>" label).
+  const groceryRow = page.getByRole("row", { name: /Mercado da esquina/ });
+  const salaryRow = page.getByRole("row", { name: /Salário recorrente/ });
+  await expect(groceryRow).toHaveCount(1);
+  // The tag chip renders on the row, which is what makes the filter meaningful.
+  await expect(groceryRow).toContainText("mercado");
+
+  // Filtering by the tag narrows the list to the tagged entry...
+  await page.locator("#filter-tags").fill("mercado");
+  await page.locator("#filter-tags").press("Enter");
+  await expect(groceryRow).toHaveCount(1);
+  await expect(salaryRow).toHaveCount(0);
+
+  // ...and clearing it brings the rest back.
+  await page.getByRole("button", { name: /Remover tag mercado/ }).click();
+  await expect(salaryRow).toHaveCount(1);
+});
