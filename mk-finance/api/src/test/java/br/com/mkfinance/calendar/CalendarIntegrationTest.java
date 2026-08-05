@@ -59,7 +59,7 @@ class CalendarIntegrationTest extends AbstractCalendarIntegrationTest {
                         LocalDate.of(2026, 8, 12),
                         "Conta de luz",
                         null,
-                        TransactionStatus.PENDING),
+                        TransactionStatus.PENDING, null),
                 TransactionResponse.class);
 
         CalendarMonthResponse response = calendar("2026-08");
@@ -87,7 +87,7 @@ class CalendarIntegrationTest extends AbstractCalendarIntegrationTest {
                         LocalDate.of(2026, 8, 12),
                         "Mercado",
                         null,
-                        null),
+                        null, null),
                 TransactionResponse.class);
 
         assertThat(calendar("2026-08").entries()).isEmpty();

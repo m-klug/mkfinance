@@ -104,7 +104,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         ResponseEntity<TransactionResponse> updated = session.patch(
                 path("/transactions/" + outgoing.id()),
                 new TransactionRequest(
-                        checking.id(), null, null, 75_000L, newDate, "Saque corrigido", "conferido", null),
+                        checking.id(), null, null, 75_000L, newDate, "Saque corrigido", "conferido", null, null),
                 TransactionResponse.class);
         assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -132,7 +132,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         TransactionResponse incoming = legOn(wallet.id());
         session.patch(
                 path("/transactions/" + incoming.id()),
-                new TransactionRequest(savings.id(), null, null, 50_000L, DATE, "Aporte", null, null),
+                new TransactionRequest(savings.id(), null, null, 50_000L, DATE, "Aporte", null, null, null),
                 TransactionResponse.class);
 
         TransactionResponse movedLeg = legOn(savings.id());
@@ -341,7 +341,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
                                 DATE,
                                 "Mercado",
                                 null,
-                                null),
+                                null, null),
                         TransactionResponse.class)
                 .getBody();
 
@@ -398,7 +398,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         session.patch(
                 path("/transactions/" + outgoing.id()),
                 new TransactionRequest(
-                        checking.id(), null, null, 30_000L, DATE, "Saque", null, TransactionStatus.PENDING),
+                        checking.id(), null, null, 30_000L, DATE, "Saque", null, TransactionStatus.PENDING, null),
                 TransactionResponse.class);
         assertThat(allTransactions()).allSatisfy(leg -> assertThat(leg.status()).isEqualTo(TransactionStatus.PENDING));
         assertThat(balanceService.balanceOf(workspaceId, checking.id()).currentCents())
@@ -565,7 +565,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         TransactionResponse incoming = legOn(first.id());
         session.patch(
                 path("/transactions/" + incoming.id()),
-                new TransactionRequest(second.id(), null, null, 70_000L, DATE, "Aporte", null, null),
+                new TransactionRequest(second.id(), null, null, 70_000L, DATE, "Aporte", null, null, null),
                 TransactionResponse.class);
 
         assertThat(legOn(second.id()).contributionPillar())
@@ -586,7 +586,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
 
         ResponseEntity<TransactionResponse> moved = session.patch(
                 path("/transactions/" + incoming.id()),
-                new TransactionRequest(wallet.id(), null, null, 40_000L, DATE, "Saque afinal", null, null),
+                new TransactionRequest(wallet.id(), null, null, 40_000L, DATE, "Saque afinal", null, null, null),
                 TransactionResponse.class);
 
         assertThat(moved.getStatusCode()).isEqualTo(HttpStatus.OK);

@@ -4,6 +4,7 @@ import br.com.mkfinance.domain.model.Transaction;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -16,7 +17,13 @@ final class TransactionSpecifications {
     private TransactionSpecifications() {
     }
 
-    static Specification<Transaction> of(UUID workspaceId, TransactionFilter filter) {
+    /**
+     * @param tagTransactionIds the transactions matching {@code filter.tags()}, resolved beforehand
+     *     by {@code application/tag/TagService#matchingTransactionIds} — this class has no repository
+     *     access of its own. {@code null} means no tag filter was requested; an empty set means the
+     *     filter matched no tag at all, and the listing must return nothing rather than everything.
+     */
+    static Specification<Transaction> of(UUID workspaceId, TransactionFilter filter, Set<UUID> tagTransactionIds) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("workspaceId"), workspaceId));
@@ -44,6 +51,9 @@ final class TransactionSpecifications {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("description")), pattern),
                         cb.like(cb.lower(root.get("note")), pattern)));
+            }
+            if (tagTransactionIds != null) {
+                predicates.add(tagTransactionIds.isEmpty() ? cb.disjunction() : root.get("id").in(tagTransactionIds));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };

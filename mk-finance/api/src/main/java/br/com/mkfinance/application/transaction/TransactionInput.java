@@ -3,6 +3,7 @@ package br.com.mkfinance.application.transaction;
 import br.com.mkfinance.domain.model.TransactionStatus;
 import br.com.mkfinance.domain.model.TransactionType;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -13,6 +14,10 @@ import java.util.UUID;
  * are dropped as the request is bridged to {@link TransferUpdateInput}: a transfer has no category
  * and its type cannot change (TRANSACTION_TYPE_IMMUTABLE). Re-targeting a contribution pillar is not
  * possible here — that goes through {@code PATCH /transfers}.
+ *
+ * @param tags names, not ids (CT-1) — {@code null} means "leave the current tags alone" on an edit
+ *     (there is nothing to leave alone on a create, so it means "no tags" there); a present list,
+ *     even empty, replaces the whole set.
  */
 public record TransactionInput(
         UUID accountId,
@@ -22,5 +27,6 @@ public record TransactionInput(
         LocalDate date,
         String description,
         String note,
-        TransactionStatus status) {
+        TransactionStatus status,
+        List<String> tags) {
 }

@@ -1,10 +1,12 @@
 package br.com.mkfinance.api.transaction;
 
+import br.com.mkfinance.api.tag.TagResponse;
 import br.com.mkfinance.domain.model.ContributionPillar;
 import br.com.mkfinance.domain.model.TransactionStatus;
 import br.com.mkfinance.domain.model.TransactionType;
 import br.com.mkfinance.domain.model.TransferDirection;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /** Contract schema {@code Transaction}. */
@@ -30,5 +32,10 @@ public record TransactionResponse(
         /** Set on transfers into INVESTMENT/SAVINGS accounts (R9). */
         ContributionPillar contributionPillar,
         /** The rule that materialized this row, when it came from a recurrence (CT-1); null otherwise. */
-        UUID recurrenceId) {
+        UUID recurrenceId,
+        /**
+         * Always sent, empty when the transaction has none (CT-1). Transfer legs are always empty —
+         * {@code TransferRequest} has no {@code tags} field to set them with (BE-8 scope).
+         */
+        List<TagResponse> tags) {
 }

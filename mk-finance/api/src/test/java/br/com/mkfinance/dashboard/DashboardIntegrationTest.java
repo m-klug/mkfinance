@@ -213,7 +213,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
 
         String text = new String(inRange, StandardCharsets.UTF_8);
         assertThat(text).contains(";"); // Excel BR separator
-        assertThat(text).contains("date;type;direction;description;category;account;amount;status;note");
+        assertThat(text).contains("date;type;direction;description;category;account;amount;status;note;tags");
         assertThat(text).contains("5000,00"); // income amount, comma decimal
         // Two transactions in range → header + 2 data lines.
         assertThat(nonEmptyLines(text)).hasSize(3);
@@ -289,7 +289,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
             AccountResponse account, CategoryResponse category, TransactionType type, long amountCents, LocalDate date) {
         return session.post(
                         path("/transactions"),
-                        new TransactionRequest(account.id(), category.id(), type, amountCents, date, "entry", null, null),
+                        new TransactionRequest(account.id(), category.id(), type, amountCents, date, "entry", null, null, null),
                         TransactionResponse.class)
                 .getBody();
     }
@@ -306,7 +306,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
                                 date,
                                 "pending entry",
                                 null,
-                                TransactionStatus.PENDING),
+                                TransactionStatus.PENDING, null),
                         TransactionResponse.class)
                 .getBody();
     }
