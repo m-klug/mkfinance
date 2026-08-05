@@ -17,7 +17,8 @@
     "required": "Campo obrigatório.",
     "amountPositive": "Informe um valor maior que zero.",
     "transferAccountsRequired": "Selecione a conta de origem e a de destino.",
-    "transferAccountsDistinct": "A conta de destino deve ser diferente da de origem."
+    "transferAccountsDistinct": "A conta de destino deve ser diferente da de origem.",
+    "invalid": "Valor inválido."
   },
   "accountType": {
     "CHECKING": "Conta corrente",
@@ -44,6 +45,24 @@
     "CLOSED": "Fechada",
     "PARTIAL": "Parcial",
     "PAID": "Paga"
+  },
+  "recurrenceFrequency": {
+    "MONTHLY": "Mensal",
+    "WEEKLY": "Semanal",
+    "YEARLY": "Anual"
+  },
+  "dayOfWeek": {
+    "MONDAY": "Segunda-feira",
+    "TUESDAY": "Terça-feira",
+    "WEDNESDAY": "Quarta-feira",
+    "THURSDAY": "Quinta-feira",
+    "FRIDAY": "Sexta-feira",
+    "SATURDAY": "Sábado",
+    "SUNDAY": "Domingo"
+  },
+  "calendarEntryKind": {
+    "STATEMENT_DUE": "Vencimento de fatura",
+    "PENDING_TRANSACTION": "Lançamento pendente"
   },
   "accounts": {
     "new": "Nova conta",
@@ -217,12 +236,81 @@
     "reverseDescription": "O pagamento será desfeito e a despesa correspondente removida da conta. A fatura volta a ficar em aberto.",
     "reverseConfirm": "Estornar"
   },
+  "recurrences": {
+    "new": "Nova recorrência",
+    "newTitle": "Nova recorrência",
+    "editTitle": "Editar recorrência",
+    "editOccurrenceTitle": "Editar ocorrência",
+    "editOccurrenceSubtitle": "As alterações valem só para a ocorrência de {{date}} — a série continua como está.",
+    "formSubtitle": "Uma série recorrente materializa lançamentos pendentes automaticamente, um clique para confirmar.",
+    "type": "Tipo",
+    "account": "Conta",
+    "category": "Categoria",
+    "categoryPlaceholder": "Selecione uma categoria",
+    "amount": "Valor",
+    "description": "Descrição",
+    "note": "Observação",
+    "frequency": "Frequência",
+    "dayOfMonth": "Dia do mês",
+    "dayOfWeek": "Dia da semana",
+    "dayOfWeekPlaceholder": "Selecione um dia",
+    "monthOfYear": "Mês do ano (1-12)",
+    "startDate": "Início",
+    "endDate": "Fim",
+    "endDateHint": "Deixe em branco para uma série sem data de término.",
+    "endDateBeforeStart": "O fim não pode ser antes do início.",
+    "active": "Série ativa",
+    "showClosed": "Mostrar encerradas",
+    "empty": "Nenhuma recorrência cadastrada ainda.",
+    "created": "Recorrência criada.",
+    "updated": "Recorrência atualizada.",
+    "deleted": "Recorrência excluída.",
+    "statusClosed": "Encerrada",
+    "editAction": "Editar {{description}}",
+    "deleteAction": "Excluir {{description}}",
+    "deleteTitle": "Excluir recorrência",
+    "deleteDescription": "A recorrência {{description}} será encerrada a partir de hoje. Ocorrências já efetivadas são preservadas.",
+    "deleteConfirm": "Excluir",
+    "schedule": {
+      "monthly": "Todo dia {{day}}",
+      "weekly": "Toda {{day}}",
+      "yearly": "Todo dia {{day}} de {{month}}"
+    },
+    "scope": {
+      "editTitle": "Qual parte da série editar?",
+      "editDescription": "Esta série pode já ter gerado ocorrências. Escolha o alcance da alteração.",
+      "deleteTitle": "Qual parte da série excluir?",
+      "deleteDescription": "Esta série pode já ter gerado ocorrências. Escolha o alcance da exclusão.",
+      "thisOne": "Só esta ocorrência",
+      "thisOneEditHint": "Altera só a ocorrência escolhida; a série continua como está.",
+      "thisOneDeleteHint": "Pula só a ocorrência escolhida; lançamentos já efetivados são preservados.",
+      "thisAndFuture": "Esta e as futuras",
+      "thisAndFutureEditHint": "Fecha a série atual e cria uma nova com os novos valores a partir da data escolhida.",
+      "thisAndFutureDeleteHint": "Encerra a série a partir da data escolhida; ocorrências futuras ainda pendentes são removidas.",
+      "occurrenceDate": "Data da ocorrência",
+      "occurrenceDateHint": "Precisa ser uma data em que a série realmente cai.",
+      "editConfirm": "Continuar",
+      "deleteConfirm": "Excluir"
+    }
+  },
+  "calendar": {
+    "empty": "Nenhum evento neste mês.",
+    "today": "Hoje",
+    "recurrenceBadge": "Recorrência",
+    "viewRecurrences": "Ver recorrências",
+    "direction": {
+      "IN": "A receber",
+      "OUT": "A pagar"
+    }
+  },
   "nav": {
     "dashboard": "Dashboard",
     "transactions": "Lançamentos",
     "accounts": "Contas",
     "cards": "Cartões",
     "categories": "Categorias",
+    "recurrences": "Recorrências",
+    "calendar": "Calendário",
     "settings": "Pilares",
     "openMenu": "Abrir menu",
     "closeMenu": "Fechar menu"
@@ -334,6 +422,8 @@
     "PAYMENT_EXCEEDS_REMAINING": "O valor excede o restante da fatura.",
     "INVITE_EXPIRED": "Este convite expirou ou já foi usado.",
     "VALIDATION_ERROR": "Verifique os campos destacados.",
-    "PILLAR_TARGETS_MUST_SUM_100": "A soma dos seis pilares precisa ser 100%."
+    "PILLAR_TARGETS_MUST_SUM_100": "A soma dos seis pilares precisa ser 100%.",
+    "RECURRENCE_NOT_FOUND": "Esta recorrência não foi encontrada.",
+    "RECURRENCE_OCCURRENCE_NOT_FOUND": "Essa data não corresponde a uma ocorrência desta série."
   }
 }

@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
+  CalendarDays,
   CreditCard,
   LayoutDashboard,
   LogOut,
   Menu,
+  Repeat,
   Settings,
   Tags,
   Wallet,
@@ -34,6 +36,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/accounts", labelKey: "nav.accounts", icon: Wallet },
   { to: "/cards", labelKey: "nav.cards", icon: CreditCard },
   { to: "/categories", labelKey: "nav.categories", icon: Tags },
+  { to: "/recurrences", labelKey: "nav.recurrences", icon: Repeat },
+  { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
   { to: "/settings/pillars", labelKey: "nav.settings", icon: Settings },
 ];
 
