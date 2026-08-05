@@ -166,6 +166,8 @@ Hoje **nenhuma** das queries de `application/dashboard/DashboardAggregateReposit
 
 Gate verde na `main` com as três frentes integradas: `./mvnw clean verify` 237 testes, `npm test` 79, `npm run build` e `docker compose config` ok. Reservas de Flyway respeitadas (V13 · V14–V15), zero sobreposição de arquivo entre as frentes de back.
 
+**Item do gate E6 conscientemente adiado**: a *reconferência à mão* do cenário canônico da E3 após a mudança para SETTLED-only **não foi feita** — decisão do usuário em 30/07/2026 de empurrá-la para a **INT-2**, que já sobe a stack real para validar as migrações contra dump de produção. O que existe hoje é cobertura automatizada (`DashboardIntegrationTest.canonicalAllocationAndSummary` verde, mais teste de que editar alvo em julho não mexe em junho). A E6 fecha com este item **reconhecidamente pendente, não mascarado**.
+
 **⚠️ Pendência real herdada da BE-7 — a materialização NÃO está ligada ao extrato.**
 
 A ficha dizia "ao ler o mês (extrato ou calendário), as ocorrências faltantes nascem". A BE-7 ligou a materialização **só ao endpoint do calendário**, com uma justificativa boa: o `GET /transactions` filtra por `from`/`to`, um intervalo arbitrário sem noção de competência, e materializar sob um range ilimitado é exatamente o "escrever linhas até 2094" que o contrato evita. `TransactionController`/`TransactionService` também estavam fora da propriedade dela, então parar foi o comportamento certo.
@@ -220,7 +222,7 @@ Outras duas decisões registradas, sem impacto de contrato: fechar regra por `TH
 ### INT-2 — Integração & gate da Fase 2 `[E8 · java-architect, sequencial]`
 
 - **Objetivo**: fechar a fase contra a stack real já implantada.
-- **Passos**: `npm run api:generate` e conferência contrato × springdoc `/v3/api-docs`; rodar o gate completo (seção 5); estender `web/e2e/smoke.spec.ts` com editar alvos → confirmar recorrência → filtrar por tag; conferir i18n sem chave faltando; validar as migrações V13+ contra um **dump restaurado do banco de produção** (é o único jeito de provar que o backfill do `effective_from` e a troca de PK funcionam com dados reais).
+- **Passos**: `npm run api:generate` e conferência contrato × springdoc `/v3/api-docs`; rodar o gate completo (seção 5); **a reconferência à mão do cenário canônico da E3 pós-SETTLED-only, herdada do gate E6 e adiada até aqui**; estender `web/e2e/smoke.spec.ts` com editar alvos → confirmar recorrência → filtrar por tag; conferir i18n sem chave faltando; validar as migrações V13+ contra um **dump restaurado do banco de produção** (é o único jeito de provar que o backfill do `effective_from` e a troca de PK funcionam com dados reais).
 - **Aceite**: gate verde; E2E verde; migrações aplicam limpo sobre o dump de produção; dashboard do mês corrente confere após a mudança para SETTLED-only.
 
 ---
