@@ -30,3 +30,6 @@ mk-finance/docker/jar.txt
 
 # Claude Code machine-local settings (agents/ and launch.json ARE tracked)
 .claude/settings.local.json
+
+# worktrees temporários dos agentes
+.claude/worktrees/
