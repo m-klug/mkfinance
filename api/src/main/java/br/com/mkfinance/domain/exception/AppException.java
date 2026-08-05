@@ -179,4 +179,8 @@ public class AppException extends RuntimeException {
     public static AppException tagNameDuplicate(String name) {
         return of(ErrorCode.TAG_NAME_DUPLICATE, HttpStatus.CONFLICT, Map.of("name", name));
     }
+
+    public static AppException tagNotFound() {
+        return of(ErrorCode.TAG_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
 }

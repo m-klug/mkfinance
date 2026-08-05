@@ -84,6 +84,12 @@ public final class ErrorCode {
     // tags (BE-8)
     /** Tag names are unique per workspace, compared case-insensitively. */
     public static final String TAG_NAME_DUPLICATE = "TAG_NAME_DUPLICATE";
+    /**
+     * Unknown id, another workspace's, or already deleted — {@code updateTag}/{@code deleteTag}
+     * document a 404 in the contract (CT-1) that has no dedicated code yet; this fills that gap the
+     * same way every other resource's not-found does (CATEGORY_NOT_FOUND, ACCOUNT_NOT_FOUND, ...).
+     */
+    public static final String TAG_NOT_FOUND = "TAG_NOT_FOUND";
 
     // generic
     public static final String VALIDATION_ERROR = "VALIDATION_ERROR";
