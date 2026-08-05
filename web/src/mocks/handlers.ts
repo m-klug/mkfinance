@@ -7,6 +7,7 @@ import { getDashboardMock } from "@/lib/api/generated/dashboard/dashboard.msw";
 import { getExportMock } from "@/lib/api/generated/export/export.msw";
 import { getPillarsMock } from "@/lib/api/generated/pillars/pillars.msw";
 import { getStatementsMock } from "@/lib/api/generated/statements/statements.msw";
+import { getTagsMock } from "@/lib/api/generated/tags/tags.msw";
 import { getTransactionsMock } from "@/lib/api/generated/transactions/transactions.msw";
 import { getTransfersMock } from "@/lib/api/generated/transfers/transfers.msw";
 import { getWorkspacesMock } from "@/lib/api/generated/workspaces/workspaces.msw";
@@ -95,6 +96,7 @@ export const handlers = [
   ...getPillarsMock(),
   ...getCardsMock(),
   ...getStatementsMock(),
+  ...getTagsMock(),
   ...getTransactionsMock(),
   ...getTransfersMock(),
   ...getDashboardMock(),
