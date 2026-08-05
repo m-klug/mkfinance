@@ -10,9 +10,11 @@ import {
   checkingAccount,
   financeReadHandlers,
   groceriesCategory,
+  groceriesTag,
   investmentAccount,
   salaryCategory,
   settledExpense,
+  urgentTag,
 } from "@/test/financeFixtures";
 import {
   ContributionPillar,
@@ -69,6 +71,43 @@ describe("QuickTransactionDialog", () => {
       status: "SETTLED",
     });
     expect(calls[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  // BE-8/FE-7: tags are optional and off the ≤5-interaction critical path —
+  // this test only asserts they are sent when the user does add them.
+  it("registers an expense with two tags", async () => {
+    const calls: TransactionRequest[] = [];
+    server.use(captureTransactions(calls));
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(await screen.findByLabelText("Valor"), "3000");
+    await user.type(screen.getByLabelText("Descrição"), "Compra com tags");
+    await user.selectOptions(screen.getByLabelText("Categoria"), groceriesCategory.id);
+
+    const tagsField = screen.getByLabelText("Tags");
+    await user.type(tagsField, `${groceriesTag.name}{Enter}`);
+    await user.type(tagsField, `${urgentTag.name}{Enter}`);
+
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0].tags).toEqual([groceriesTag.name, urgentTag.name]);
+  });
+
+  it("does not require any tag to register an expense (kept off the critical path)", async () => {
+    const calls: TransactionRequest[] = [];
+    server.use(captureTransactions(calls));
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(await screen.findByLabelText("Valor"), "3000");
+    await user.type(screen.getByLabelText("Descrição"), "Sem tags");
+    await user.selectOptions(screen.getByLabelText("Categoria"), groceriesCategory.id);
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0].tags).toEqual([]);
   });
 
   it("offers income categories on the income tab", async () => {
