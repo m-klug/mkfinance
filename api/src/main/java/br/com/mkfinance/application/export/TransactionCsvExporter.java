@@ -1,15 +1,19 @@
 package br.com.mkfinance.application.export;
 
+import br.com.mkfinance.application.tag.TagService;
 import br.com.mkfinance.application.transaction.TransactionFilter;
 import br.com.mkfinance.application.transaction.TransactionService;
 import br.com.mkfinance.domain.model.Account;
 import br.com.mkfinance.domain.model.Category;
+import br.com.mkfinance.domain.model.Tag;
 import br.com.mkfinance.domain.model.Transaction;
 import br.com.mkfinance.infrastructure.persistence.AccountRepository;
 import br.com.mkfinance.infrastructure.persistence.CategoryRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Rows come from BE-3's own read path ({@link TransactionService#list}, same filters and same
  * newest-first order as the on-screen extrato), page by page, so nothing loads the whole history into
- * memory at once. Account and category ids are resolved to names through two small lookups.
+ * memory at once. Account and category ids are resolved to names through two small lookups; tags
+ * (BE-8) are batch-loaded per page the same way {@code TransactionController} does for the extrato.
  *
  * <p>Column headers are kept in English: the backend does not emit localized copy (PLANEJAMENTO
  * §3.3). Category and account <em>names</em> in the data are user content and stay as the user typed
@@ -36,23 +41,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class TransactionCsvExporter {
 
     private static final char SEPARATOR = ';';
+    /** Joins the tags of one row inside a single column — never conflicts with {@link #SEPARATOR}. */
+    private static final String TAG_JOIN = ",";
     private static final String LINE_END = "\r\n";
     /** Excel reads a file starting with this BOM as UTF-8, so accented category names are not mojibake. */
-    private static final String BOM = "\uFEFF";
+    private static final String BOM = "﻿";
     private static final int PAGE_SIZE = 500;
     private static final String[] HEADER = {
-        "date", "type", "direction", "description", "category", "account", "amount", "status", "note"
+        "date", "type", "direction", "description", "category", "account", "amount", "status", "note", "tags"
     };
 
     private final TransactionService transactionService;
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
+    private final TagService tagService;
 
     @Transactional(readOnly = true)
     public byte[] export(UUID workspaceId, LocalDate from, LocalDate to) {
         Map<UUID, String> accountNames = accountNames(workspaceId);
         Map<UUID, String> categoryNames = categoryNames(workspaceId);
-        TransactionFilter filter = new TransactionFilter(from, to, null, null, null, null, null);
+        TransactionFilter filter = new TransactionFilter(from, to, null, null, null, null, null, null);
 
         StringBuilder csv = new StringBuilder(BOM);
         appendRow(csv, HEADER);
@@ -61,8 +69,10 @@ public class TransactionCsvExporter {
         Page<Transaction> pageResult;
         do {
             pageResult = transactionService.list(workspaceId, filter, PageRequest.of(page, PAGE_SIZE));
+            Map<UUID, List<Tag>> tagsByTransaction = tagService.tagsOf(
+                    pageResult.getContent().stream().map(Transaction::getId).toList());
             for (Transaction transaction : pageResult.getContent()) {
-                appendRow(csv, row(transaction, accountNames, categoryNames));
+                appendRow(csv, row(transaction, accountNames, categoryNames, tagsByTransaction));
             }
             page++;
         } while (page < pageResult.getTotalPages());
@@ -70,7 +80,11 @@ public class TransactionCsvExporter {
         return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    private String[] row(Transaction transaction, Map<UUID, String> accountNames, Map<UUID, String> categoryNames) {
+    private String[] row(
+            Transaction transaction,
+            Map<UUID, String> accountNames,
+            Map<UUID, String> categoryNames,
+            Map<UUID, List<Tag>> tagsByTransaction) {
         return new String[] {
             transaction.getDate().toString(),
             transaction.getType().name(),
@@ -80,8 +94,17 @@ public class TransactionCsvExporter {
             accountNames.getOrDefault(transaction.getAccountId(), ""),
             reais(transaction.getAmountCents()),
             transaction.getStatus().name(),
-            nullToEmpty(transaction.getNote())
+            nullToEmpty(transaction.getNote()),
+            tagList(tagsByTransaction.getOrDefault(transaction.getId(), List.of()))
         };
+    }
+
+    private String tagList(List<Tag> tags) {
+        return tags.stream()
+                .map(Tag::getName)
+                .sorted(Comparator.naturalOrder())
+                .reduce((a, b) -> a + TAG_JOIN + b)
+                .orElse("");
     }
 
     private Map<UUID, String> accountNames(UUID workspaceId) {

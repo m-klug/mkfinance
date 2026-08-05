@@ -469,7 +469,7 @@ class StatementPaymentIntegrationTest extends AbstractCardIntegrationTest {
                                 date,
                                 "Padaria",
                                 null,
-                                TransactionStatus.SETTLED),
+                                TransactionStatus.SETTLED, null),
                         TransactionResponse.class)
                 .getBody();
     }

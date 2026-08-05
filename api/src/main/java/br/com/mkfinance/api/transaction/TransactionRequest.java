@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -18,6 +19,9 @@ import java.util.UUID;
  * transfer has no category and its type cannot change. The service enforces the rest and answers
  * with machine codes (TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH) rather than a bean
  * validation error, so the client can tell the cases apart.
+ *
+ * @param tags names, not ids (CT-1) — typing one that does not exist yet creates it. Sending the
+ *     field replaces the whole set; omitting it (null) leaves the current tags alone.
  */
 public record TransactionRequest(
         @NotNull UUID accountId,
@@ -27,5 +31,6 @@ public record TransactionRequest(
         @NotNull LocalDate date,
         @NotBlank @Size(max = 255) String description,
         String note,
-        TransactionStatus status) {
+        TransactionStatus status,
+        List<@Size(max = 40) String> tags) {
 }

@@ -396,15 +396,20 @@ class RecurrenceRuleIntegrationTest extends AbstractRecurrenceIntegrationTest {
             RecurrenceResponse rule = createMonthly(5, LocalDate.of(2026, 1, 1));
             materializer.materializeMonth(workspaceId, YearMonth.of(2026, 8));
 
-            session.patch(
-                    path("/recurrences/" + rule.id() + "?scope=THIS_AND_FUTURE&occurrenceDate=2026-08-05"),
-                    monthlyRequest(20, LocalDate.of(2026, 1, 1)),
-                    RecurrenceResponse.class);
+            RecurrenceResponse newRule = session.patch(
+                            path("/recurrences/" + rule.id() + "?scope=THIS_AND_FUTURE&occurrenceDate=2026-08-05"),
+                            monthlyRequest(20, LocalDate.of(2026, 1, 1)),
+                            RecurrenceResponse.class)
+                    .getBody();
 
+            // The extrato itself materializes the window it reads (BE-8): the old rule's Aug 5th
+            // occurrence must be gone, and the date it freed now belongs to the new rule's Aug 20th —
+            // proving both halves of this test's name in one read, instead of only the first half.
             TransactionPageResponse augustPage = session.get(
                             path("/transactions?from=2026-08-01&to=2026-08-31"), TransactionPageResponse.class)
                     .getBody();
-            assertThat(augustPage.content()).isEmpty();
+            assertThat(augustPage.content()).extracting(TransactionResponse::date).containsExactly(LocalDate.of(2026, 8, 20));
+            assertThat(augustPage.content().get(0).recurrenceId()).isEqualTo(newRule.id());
         }
 
         @Test

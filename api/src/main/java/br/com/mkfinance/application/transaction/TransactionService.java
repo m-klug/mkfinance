@@ -1,5 +1,7 @@
 package br.com.mkfinance.application.transaction;
 
+import br.com.mkfinance.application.recurrence.RecurrenceOccurrenceMaterializer;
+import br.com.mkfinance.application.tag.TagService;
 import br.com.mkfinance.domain.exception.AppException;
 import br.com.mkfinance.domain.model.Account;
 import br.com.mkfinance.domain.model.Category;
@@ -11,6 +13,9 @@ import br.com.mkfinance.infrastructure.persistence.AccountRepository;
 import br.com.mkfinance.infrastructure.persistence.CategoryRepository;
 import br.com.mkfinance.infrastructure.persistence.TransactionRepository;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -41,10 +46,22 @@ public class TransactionService {
     private static final Sort NEWEST_FIRST =
             Sort.by(Sort.Order.desc("date"), Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
 
+    /**
+     * Ceiling on how many competencies a single extrato read may materialize (BE-8, decision
+     * 30/07/2026). About a year of browsing — generous enough for normal use, but bounded, so a
+     * client asking for an unrestricted or absurdly wide window cannot make this write rows "until
+     * 2094", the very thing the contract's {@code createRecurrence} already guards against. A window
+     * wider than this — or with {@code from}/{@code to} missing altogether — materializes nothing and
+     * only reads what already exists.
+     */
+    private static final int MAX_MATERIALIZED_MONTHS = 12;
+
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
     private final TransferService transferService;
+    private final TagService tagService;
+    private final RecurrenceOccurrenceMaterializer recurrenceMaterializer;
 
     /**
      * The extrato listing: optional filters, newest first, paginated (contract: TransactionPage).
@@ -53,11 +70,39 @@ public class TransactionService {
      * endpoint can accidentally page through an unordered result — which in Postgres would repeat
      * and skip rows across pages. {@code createdAt} and {@code id} break ties on equal dates to keep
      * paging stable.
+     *
+     * <p>Before querying, materializes the recurrence occurrences of every competency
+     * {@code filter.from()}/{@code filter.to()} touches (see {@link #materializeWindow}) — reusing
+     * {@link RecurrenceOccurrenceMaterializer}, the same component the calendar already calls, so a
+     * recurrence shows up in the extrato without the user having to open the calendar first.
      */
-    @Transactional(readOnly = true)
     public Page<Transaction> list(UUID workspaceId, TransactionFilter filter, Pageable pageable) {
+        materializeWindow(workspaceId, filter.from(), filter.to());
         Pageable ordered = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), NEWEST_FIRST);
-        return transactionRepository.findAll(TransactionSpecifications.of(workspaceId, filter), ordered);
+        Set<UUID> tagTransactionIds = tagService.matchingTransactionIds(workspaceId, filter.tags());
+        return transactionRepository.findAll(TransactionSpecifications.of(workspaceId, filter, tagTransactionIds), ordered);
+    }
+
+    /**
+     * Materializes every competency between {@code from} and {@code to}, inclusive, when the window
+     * is bounded and no wider than {@link #MAX_MATERIALIZED_MONTHS}. A missing bound, an inverted
+     * range, or a too-wide one is treated as "unrestricted" and materializes nothing — idempotent
+     * either way, since {@link RecurrenceOccurrenceMaterializer} itself never duplicates a
+     * transaction for a competency already read.
+     */
+    private void materializeWindow(UUID workspaceId, LocalDate from, LocalDate to) {
+        if (from == null || to == null || to.isBefore(from)) {
+            return;
+        }
+        YearMonth start = YearMonth.from(from);
+        YearMonth end = YearMonth.from(to);
+        long spanMonths = ChronoUnit.MONTHS.between(start, end) + 1;
+        if (spanMonths > MAX_MATERIALIZED_MONTHS) {
+            return;
+        }
+        for (YearMonth month = start; !month.isAfter(end); month = month.plusMonths(1)) {
+            recurrenceMaterializer.materializeMonth(workspaceId, month);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +115,10 @@ public class TransactionService {
     /**
      * Creates an INCOME or EXPENSE entry. Transfers do not come through here — they need two legs,
      * so they go through {@link TransferService#create} behind the {@code /transfers} endpoint.
+     *
+     * <p>{@code input.tags()} resolves through {@link TagService#resolveOrCreate} — names that do not
+     * exist yet are created on the spot (CT-1) — and {@code null} means no tags on a brand-new entry
+     * (there is nothing to "leave alone" yet).
      */
     public Transaction create(UUID workspaceId, TransactionInput input) {
         TransactionType type = requireEntryType(input.type());
@@ -87,7 +136,11 @@ public class TransactionService {
                 .note(input.note())
                 .status(input.status() != null ? input.status() : TransactionStatus.SETTLED)
                 .build();
-        return transactionRepository.save(transaction);
+        transaction = transactionRepository.save(transaction);
+        if (input.tags() != null) {
+            tagService.replaceTransactionTags(transaction.getId(), tagService.resolveOrCreate(workspaceId, input.tags()));
+        }
+        return transaction;
     }
 
     /**
@@ -131,7 +184,13 @@ public class TransactionService {
         if (input.status() != null) {
             transaction.setStatus(input.status());
         }
-        return transactionRepository.save(transaction);
+        transaction = transactionRepository.save(transaction);
+        // null means "leave the current tags alone" (contract); a present list, even empty, replaces
+        // the whole set.
+        if (input.tags() != null) {
+            tagService.replaceTransactionTags(transaction.getId(), tagService.resolveOrCreate(workspaceId, input.tags()));
+        }
+        return transaction;
     }
 
     /**
@@ -205,7 +264,8 @@ public class TransactionService {
                         date,
                         description,
                         null,
-                        TransactionStatus.SETTLED));
+                        TransactionStatus.SETTLED,
+                        null));
     }
 
     /** The transactions endpoint only accepts INCOME/EXPENSE — transfers need the /transfers one. */
