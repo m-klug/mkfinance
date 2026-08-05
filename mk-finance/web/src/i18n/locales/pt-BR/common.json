@@ -465,6 +465,7 @@
     "reallocated": "Saldo remanejado.",
     "reallocateConfirm": "Remanejar",
     "entriesTitle": "Extrato de {{name}}",
+    "entriesSubtitle": "Lançamentos mais recentes primeiro.",
     "entriesEmpty": "Nenhum lançamento nesta caixinha ainda.",
     "entryDate": "Data",
     "entryDescription": "Descrição",
