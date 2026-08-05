@@ -2,11 +2,13 @@ package br.com.mkfinance.api.vault;
 
 import br.com.mkfinance.application.transaction.AccountBalanceService;
 import br.com.mkfinance.application.vault.VaultBalanceService;
+import br.com.mkfinance.application.vault.VaultLedgerService;
 import br.com.mkfinance.application.vault.VaultService;
 import br.com.mkfinance.domain.model.Vault;
 import br.com.mkfinance.domain.service.BalanceCalculator.Balance;
 import br.com.mkfinance.domain.service.VaultBalanceCalculator.Composition;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ public class VaultController {
 
     private final VaultService vaultService;
     private final VaultBalanceService vaultBalanceService;
+    private final VaultLedgerService vaultLedgerService;
     private final AccountBalanceService accountBalanceService;
     private final VaultMapper mapper;
     private final WorkspaceContext workspaceContext;
@@ -84,5 +87,19 @@ public class VaultController {
         UUID scope = workspaceContext.getWorkspaceId();
         Vault vault = vaultService.archive(scope, vaultId);
         return mapper.toResponse(vault, vaultBalanceService.balanceOf(scope, vaultId));
+    }
+
+    /** The vault's own ledger, most recent first. */
+    @GetMapping("/vaults/{vaultId}/entries")
+    public List<VaultEntryResponse> entries(
+            @PathVariable UUID workspaceId,
+            @PathVariable UUID vaultId,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to) {
+        UUID scope = workspaceContext.getWorkspaceId();
+        vaultService.getOwned(scope, vaultId); // 404 guard — the vault must exist in this workspace
+        return vaultLedgerService.listEntries(vaultId, from, to).stream()
+                .map(mapper::toEntryResponse)
+                .toList();
     }
 }
