@@ -55,7 +55,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                                 date,
                                 description,
                                 null,
-                                null),
+                                null, null),
                         TransactionResponse.class)
                 .getBody();
     }
@@ -81,7 +81,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                             DATE,
                             "Mercado",
                             "compra do mês",
-                            null),
+                            null, null),
                     TransactionResponse.class);
 
             assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -105,7 +105,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                             DATE,
                             "Salário",
                             null,
-                            null),
+                            null, null),
                     TransactionResponse.class);
 
             assertThat(balanceService.balanceOf(workspaceId, checking.id()).currentCents())
@@ -126,7 +126,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                             DATE.plusDays(1),
                             "Mercado (corrigido)",
                             null,
-                            null),
+                            null, null),
                     TransactionResponse.class);
 
             assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -159,7 +159,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                             DATE,
                             "Categoria errada",
                             null,
-                            null),
+                            null, null),
                     ErrorResponse.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -178,7 +178,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                             DATE,
                             "Transferência",
                             null,
-                            null),
+                            null, null),
                     ErrorResponse.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
@@ -215,7 +215,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                                     DATE,
                                     "Conta de luz",
                                     null,
-                                    TransactionStatus.PENDING),
+                                    TransactionStatus.PENDING, null),
                             TransactionResponse.class)
                     .getBody();
             assertThat(pending.status()).isEqualTo(TransactionStatus.PENDING);
@@ -273,7 +273,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                             LocalDate.of(2026, 2, 5),
                             "Salário fevereiro",
                             null,
-                            null),
+                            null, null),
                     TransactionResponse.class);
             session.post(
                     path("/transactions"),
@@ -285,7 +285,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                             LocalDate.of(2026, 2, 20),
                             "Remédio",
                             null,
-                            null),
+                            null, null),
                     TransactionResponse.class);
 
             assertThat(listWith("").totalElements()).isEqualTo(5L);
@@ -321,7 +321,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                             DATE,
                             "Agendada",
                             null,
-                            TransactionStatus.PENDING),
+                            TransactionStatus.PENDING, null),
                     TransactionResponse.class);
 
             assertThat(listWith("?status=PENDING").totalElements()).isEqualTo(1L);
@@ -340,7 +340,7 @@ class TransactionIntegrationTest extends AbstractTransactionIntegrationTest {
                             DATE,
                             "Compra",
                             "reembolsável pelo trabalho",
-                            null),
+                            null, null),
                     TransactionResponse.class);
 
             assertThat(listWith("?search=reembols").totalElements()).isEqualTo(1L);
