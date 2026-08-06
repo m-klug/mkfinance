@@ -18,7 +18,8 @@
     "amountPositive": "Informe um valor maior que zero.",
     "transferAccountsRequired": "Selecione a conta de origem e a de destino.",
     "transferAccountsDistinct": "A conta de destino deve ser diferente da de origem.",
-    "invalid": "Valor inválido."
+    "invalid": "Valor inválido.",
+    "vaultRequired": "Selecione uma caixinha."
   },
   "accountType": {
     "CHECKING": "Conta corrente",
@@ -503,6 +504,16 @@
     "PILLAR_TARGETS_MUST_SUM_100": "A soma dos seis pilares precisa ser 100%.",
     "RECURRENCE_NOT_FOUND": "Esta recorrência não foi encontrada.",
     "RECURRENCE_OCCURRENCE_NOT_FOUND": "Essa data não corresponde a uma ocorrência desta série.",
-    "TAG_NAME_DUPLICATE": "Já existe uma tag com esse nome."
+    "TAG_NAME_DUPLICATE": "Já existe uma tag com esse nome.",
+    "VAULT_NOT_FOUND": "Esta caixinha não foi encontrada.",
+    "VAULT_REQUIRED": "Selecione uma caixinha para este lançamento.",
+    "VAULT_PILLAR_CONFLICT": "O pilar informado não é o desta caixinha — o pilar de quem decide é o da caixinha.",
+    "VAULT_ACCOUNT_MISMATCH": "Esta caixinha pertence a outra conta.",
+    "VAULT_INSUFFICIENT_BALANCE": "Saldo insuficiente na caixinha: faltam {{shortfallAmount}}.",
+    "VAULT_NAME_DUPLICATE": "Já existe uma caixinha com esse nome nesta conta.",
+    "VAULT_NOT_EMPTY": "Esta caixinha ainda tem {{balanceAmount}} — esvazie antes de arquivar.",
+    "VAULT_HAS_ENTRIES": "Esta caixinha tem lançamentos e não pode ser excluída — arquive em vez de excluir.",
+    "VAULT_ARCHIVED": "Esta caixinha está arquivada e não aceita novos lançamentos.",
+    "VAULT_REALLOCATION_NOT_FOUND": "Este remanejo não foi encontrado."
   }
 }
