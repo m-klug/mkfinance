@@ -153,9 +153,10 @@ public class TransactionService {
         Transaction transaction = get(workspaceId, transactionId);
 
         if (transaction.isTransfer()) {
-            // This endpoint has no pillar field, so a transfer edited here keeps whichever pillar it
-            // already carries (null = "leave alone"); re-targeting a contribution goes through
-            // PATCH /transfers. The reload inside the engine is a persistence-context hit, no SQL.
+            // This endpoint has no pillar field and no vault field, so a transfer edited here keeps
+            // whichever pillar and caixinha it already carries (null = "leave alone" for both);
+            // re-targeting a contribution goes through PATCH /transfers. The reload inside the engine
+            // is a persistence-context hit, no SQL.
             TransferUpdateInput transferInput = new TransferUpdateInput(
                     input.accountId(),
                     input.amountCents(),
@@ -163,6 +164,7 @@ public class TransactionService {
                     input.description(),
                     input.note(),
                     input.status(),
+                    null,
                     null);
             return transferService.update(workspaceId, transactionId, transferInput).legById(transactionId);
         }

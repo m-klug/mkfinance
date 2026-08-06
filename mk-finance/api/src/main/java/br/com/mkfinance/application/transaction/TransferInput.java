@@ -23,15 +23,4 @@ public record TransferInput(
         ContributionPillar contributionPillar,
         UUID fromVaultId,
         UUID toVaultId) {
-
-    /** Pre-Caixinhas shape — kept so callers that predate BE-10 keep compiling with no vaults. */
-    public TransferInput(
-            UUID fromAccountId,
-            UUID toAccountId,
-            long amountCents,
-            LocalDate date,
-            String description,
-            ContributionPillar contributionPillar) {
-        this(fromAccountId, toAccountId, amountCents, date, description, contributionPillar, null, null);
-    }
 }

@@ -68,7 +68,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void createTransferCreatesMirroredPair() {
         ResponseEntity<TransactionResponse> created = session.post(
                 path("/transfers"),
-                new TransferRequest(checking.id(), wallet.id(), 120_000L, DATE, "Saque", null),
+                new TransferRequest(checking.id(), wallet.id(), 120_000L, DATE, "Saque", null, null, null),
                 TransactionResponse.class);
 
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -96,7 +96,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void editingOneLegUpdatesBothSides() {
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), wallet.id(), 100_000L, DATE, "Saque", null),
+                        new TransferRequest(checking.id(), wallet.id(), 100_000L, DATE, "Saque", null, null, null),
                         TransactionResponse.class)
                 .getBody();
 
@@ -124,7 +124,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         AccountResponse savings = createAccount("Poupança", AccountType.SAVINGS, 0L, ContributionPillar.GOALS);
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), wallet.id(), 50_000L, DATE, "Saque", null),
+                        new TransferRequest(checking.id(), wallet.id(), 50_000L, DATE, "Saque", null, null, null),
                         TransactionResponse.class)
                 .getBody();
 
@@ -156,14 +156,14 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void transferEndpointEditsBothLegs() {
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), wallet.id(), 100_000L, DATE, "Saque", null),
+                        new TransferRequest(checking.id(), wallet.id(), 100_000L, DATE, "Saque", null, null, null),
                         TransactionResponse.class)
                 .getBody();
 
         LocalDate newDate = DATE.plusDays(3);
         ResponseEntity<TransactionResponse> updated = session.patch(
                 path("/transfers/" + outgoing.id()),
-                new TransferUpdateRequest(null, 75_000L, newDate, "Saque corrigido", "conferido", null, null),
+                new TransferUpdateRequest(null, 75_000L, newDate, "Saque corrigido", "conferido", null, null, null),
                 TransactionResponse.class);
 
         assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -187,13 +187,13 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void transferEndpointEditsThroughIncomingLeg() {
         session.post(
                 path("/transfers"),
-                new TransferRequest(checking.id(), wallet.id(), 20_000L, DATE, "Saque", null),
+                new TransferRequest(checking.id(), wallet.id(), 20_000L, DATE, "Saque", null, null, null),
                 TransactionResponse.class);
         TransactionResponse incoming = legOn(wallet.id());
 
         TransactionResponse updated = session.patch(
                         path("/transfers/" + incoming.id()),
-                        new TransferUpdateRequest(null, 45_000L, DATE, "Saque maior", null, null, null),
+                        new TransferUpdateRequest(null, 45_000L, DATE, "Saque maior", null, null, null, null),
                         TransactionResponse.class)
                 .getBody();
 
@@ -207,13 +207,13 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         AccountResponse other = createAccount("Outra Conta", AccountType.CHECKING, 0L);
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), wallet.id(), 50_000L, DATE, "Saque", null),
+                        new TransferRequest(checking.id(), wallet.id(), 50_000L, DATE, "Saque", null, null, null),
                         TransactionResponse.class)
                 .getBody();
 
         session.patch(
                 path("/transfers/" + outgoing.id()),
-                new TransferUpdateRequest(other.id(), 50_000L, DATE, "Saque", null, null, null),
+                new TransferUpdateRequest(other.id(), 50_000L, DATE, "Saque", null, null, null, null),
                 TransactionResponse.class);
 
         assertThat(legOn(other.id()).id()).isEqualTo(outgoing.id());
@@ -229,14 +229,14 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void transferEndpointMovesStatusOnBothLegs() {
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), wallet.id(), 30_000L, DATE, "Saque", null),
+                        new TransferRequest(checking.id(), wallet.id(), 30_000L, DATE, "Saque", null, null, null),
                         TransactionResponse.class)
                 .getBody();
 
         session.patch(
                 path("/transfers/" + outgoing.id()),
                 new TransferUpdateRequest(
-                        null, 30_000L, DATE, "Saque", null, TransactionStatus.PENDING, null),
+                        null, 30_000L, DATE, "Saque", null, TransactionStatus.PENDING, null, null),
                 TransactionResponse.class);
 
         assertThat(allTransactions()).allSatisfy(leg -> assertThat(leg.status()).isEqualTo(TransactionStatus.PENDING));
@@ -252,7 +252,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
                 createAccount("Corretora", AccountType.INVESTMENT, 0L, ContributionPillar.FINANCIAL_FREEDOM);
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), brokerage.id(), 60_000L, DATE, "Aporte", null),
+                        new TransferRequest(checking.id(), brokerage.id(), 60_000L, DATE, "Aporte", null, null, null),
                         TransactionResponse.class)
                 .getBody();
         assertThat(legOn(brokerage.id()).contributionPillar()).isEqualTo(ContributionPillar.FINANCIAL_FREEDOM);
@@ -260,7 +260,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         TransactionResponse updated = session.patch(
                         path("/transfers/" + outgoing.id()),
                         new TransferUpdateRequest(
-                                null, 60_000L, DATE, "Aporte", null, null, ContributionPillar.GOALS),
+                                null, 60_000L, DATE, "Aporte", null, null, ContributionPillar.GOALS, null),
                         TransactionResponse.class)
                 .getBody();
 
@@ -280,13 +280,13 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
                         new TransferRequest(
-                                checking.id(), brokerage.id(), 60_000L, DATE, "Aporte", ContributionPillar.GOALS),
+                                checking.id(), brokerage.id(), 60_000L, DATE, "Aporte", ContributionPillar.GOALS, null, null),
                         TransactionResponse.class)
                 .getBody();
 
         session.patch(
                 path("/transfers/" + outgoing.id()),
-                new TransferUpdateRequest(null, 90_000L, DATE, "Aporte maior", null, null, null),
+                new TransferUpdateRequest(null, 90_000L, DATE, "Aporte maior", null, null, null, null),
                 TransactionResponse.class);
 
         assertThat(legOn(brokerage.id()).contributionPillar()).isEqualTo(ContributionPillar.GOALS);
@@ -297,13 +297,13 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void transferEndpointRejectsPillarOnPlainDestination() {
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), wallet.id(), 10_000L, DATE, "Saque", null),
+                        new TransferRequest(checking.id(), wallet.id(), 10_000L, DATE, "Saque", null, null, null),
                         TransactionResponse.class)
                 .getBody();
 
         ResponseEntity<ErrorResponse> response = session.patch(
                 path("/transfers/" + outgoing.id()),
-                new TransferUpdateRequest(null, 10_000L, DATE, "Saque", null, null, ContributionPillar.GOALS),
+                new TransferUpdateRequest(null, 10_000L, DATE, "Saque", null, null, ContributionPillar.GOALS, null),
                 ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -315,13 +315,13 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void transferEndpointRejectsMovingLegOntoItsSibling() {
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), wallet.id(), 10_000L, DATE, "Saque", null),
+                        new TransferRequest(checking.id(), wallet.id(), 10_000L, DATE, "Saque", null, null, null),
                         TransactionResponse.class)
                 .getBody();
 
         ResponseEntity<ErrorResponse> response = session.patch(
                 path("/transfers/" + outgoing.id()),
-                new TransferUpdateRequest(wallet.id(), 10_000L, DATE, "Saque", null, null, null),
+                new TransferUpdateRequest(wallet.id(), 10_000L, DATE, "Saque", null, null, null, null),
                 ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -347,7 +347,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
 
         ResponseEntity<ErrorResponse> response = session.patch(
                 path("/transfers/" + expense.id()),
-                new TransferUpdateRequest(null, 5_000L, DATE, "Mercado", null, null, null),
+                new TransferUpdateRequest(null, 5_000L, DATE, "Mercado", null, null, null, null),
                 ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -359,7 +359,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void legsExposeTheirTransferDirection() {
         session.post(
                 path("/transfers"),
-                new TransferRequest(checking.id(), wallet.id(), 25_000L, DATE, "Saque", null),
+                new TransferRequest(checking.id(), wallet.id(), 25_000L, DATE, "Saque", null, null, null),
                 TransactionResponse.class);
 
         assertThat(legOn(checking.id()).transferDirection()).isEqualTo(TransferDirection.OUT);
@@ -374,7 +374,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void deletingOneLegDeletesBothSides() {
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), wallet.id(), 90_000L, DATE, "Saque", null),
+                        new TransferRequest(checking.id(), wallet.id(), 90_000L, DATE, "Saque", null, null, null),
                         TransactionResponse.class)
                 .getBody();
         assertThat(allTransactions()).hasSize(2);
@@ -392,7 +392,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void settlingOneLegSettlesBothSides() {
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), wallet.id(), 30_000L, DATE, "Saque", null),
+                        new TransferRequest(checking.id(), wallet.id(), 30_000L, DATE, "Saque", null, null, null),
                         TransactionResponse.class)
                 .getBody();
         session.patch(
@@ -417,7 +417,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void transferToSameAccountIsRejected() {
         ResponseEntity<ErrorResponse> response = session.post(
                 path("/transfers"),
-                new TransferRequest(checking.id(), checking.id(), 10_000L, DATE, "Loop", null),
+                new TransferRequest(checking.id(), checking.id(), 10_000L, DATE, "Loop", null, null, null),
                 ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -435,7 +435,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
 
         ResponseEntity<ErrorResponse> response = session.post(
                 path("/transfers"),
-                new TransferRequest(mine.id(), foreignAccountId, 100L, DATE, "Invasão", null),
+                new TransferRequest(mine.id(), foreignAccountId, 100L, DATE, "Invasão", null, null, null),
                 ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -447,7 +447,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     void transferIsNeitherIncomeNorExpense() {
         session.post(
                 path("/transfers"),
-                new TransferRequest(checking.id(), wallet.id(), 60_000L, DATE, "Saque", null),
+                new TransferRequest(checking.id(), wallet.id(), 60_000L, DATE, "Saque", null, null, null),
                 TransactionResponse.class);
 
         TransactionPageResponse expenses = session.get(
@@ -474,7 +474,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
 
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
-                        new TransferRequest(checking.id(), brokerage.id(), 200_000L, DATE, "Aporte", null),
+                        new TransferRequest(checking.id(), brokerage.id(), 200_000L, DATE, "Aporte", null, null, null),
                         TransactionResponse.class)
                 .getBody();
 
@@ -496,7 +496,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         TransactionResponse outgoing = session.post(
                         path("/transfers"),
                         new TransferRequest(
-                                checking.id(), brokerage.id(), 80_000L, DATE, "Aporte", ContributionPillar.GOALS),
+                                checking.id(), brokerage.id(), 80_000L, DATE, "Aporte", ContributionPillar.GOALS, null, null),
                         TransactionResponse.class)
                 .getBody();
 
@@ -511,7 +511,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
 
         ResponseEntity<ErrorResponse> response = session.post(
                 path("/transfers"),
-                new TransferRequest(checking.id(), brokerage.id(), 50_000L, DATE, "Aporte", null),
+                new TransferRequest(checking.id(), brokerage.id(), 50_000L, DATE, "Aporte", null, null, null),
                 ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -524,7 +524,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         ResponseEntity<ErrorResponse> response = session.post(
                 path("/transfers"),
                 new TransferRequest(
-                        checking.id(), wallet.id(), 10_000L, DATE, "Saque", ContributionPillar.GOALS),
+                        checking.id(), wallet.id(), 10_000L, DATE, "Saque", ContributionPillar.GOALS, null, null),
                 ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -537,7 +537,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         AccountResponse brokerage = createAccount("Corretora", AccountType.INVESTMENT, 0L, ContributionPillar.GOALS);
         session.post(
                 path("/transfers"),
-                new TransferRequest(checking.id(), brokerage.id(), 150_000L, DATE, "Aporte", null),
+                new TransferRequest(checking.id(), brokerage.id(), 150_000L, DATE, "Aporte", null, null, null),
                 TransactionResponse.class);
 
         assertThat(session.get(path("/transactions?type=EXPENSE"), TransactionPageResponse.class)
@@ -559,7 +559,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
                 createAccount("Corretora B", AccountType.INVESTMENT, 0L, ContributionPillar.FINANCIAL_FREEDOM);
         session.post(
                 path("/transfers"),
-                new TransferRequest(checking.id(), first.id(), 70_000L, DATE, "Aporte", ContributionPillar.GOALS),
+                new TransferRequest(checking.id(), first.id(), 70_000L, DATE, "Aporte", ContributionPillar.GOALS, null, null),
                 TransactionResponse.class);
 
         TransactionResponse incoming = legOn(first.id());
@@ -579,7 +579,7 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
         AccountResponse brokerage = createAccount("Corretora", AccountType.INVESTMENT, 0L, ContributionPillar.GOALS);
         session.post(
                 path("/transfers"),
-                new TransferRequest(checking.id(), brokerage.id(), 40_000L, DATE, "Aporte", null),
+                new TransferRequest(checking.id(), brokerage.id(), 40_000L, DATE, "Aporte", null, null, null),
                 TransactionResponse.class);
         TransactionResponse incoming = legOn(brokerage.id());
         assertThat(incoming.contributionPillar()).isEqualTo(ContributionPillar.GOALS);

@@ -31,20 +31,4 @@ public record TransferUpdateInput(
         ContributionPillar contributionPillar,
         UUID vaultId) {
 
-    /**
-     * Pre-Caixinhas shape — kept so {@code TransactionService.update} (BE-3, out of BE-10's
-     * ownership) keeps compiling unmodified: a plain {@code PATCH /transactions} edit has no vault
-     * concept, so {@code vaultId} defaults to {@code null} — "carry the current vault forward",
-     * exactly the semantics an omitted value already carries above.
-     */
-    public TransferUpdateInput(
-            UUID accountId,
-            long amountCents,
-            LocalDate date,
-            String description,
-            String note,
-            TransactionStatus status,
-            ContributionPillar contributionPillar) {
-        this(accountId, amountCents, date, description, note, status, contributionPillar, null);
-    }
 }
