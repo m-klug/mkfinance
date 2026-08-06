@@ -21,6 +21,11 @@ import java.util.UUID;
  * {@code status} keeps the current one, and {@code contributionPillar} keeps whichever pillar the
  * transfer already carries (R9). The shared facts — amount, date and description — are required,
  * because the engine writes them to both legs unconditionally.
+ *
+ * <p>{@code vaultId} re-points the leg being edited at another vault, mirroring what {@code accountId}
+ * does for the account. Omit to carry the current vault forward — unless {@code accountId} moved the
+ * leg to a different account, in which case the old vault belongs to the old account and the
+ * requirement runs afresh against the new one (DESENVOLVIMENTO-CAIXINHAS.md §4.4).
  */
 public record TransferUpdateRequest(
         UUID accountId,
@@ -29,5 +34,18 @@ public record TransferUpdateRequest(
         @NotBlank @Size(max = 255) String description,
         String note,
         TransactionStatus status,
-        ContributionPillar contributionPillar) {
+        ContributionPillar contributionPillar,
+        UUID vaultId) {
+
+    /** Pre-Caixinhas shape — kept so callers/tests that predate BE-10 keep compiling with no vaults. */
+    public TransferUpdateRequest(
+            UUID accountId,
+            Long amountCents,
+            LocalDate date,
+            String description,
+            String note,
+            TransactionStatus status,
+            ContributionPillar contributionPillar) {
+        this(accountId, amountCents, date, description, note, status, contributionPillar, null);
+    }
 }
