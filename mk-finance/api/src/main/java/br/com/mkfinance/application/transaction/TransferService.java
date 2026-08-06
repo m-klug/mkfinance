@@ -88,7 +88,8 @@ public class TransferService {
         Vault sourceVault = resolveVault(workspaceId, source.getId(), input.fromVaultId());
         Vault destinationVault = resolveVault(workspaceId, destination.getId(), input.toVaultId());
         checkVaultRequirement(source.getId(), sourceVault);
-        ContributionPillar pillar = resolveContributionPillar(destination, destinationVault, input.contributionPillar());
+        ContributionPillar pillar =
+                resolveContributionPillar(destination, destinationVault, input.contributionPillar(), true);
 
         Transaction outgoing = leg(
                 workspaceId,
@@ -208,9 +209,15 @@ public class TransferService {
         ContributionPillar requested = input.contributionPillar() != null
                 ? input.contributionPillar()
                 : (destinationVault == null ? legacyPillar : null);
+        // The vault requirement only applies to the leg actually being re-pointed — moved to another
+        // account, or handed an explicit vaultId. A leg left alone keeps whatever it has, including
+        // nothing: a contribution booked before its account had vaults must not become uneditable the
+        // day the first caixinha is created (§4.0's "nada migra em produção").
+        boolean repointed = legMoved || input.vaultId() != null;
         outgoing.setContributionPillar(null);
-        incoming.setContributionPillar(resolveContributionPillar(destination, destinationVault, requested));
-        if (!addressedIsIncoming) {
+        incoming.setContributionPillar(
+                resolveContributionPillar(destination, destinationVault, requested, repointed && addressedIsIncoming));
+        if (!addressedIsIncoming && repointed) {
             // resolveContributionPillar above only ever inspects the destination; the source's own
             // vault requirement (§4.4's symmetric "resgate também exige caixinha") is checked here
             // when it is the leg actually being edited.
@@ -289,8 +296,19 @@ public class TransferService {
      * vault's own pillar is deliberate, not laxity — the client round-trips the value it just read
      * back, and refusing an unchanged answer would break editing (armadilha 8, §7).
      */
+    /**
+     * @param enforceVaultRequirement false only when editing a leg that is <em>not</em> being
+     *     re-pointed (§4.4). A contribution booked before its account had any vault has none, and
+     *     creating the first vault must not make that row uneditable forever — "nada migra em
+     *     produção" (§4.0) would be a dead letter if it did. Such a contribution keeps the pillar it
+     *     already consumed and its money simply stays in the unallocated slice, which is what that
+     *     slice is for (§4.3). Re-point the leg and the requirement applies in full again.
+     */
     private ContributionPillar resolveContributionPillar(
-            Account destination, Vault destinationVault, ContributionPillar requested) {
+            Account destination,
+            Vault destinationVault,
+            ContributionPillar requested,
+            boolean enforceVaultRequirement) {
         if (!isContributionTarget(destination)) {
             // A pillar — or a vault — on a plain checking/cash destination would silently inflate
             // that pillar, or claim a caixinha a non-investment account can never have.
@@ -302,7 +320,9 @@ public class TransferService {
             }
             return null;
         }
-        checkVaultRequirement(destination.getId(), destinationVault);
+        if (enforceVaultRequirement) {
+            checkVaultRequirement(destination.getId(), destinationVault);
+        }
         if (destinationVault == null) {
             ContributionPillar resolved = requested != null
                     ? requested
