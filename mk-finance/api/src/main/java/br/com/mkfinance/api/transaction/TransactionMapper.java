@@ -43,7 +43,8 @@ public class TransactionMapper {
                 request.description(),
                 request.note(),
                 request.status(),
-                request.contributionPillar());
+                request.contributionPillar(),
+                request.vaultId());
     }
 
     public TransferInput toInput(TransferRequest request) {
@@ -53,16 +54,23 @@ public class TransactionMapper {
                 request.amountCents(),
                 request.date(),
                 request.description(),
-                request.contributionPillar());
+                request.contributionPillar(),
+                request.fromVaultId(),
+                request.toVaultId());
     }
 
-    /** {@code tags} defaults to empty — callers that resolved real tags use the overload below. */
+    /** {@code tags}/{@code vaultId} default to empty/null — callers with real values use the overloads below. */
     public TransactionResponse toResponse(Transaction transaction) {
-        return toResponse(transaction, transaction.getContributionPillar(), List.of());
+        return toResponse(transaction, transaction.getContributionPillar(), List.of(), null);
     }
 
     public TransactionResponse toResponse(Transaction transaction, List<Tag> tags) {
-        return toResponse(transaction, transaction.getContributionPillar(), tagMapper.toResponseList(tags));
+        return toResponse(transaction, transaction.getContributionPillar(), tagMapper.toResponseList(tags), null);
+    }
+
+    /** Overload for a single-transaction response that also carries the extrato's vault badge (BE-10). */
+    public TransactionResponse toResponse(Transaction transaction, List<Tag> tags, UUID vaultId) {
+        return toResponse(transaction, transaction.getContributionPillar(), tagMapper.toResponseList(tags), vaultId);
     }
 
     /**
@@ -71,12 +79,12 @@ public class TransactionMapper {
      * overload lets the transfer endpoint answer with the pillar that was actually applied instead
      * of a misleading null. Transfer legs never carry tags (BE-8 scope), so {@code tags} is empty.
      */
-    public TransactionResponse toResponse(Transaction transaction, ContributionPillar contributionPillar) {
-        return toResponse(transaction, contributionPillar, List.of());
+    public TransactionResponse toResponse(Transaction transaction, ContributionPillar contributionPillar, UUID vaultId) {
+        return toResponse(transaction, contributionPillar, List.of(), vaultId);
     }
 
     private TransactionResponse toResponse(
-            Transaction transaction, ContributionPillar contributionPillar, List<TagResponse> tags) {
+            Transaction transaction, ContributionPillar contributionPillar, List<TagResponse> tags, UUID vaultId) {
         return new TransactionResponse(
                 transaction.getId(),
                 transaction.getAccountId(),
@@ -90,19 +98,24 @@ public class TransactionMapper {
                 transaction.getTransferPairId(),
                 transaction.getTransferDirection(),
                 contributionPillar,
+                vaultId,
                 transaction.getRecurrenceId(),
                 tags);
     }
 
-    public TransactionResponse toResponse(TransferPair pair) {
-        return toResponse(pair.outgoing(), pair.incoming().getContributionPillar());
+    /** {@code vaultId} is the outgoing leg's own — the leg the contract has {@code POST /transfers} return. */
+    public TransactionResponse toResponse(TransferPair pair, UUID vaultId) {
+        return toResponse(pair.outgoing(), pair.incoming().getContributionPillar(), vaultId);
     }
 
-    public TransactionPageResponse toPageResponse(Page<Transaction> page, Map<UUID, List<Tag>> tagsByTransactionId) {
+    public TransactionPageResponse toPageResponse(
+            Page<Transaction> page, Map<UUID, List<Tag>> tagsByTransactionId, Map<UUID, UUID> vaultIdByTransactionId) {
         return new TransactionPageResponse(
                 page.getContent().stream()
                         .map(transaction -> toResponse(
-                                transaction, tagsByTransactionId.getOrDefault(transaction.getId(), List.of())))
+                                transaction,
+                                tagsByTransactionId.getOrDefault(transaction.getId(), List.of()),
+                                vaultIdByTransactionId.get(transaction.getId())))
                         .toList(),
                 page.getNumber(),
                 page.getSize(),

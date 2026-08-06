@@ -4,6 +4,7 @@ import br.com.mkfinance.application.transaction.TransferPair;
 import br.com.mkfinance.application.transaction.TransferService;
 import br.com.mkfinance.infrastructure.security.WorkspaceContext;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,17 +36,22 @@ public class TransferController {
     private final TransactionMapper mapper;
     private final WorkspaceContext workspaceContext;
 
-    /** Returns the outgoing leg, carrying the contribution pillar that was actually applied. */
+    /**
+     * Returns the outgoing leg, carrying the contribution pillar that was actually applied and the
+     * vault it withdrew from, if any (BE-10, DESENVOLVIMENTO-CAIXINHAS.md §4.4).
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponse create(@PathVariable UUID workspaceId, @Valid @RequestBody TransferRequest request) {
-        return mapper.toResponse(transferService.create(workspaceContext.getWorkspaceId(), mapper.toInput(request)));
+        TransferPair pair = transferService.create(workspaceContext.getWorkspaceId(), mapper.toInput(request));
+        UUID vaultId = transferService.vaultIdsOf(List.of(pair.outgoing().getId())).get(pair.outgoing().getId());
+        return mapper.toResponse(pair, vaultId);
     }
 
     /**
      * Edits both legs atomically through either one. Returns the leg named in the path — not always
      * the outgoing one — since that is the row the caller was looking at, echoing the contribution
-     * pillar from the IN leg where it lives (R9).
+     * pillar from the IN leg where it lives (R9) and its own vault, if any (BE-10).
      */
     @PatchMapping("/{transactionId}")
     public TransactionResponse update(
@@ -54,6 +60,7 @@ public class TransferController {
             @Valid @RequestBody TransferUpdateRequest request) {
         TransferPair pair = transferService.update(
                 workspaceContext.getWorkspaceId(), transactionId, mapper.toInput(request));
-        return mapper.toResponse(pair.legById(transactionId), pair.incoming().getContributionPillar());
+        UUID vaultId = transferService.vaultIdsOf(List.of(transactionId)).get(transactionId);
+        return mapper.toResponse(pair.legById(transactionId), pair.incoming().getContributionPillar(), vaultId);
     }
 }
