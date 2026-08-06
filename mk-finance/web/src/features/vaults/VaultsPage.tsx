@@ -3,7 +3,16 @@ import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Archive, ArrowLeft, ArrowLeftRight, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArrowLeft,
+  ArrowLeftRight,
+  Pencil,
+  Plus,
+  Receipt,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { formatCents } from "@/lib/format";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
-import { useListAccounts } from "@/lib/api/generated/accounts/accounts";
+import { getListAccountsQueryKey, useListAccounts } from "@/lib/api/generated/accounts/accounts";
 import {
   getListVaultsQueryKey,
   useArchiveVault,
@@ -26,6 +35,7 @@ import { VaultFormDialog } from "@/features/vaults/VaultFormDialog";
 import { VaultGoalBar } from "@/features/vaults/VaultGoalBar";
 import { VaultReallocateDialog } from "@/features/vaults/VaultReallocateDialog";
 import { VaultEntriesSheet } from "@/features/vaults/VaultEntriesSheet";
+import { VaultYieldDialog } from "@/features/vaults/VaultYieldDialog";
 
 export default function VaultsPage() {
   const { t } = useTranslation();
@@ -39,6 +49,7 @@ export default function VaultsPage() {
   const [archiving, setArchiving] = useState<Vault | undefined>();
   const [deleting, setDeleting] = useState<Vault | undefined>();
   const [reallocateOpen, setReallocateOpen] = useState(false);
+  const [yieldOpen, setYieldOpen] = useState(false);
   const [viewingEntriesOf, setViewingEntriesOf] = useState<Vault | undefined>();
 
   const enabled = Boolean(workspaceId) && Boolean(accountId);
@@ -68,6 +79,15 @@ export default function VaultsPage() {
     void queryClient.invalidateQueries({
       queryKey: getListVaultsQueryKey(workspaceId, accountId),
     });
+  }
+
+  // A yield also books an INCOME transaction that moves the account's own
+  // balance (§4.5), shown in this page's header — the composition alone
+  // would leave it stale.
+  function invalidateAfterYield() {
+    invalidateComposition();
+    if (!workspaceId) return;
+    void queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey(workspaceId) });
   }
 
   function openCreate() {
@@ -151,6 +171,10 @@ export default function VaultsPage() {
           {t("vaults.showArchived")}
         </label>
         <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" onClick={() => setYieldOpen(true)}>
+            <TrendingUp className="size-4" />
+            {t("vaults.yieldAction")}
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -276,6 +300,17 @@ export default function VaultsPage() {
           open={reallocateOpen}
           onOpenChange={setReallocateOpen}
           onReallocated={invalidateComposition}
+        />
+      )}
+
+      {workspaceId && (
+        <VaultYieldDialog
+          workspaceId={workspaceId}
+          accountId={accountId}
+          vaults={vaults}
+          open={yieldOpen}
+          onOpenChange={setYieldOpen}
+          onCreated={invalidateAfterYield}
         />
       )}
 
