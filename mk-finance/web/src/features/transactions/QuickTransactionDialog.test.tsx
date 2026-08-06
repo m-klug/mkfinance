@@ -16,6 +16,7 @@ import {
   settledExpense,
   urgentTag,
 } from "@/test/financeFixtures";
+import { reserveVault, tripVault, vaultReadHandlers } from "@/test/vaultFixtures";
 import {
   ContributionPillar,
   type TransactionRequest,
@@ -253,5 +254,81 @@ describe("QuickTransactionDialog", () => {
       await screen.findByText("Selecione a conta de origem e a de destino."),
     ).toBeInTheDocument();
     expect(calls).toHaveLength(0);
+  });
+});
+
+// BE-10/§4.4: once an account has any active vault, every leg touching it
+// must name one, and the pillar stops being an editable field for the
+// destination — it comes from the vault chosen.
+describe("QuickTransactionDialog — vaults (§4.4)", () => {
+  const vaultedInvestment = { ...investmentAccount, hasVaults: true };
+
+  beforeEach(() => {
+    server.use(
+      ...financeReadHandlers({ accounts: [checkingAccount, vaultedInvestment] }),
+      ...vaultReadHandlers(),
+    );
+  });
+
+  it("requires the destination vault before submitting an aporte, and derives the pillar from it instead of offering the selector", async () => {
+    const calls: TransferRequest[] = [];
+    server.use(captureTransfers(calls));
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByRole("tab", { name: "Aporte" }));
+    await screen.findByLabelText("Caixinha de destino");
+    expect(screen.queryByLabelText("Pilar do aporte")).not.toBeInTheDocument();
+    expect(screen.getByText("Selecione uma caixinha para ver o pilar.")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Valor"), "50000");
+    await user.type(screen.getByLabelText("Descrição"), "Aporte de agosto");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(await screen.findByText("Selecione uma caixinha.")).toBeInTheDocument();
+    expect(calls).toHaveLength(0);
+
+    await user.selectOptions(screen.getByLabelText("Caixinha de destino"), reserveVault.id);
+    // The pillar shown switches to the vault's own — Reserva is FINANCIAL_FREEDOM.
+    expect(screen.getByText("Liberdade Financeira")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({
+      toVaultId: reserveVault.id,
+      contributionPillar: null,
+    });
+  });
+
+  it("requires the origin vault for a plain transfer out of a vaulted account (resgate)", async () => {
+    const calls: TransferRequest[] = [];
+    server.use(captureTransfers(calls));
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByRole("tab", { name: "Transferência" }));
+    await user.selectOptions(
+      await screen.findByLabelText("Conta de origem"),
+      vaultedInvestment.id,
+    );
+
+    expect(await screen.findByLabelText("Caixinha de origem")).toBeInTheDocument();
+    // The destination (moved away from the origin automatically) has no
+    // vault, so no destination vault field or derived pillar shows up.
+    expect(screen.queryByLabelText("Caixinha de destino")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Valor"), "20000");
+    await user.type(screen.getByLabelText("Descrição"), "Resgate parcial");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(await screen.findByText("Selecione uma caixinha.")).toBeInTheDocument();
+    expect(calls).toHaveLength(0);
+
+    await user.selectOptions(screen.getByLabelText("Caixinha de origem"), tripVault.id);
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ fromVaultId: tripVault.id, toVaultId: null });
   });
 });
