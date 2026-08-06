@@ -1,6 +1,7 @@
 package br.com.mkfinance.api.error;
 
 import br.com.mkfinance.application.recurrence.RecurrenceValidationException;
+import br.com.mkfinance.application.vault.VaultValidationException;
 import br.com.mkfinance.domain.exception.AppException;
 import br.com.mkfinance.domain.exception.ErrorCode;
 import jakarta.validation.ConstraintViolationException;
@@ -56,6 +57,19 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RecurrenceValidationException.class)
     public ResponseEntity<ErrorResponse> handleRecurrenceValidation(RecurrenceValidationException ex) {
+        List<FieldErrorDto> fieldErrors = ex.getViolations().stream()
+                .map(violation -> new FieldErrorDto(violation.field(), violation.code()))
+                .toList();
+        return ResponseEntity.badRequest().body(new ErrorResponse(ErrorCode.VALIDATION_ERROR, null, fieldErrors));
+    }
+
+    /**
+     * The vault validations OpenAPI cannot express (CT-2: {@code targetDate} without
+     * {@code targetAmountCents}; a reallocation with both {@code fromVaultId}/{@code toVaultId}
+     * null) — reported the same way Bean Validation would.
+     */
+    @ExceptionHandler(VaultValidationException.class)
+    public ResponseEntity<ErrorResponse> handleVaultValidation(VaultValidationException ex) {
         List<FieldErrorDto> fieldErrors = ex.getViolations().stream()
                 .map(violation -> new FieldErrorDto(violation.field(), violation.code()))
                 .toList();
