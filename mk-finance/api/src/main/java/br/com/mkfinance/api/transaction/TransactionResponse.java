@@ -31,6 +31,12 @@ public record TransactionResponse(
         TransferDirection transferDirection,
         /** Set on transfers into INVESTMENT/SAVINGS accounts (R9). */
         ContributionPillar contributionPillar,
+        /**
+         * The vault this leg went into or came out of, when the account has vaults
+         * (DESENVOLVIMENTO-CAIXINHAS.md §4.4); null for INCOME/EXPENSE and for a transfer leg on an
+         * account with no vaults, exactly like today.
+         */
+        UUID vaultId,
         /** The rule that materialized this row, when it came from a recurrence (CT-1); null otherwise. */
         UUID recurrenceId,
         /**

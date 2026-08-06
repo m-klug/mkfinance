@@ -1,6 +1,7 @@
 package br.com.mkfinance.infrastructure.persistence;
 
 import br.com.mkfinance.domain.model.VaultEntry;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,6 +68,15 @@ public interface VaultEntryRepository extends JpaRepository<VaultEntry, UUID> {
 
     /** The mirrored ledger row of a transfer leg, addressed by its transaction — used by link/unlink. */
     Optional<VaultEntry> findByTransactionIdAndAmountCentsIsNull(UUID transactionId);
+
+    /**
+     * Batch version of {@link #findByTransactionIdAndAmountCentsIsNull} — the extrato's {@code
+     * Transaction.vaultId} badge (BE-10), one query for a whole page instead of one per row, in the
+     * same spirit as {@code TagService.tagsOf(Collection)}. {@code amount_cents IS NULL} is what
+     * scopes this to CONTRIBUTION/WITHDRAWAL mirrors (V19's check constraint); a YIELD transaction
+     * never resolves here since it cannot collapse to a single vault (1 transaction : N vaults).
+     */
+    List<VaultEntry> findByTransactionIdInAndAmountCentsIsNull(Collection<UUID> transactionIds);
 
     /** Every ledger row mirroring this transaction, mirror or yield share alike — used by delete cascade helpers. */
     List<VaultEntry> findByTransactionId(UUID transactionId);
