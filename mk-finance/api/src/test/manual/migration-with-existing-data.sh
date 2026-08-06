@@ -5,6 +5,16 @@
 # V2__seed.sql não semeia pillar_allocation. Resultado: em 261 testes o "UPDATE pillar_allocation
 # SET effective_from" da V13 sempre pegou ZERO linha. O backfill e a troca de PK com linhas de
 # verdade nunca foram exercitados. Este script fecha esse buraco sem envolver dado real de produção.
+#
+# INT-3 — estendido para V18/V19 (caixinhas). O ponto a provar aqui é diferente: V18/V19 não têm
+# backfill nenhum (nem "vault" nem "vault_entry" preexistem antes delas), então o risco não é dado
+# perdido — é a aplicação continuar funcionando exatamente como antes para uma base sem NENHUMA
+# caixinha, que é o estado real do banco de produção do usuário no momento do deploy (§4.0: "nada
+# migra em produção, nenhuma caixinha automática"). Verificamos isso em SQL puro (sem subir a
+# aplicação): as tabelas novas nascem vazias, as transações e transferências pré-existentes não são
+# tocadas, e a agregação equivalente ao que VaultBalanceService faria devolve zero em todas as
+# caixinhas (porque não há nenhuma) e o saldo inteiro cai no "não alocado" — a identidade da §4.2/§4.3
+# só é honesta se ela também vale no dia zero, antes de qualquer caixinha existir.
 set -euo pipefail
 
 MIG="$1"          # diretório das migrações
@@ -61,6 +71,25 @@ INSERT INTO transaction (id, workspace_id, account_id, category_id, type, amount
 VALUES
  ('66666666-6666-6666-6666-666666666666','22222222-2222-2222-2222-222222222222','44444444-4444-4444-4444-444444444444','55555555-5555-5555-5555-555555555555','EXPENSE',150000,'2026-07-05','Aluguel julho','SETTLED'),
  ('77777777-7777-7777-7777-777777777777','22222222-2222-2222-2222-222222222222','44444444-4444-4444-4444-444444444444','55555555-5555-5555-5555-555555555555','EXPENSE',150000,'2026-08-05','Aluguel agosto','PENDING');
+
+-- INT-3: uma conta INVESTMENT com um aporte já lançado *antes* de V18/V19 existirem — o cenário real
+-- de produção, onde caixinhas nunca existiram e o aporte usou o pilar padrão da conta (regra 9 antiga).
+INSERT INTO account (id, workspace_id, name, type, default_contribution_pillar)
+VALUES ('88888888-8888-8888-8888-888888888888','22222222-2222-2222-2222-222222222222','Corretora','INVESTMENT','FINANCIAL_FREEDOM');
+
+-- Inserida sem transfer_pair_id primeiro (as duas pernas se referenciam por FK) e ligada depois,
+-- para não depender de ordem de avaliação de um INSERT multi-linha auto-referente.
+INSERT INTO transaction (id, workspace_id, account_id, type, amount_cents, date, description, status,
+                          transfer_direction, contribution_pillar)
+VALUES
+ ('99999999-9999-9999-9999-999999999999','22222222-2222-2222-2222-222222222222','44444444-4444-4444-4444-444444444444','TRANSFER',300000,'2026-07-10','Aporte corretora','SETTLED',
+  'OUT',NULL),
+ ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','22222222-2222-2222-2222-222222222222','88888888-8888-8888-8888-888888888888','TRANSFER',300000,'2026-07-10','Aporte corretora','SETTLED',
+  'IN','FINANCIAL_FREEDOM');
+UPDATE transaction SET transfer_pair_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+  WHERE id = '99999999-9999-9999-9999-999999999999';
+UPDATE transaction SET transfer_pair_id = '99999999-9999-9999-9999-999999999999'
+  WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 SQL
 
 echo "   linhas antes da V13:"
@@ -73,6 +102,10 @@ apply V14__recurrences.sql
 apply V15__recurrence_occurrences.sql
 apply V16__tags.sql
 apply V17__transaction_tag.sql
+
+echo "== aplicando as migrações das Caixinhas (V18/V19) =="
+apply V18__vault.sql
+apply V19__vault_entry.sql
 
 echo
 echo "== VERIFICAÇÕES =="
@@ -118,8 +151,9 @@ fi
 
 psql -tA <<'SQL'
 \echo '-- transações preexistentes sobreviveram e ganharam recurrence_id nulo'
-SELECT CASE WHEN count(*) = 2 AND count(*) FILTER (WHERE recurrence_id IS NULL) = 2
-            THEN 'OK    2 transações preservadas, recurrence_id NULL'
+-- 4 = as 2 despesas originais (INT-2) + as 2 pernas do aporte pré-V18 (INT-3, inserido acima).
+SELECT CASE WHEN count(*) = 4 AND count(*) FILTER (WHERE recurrence_id IS NULL) = 4
+            THEN 'OK    4 transações preservadas, recurrence_id NULL'
             ELSE 'FALHA transações: ' || count(*) END FROM transaction;
 
 \echo '-- tabelas novas da Fase 2 existem'
@@ -142,6 +176,85 @@ docker exec -i "$CID" psql -q -U postgres -d migtest -c \
    "INSERT INTO tag (workspace_id,name) VALUES ('33333333-3333-3333-3333-333333333333','Casa');" >/dev/null 2>&1 \
    && echo "OK    mesma tag permitida em outro workspace" \
    || echo "FALHA unicidade vazou entre workspaces"
+
+echo
+echo "== VERIFICAÇÕES V18/V19 (INT-3) =="
+psql -tA <<'SQL'
+\echo '-- tabelas novas existem'
+SELECT CASE WHEN count(*) = 2 THEN 'OK    vault e vault_entry criadas'
+            ELSE 'FALHA tabelas novas encontradas: ' || count(*) END
+FROM information_schema.tables WHERE table_name IN ('vault','vault_entry');
+
+\echo '-- nenhuma caixinha foi criada pela migração (nada migra em produção, §4.0)'
+SELECT CASE WHEN count(*) = 0 THEN 'OK    vault nasce vazia (0 linhas)'
+            ELSE 'FALHA vault tem ' || count(*) || ' linha(s) — algo criou caixinha sozinho' END
+FROM vault;
+SELECT CASE WHEN count(*) = 0 THEN 'OK    vault_entry nasce vazia (0 linhas)'
+            ELSE 'FALHA vault_entry tem ' || count(*) || ' linha(s)' END
+FROM vault_entry;
+
+\echo '-- a transação/transferência pré-caixinha (aporte de julho) sobreviveu intacta'
+SELECT CASE WHEN count(*) = 2
+             AND bool_and(amount_cents = 300000) AND bool_and(status = 'SETTLED')
+            THEN 'OK    as duas pernas do aporte pré-V18 sobreviveram (300000, SETTLED)'
+            ELSE 'FALHA aporte pré-V18: ' || count(*) || ' linha(s)' END
+FROM transaction WHERE transfer_pair_id IN
+  ('99999999-9999-9999-9999-999999999999','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+
+\echo '-- ck_vault_goal: prazo sem valor-alvo é rejeitado (não há do que calcular progresso)'
+SQL
+
+if docker exec -i "$CID" psql -q -v ON_ERROR_STOP=1 -U postgres -d migtest -c \
+   "INSERT INTO vault (workspace_id, account_id, name, contribution_pillar, target_date)
+    VALUES ('22222222-2222-2222-2222-222222222222','88888888-8888-8888-8888-888888888888','X','GOALS',DATE '2027-01-01');" >/dev/null 2>&1; then
+  echo "FALHA ck_vault_goal aceitou target_date sem target_amount_cents"
+else
+  echo "OK    ck_vault_goal rejeitou prazo sem valor-alvo"
+fi
+
+echo '-- uma caixinha de verdade agora (fora do escopo do backfill, só prova que INSERT funciona pós-migração)'
+docker exec -i "$CID" psql -q -v ON_ERROR_STOP=1 -U postgres -d migtest -c \
+   "INSERT INTO vault (id, workspace_id, account_id, name, contribution_pillar)
+    VALUES ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','22222222-2222-2222-2222-222222222222','88888888-8888-8888-8888-888888888888','Reserva','FINANCIAL_FREEDOM');" >/dev/null 2>&1 \
+  && echo "OK    caixinha criada pós-migração com sucesso" \
+  || echo "FALHA não conseguiu criar caixinha pós-migração"
+
+psql -tA <<'SQL'
+\echo '-- ux_vault_account_name_ci: nome duplicado (case-insensitive) na mesma conta é rejeitado'
+SQL
+if docker exec -i "$CID" psql -q -v ON_ERROR_STOP=1 -U postgres -d migtest -c \
+   "INSERT INTO vault (workspace_id, account_id, name, contribution_pillar)
+    VALUES ('22222222-2222-2222-2222-222222222222','88888888-8888-8888-8888-888888888888','RESERVA','FINANCIAL_FREEDOM');" >/dev/null 2>&1; then
+  echo "FALHA 'RESERVA' passou apesar de 'Reserva' já existir na mesma conta"
+else
+  echo "OK    unicidade case-insensitive de caixinha por conta rejeitou 'RESERVA'"
+fi
+
+psql -tA <<'SQL'
+\echo '-- identidade Σ caixinhas + não alocado = saldo da conta, no dia zero (uma caixinha vazia)'
+-- equivalente em SQL puro às três agregações da §5.5: nenhuma delas tem linha para esta caixinha
+-- (nenhum vault_entry foi criado), então o saldo dela é 0 e o "não alocado" é o saldo inteiro da
+-- conta, calculado exatamente como BalanceCalculator.signedAmountCents faria (IN soma, OUT subtrai).
+WITH account_balance AS (
+  SELECT COALESCE(SUM(CASE
+    WHEN type = 'TRANSFER' AND transfer_direction = 'IN'  THEN  amount_cents
+    WHEN type = 'TRANSFER' AND transfer_direction = 'OUT' THEN -amount_cents
+    WHEN type = 'INCOME'  THEN  amount_cents
+    WHEN type = 'EXPENSE' THEN -amount_cents
+    ELSE 0 END), 0) AS balance_cents
+  FROM transaction
+  WHERE account_id = '88888888-8888-8888-8888-888888888888' AND status = 'SETTLED'
+),
+vault_balance AS (
+  SELECT COALESCE(SUM(amount_cents), 0) AS balance_cents FROM vault_entry
+  WHERE vault_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+)
+SELECT CASE WHEN ab.balance_cents = 300000 AND vb.balance_cents = 0
+             AND (ab.balance_cents - vb.balance_cents) = 300000
+            THEN 'OK    saldo conta=300000, Reserva=0, não alocado=300000 (identidade fecha no dia zero)'
+            ELSE 'FALHA saldo conta=' || ab.balance_cents || ' Reserva=' || vb.balance_cents END
+FROM account_balance ab, vault_balance vb;
+SQL
 
 echo
 echo "== fim =="

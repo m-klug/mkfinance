@@ -367,6 +367,48 @@ Cenário canônico coberto: bases 6.000/4.500 e rendimento de R$ 100,01 → R$ 5
 - **Passos**: `npm run api:generate` e conferência contrato × springdoc `/v3/api-docs`; gate completo (seção 6); estender `web/e2e/smoke.spec.ts` com o roteiro da seção 8; conferir i18n sem chave faltando; **revisar que o diff de `BalanceCalculator.java` e de `aggregateBalanceBuckets` é vazio**.
 - **Aceite**: gate verde; E2E verde; a identidade da §4.2 confere à mão na stack real.
 
+#### ✅ INT-3 concluída — 06/08/2026 (worktree `worktree-agent-ab33ee47e54c830c9`, 2 commits incrementais)
+
+**Rebase**: a worktree nasceu de um commit anterior à fatia inteira (E3 da Fase 2); `merge-base(HEAD, main) == HEAD` confirmou que era um simples fast-forward (`git merge --ff-only main`, `e5052f5..fa23159`) — sem conflito, todas as fichas CT-2..FE-9 entraram de uma vez.
+
+**Gate completo, verde**: `./mvnw verify` **353 testes, 0 falhas** (conferido por contagem de `Tests run` nos 106 `surefire-reports`, já que `-q` suprime o resumo do Maven); `npm test` **142/142**; `npm run build` verde (mesmo aviso de chunk >500kB que já existia, sem regressão); `POSTGRES_PASSWORD=x docker compose config -q` verde. Nenhum número mudou em relação ao que a BE-11 já tinha fechado — INT-3 não tocou código de produção, só testes.
+
+**Contrato × springdoc, nos dois sentidos**: subi a aplicação local (Postgres efêmero + `spring-boot:run`) e comparei `contracts/openapi.yaml` com `/v3/api-docs` por conjunto de `(método, path)`. **58 endpoints dos dois lados, diff vazio nas duas direções** — nada declarado e não implementado, nada implementado e não declarado.
+
+**i18n**: as 10 chaves `error.VAULT_*` existem (já verificado pela FE-9). Os dois enums novos do contrato têm os mapas completos: `VaultEntrySource` (`CONTRIBUTION`/`WITHDRAWAL`/`YIELD`/`REALLOCATION`, 4/4 em `vaults.entrySourceLabel`) e `VaultGoalStatus` (`IN_PROGRESS`/`REACHED`/`OVERDUE`, 3/3 em `vaults.goalStatus`). Varredura automatizada de todo `t("...")` no código-fonte (370 chamadas reais, descontados 6 falsos-positivos de `.get()`/`.split()`/mocks MSW capturados pela regex) contra `common.json`: **zero chave faltando**.
+
+**`BalanceCalculator`/`aggregateBalanceBuckets`**: já conferido pela BE-11 e permanece com diff zero — não há nada novo a revisar aqui, a fatia inteira nunca tocou esses dois pontos.
+
+**E2E**: `web/e2e/smoke.spec.ts` ganhou um terceiro teste, cobrindo o caminho pedido — conta INVESTMENT com saldo pré-existente → caixinha com meta → remanejo `null → caixinha` do saldo pré-existente → aporte pela caixinha no lançamento rápido do cabeçalho → dashboard credita **GOALS** (o pilar da caixinha) e não `FINANCIAL_FREEDOM` (o default da conta) → rendimento lançado e absorvido pela caixinha. **3/3 testes passam contra a stack real** (backend + Postgres, `VITE_API_MOCK=false`), rodado duas vezes seguidas sem flakiness.
+
+Achado real no meio do caminho, não fabricado: o **"Novo lançamento" do cabeçalho não invalida a query de composição** que `VaultsPage` mantém (`invalidateAfterWrite` do `QuickTransactionDialog` só mexe em `transactions`/`accounts`), então a tela de caixinhas fica presa ao `staleTime` de 30s (`main.tsx`) até um reload — a mesma classe de lacuna que o teste feliz original já contornava para o dashboard (comentário existente: "so the summary/allocation queries fetch fresh server truth rather than the staleTime-cached empty snapshot"). Não é um bug exclusivo desta fatia — é uma lacuna de invalidação cross-feature que já existia antes das caixinhas, só nunca tinha um teste que a expusesse. Resolvido no teste com `page.reload()` no lugar de navegação client-side, documentado inline; **registro para o usuário decidir se vale um item de polimento** (o `QuickTransactionDialog` poderia invalidar `getListVaultsQueryKey` também, condicionado a `destinationHasVault`/`originHasVault`) — não corrigido aqui porque a ficha não pede mudança de código de produção.
+
+**Roteiro da §8, os 14 passos, à mão contra a stack real** (script `curl` em `/private/tmp/.../scratchpad/int3-roteiro.sh` desta sessão, no molde do `canonical-scenario-live.sh` da INT-2):
+
+| # | O que prova | Resultado |
+|---|---|---|
+| 1 | Aporte sem caixinha funciona como hoje | OK — 201, saldo R$10.500,00 |
+| 2 | Cria Reserva e Viagem 2027 (meta) | OK |
+| 3 | Composição mostra R$10.500 não alocado, caixinhas em zero | OK |
+| 4 | Remanejo `null→Reserva` 6000 + `null→Viagem` 4000; saldo da conta não muda | OK |
+| 5 | Aporte sem `vaultId` → `VAULT_REQUIRED` | OK — 400 |
+| 6 | Pilar divergente → `VAULT_PILLAR_CONFLICT`; sem pilar → aceito, GOALS +500 no dashboard | OK — 400, depois 201 com delta exato |
+| 7 | Meta da Viagem: 37,5% | OK — `progressPercent` bate; `monthlyNeededCents` depende de `monthsRemaining`, que conta a competência corrente (§4.6) — com prazo de exatos 12 meses a partir de hoje o roteiro mede 13 meses restantes e R$576,93/mês, não R$625,00/mês. **Não é bug**: R$625,00 só bate com `monthsRemaining=12` exato, que depende do dia do mês em que se roda o roteiro. Comportamento documentado na §4.6, só a redação do passo 7 é otimista sobre a aritmética de datas |
+| 8 | Resgate maior que o saldo → `VAULT_INSUFFICIENT_BALANCE` | OK — 409, **`params.shortfallCents = 200000`** conferido byte a byte na resposta (não `availableCents` — o texto do roteiro já estava certo, o valor bate) |
+| 9 | Aporte PENDING: `balanceCents` não muda, `projectedBalanceCents` sobe | OK |
+| 10 | Rendimento com as bases reais (600000/450000, não as do roteiro que pressupõe 6000/4500 antes do passo 9 pendente) → soma exata | OK — 5715+4286=10001; saldo da conta +10001; tile de receitas do mês intocado |
+| 11 | `DELETE` da transação do rendimento apaga as duas linhas do razão | OK — cascade confirmado pela queda do saldo da Reserva |
+| 12 | `PATCH` do aporte (500→700) move a caixinha sem escrita no razão | OK — Viagem +200,00 só por mudar a transação |
+| 13 | Arquivar com saldo → `VAULT_NOT_EMPTY`; esvaziar → arquiva; excluir com lançamentos → `VAULT_HAS_ENTRIES` | OK, com uma descoberta real no caminho (ver abaixo) |
+| 14 | Arquivadas as duas, aporte sem `vaultId` volta a aceitar | OK — 201 |
+| — | Identidade final Σ caixinhas + não alocado = saldo da conta | OK — confere byte a byte em todos os passos do roteiro |
+
+**Descoberta real no passo 13, não fabricada**: a primeira tentativa de rodar o roteiro deixou o aporte PENDING do passo 9 sem liquidar nem apagar. Ao chegar no passo 13, `archive` da Reserva recusou com `VAULT_NOT_EMPTY` mesmo depois de remanejar todo o `balanceCents` (SETTLED) para o não alocado — porque `projectedBalanceCents` continuava maior que zero (o remanejo, por design, §4.2, não toca PENDING). Isso é **prova real, não hipotética, de que o guard do §4.7 checa "em qualquer dos dois níveis"** de propósito, exatamente como o texto diz. O roteiro final apaga o aporte PENDING de teste antes do passo 13 (limpeza dentro do próprio script, documentada inline) para poder demonstrar o caminho feliz do arquivamento — mas o comportamento observado no meio do caminho é o gate funcionando corretamente, não uma falha a corrigir.
+
+**Migração com dados preexistentes**: `mk-finance/api/src/test/manual/migration-with-existing-data.sh` estendido para V18/V19. Insere uma conta INVESTMENT com um aporte (par de transferência) lançado *antes* de V18/V19 existirem, aplica as migrações das caixinhas por cima, e confere: as tabelas nascem vazias (nenhuma caixinha automática, §4.0); as duas pernas do aporte pré-caixinha sobrevivem intactas; `ck_vault_goal` rejeita prazo sem valor-alvo; `ux_vault_account_name_ci` rejeita nome duplicado case-insensitive na mesma conta; e a identidade Σ caixinhas + não alocado = saldo da conta fecha em SQL puro no "dia zero" (uma caixinha recém-criada, saldo inteiro no não alocado). Corrigi de passagem uma asserção pré-existente da INT-2 que eu mesmo quebrei (contagem de transações passou de 2 para 4 com as duas pernas novas) — sem isso o script teria uma FALHA que não é da INT-3. **Zero FALHA no output final.**
+
+**Divergências entre desenho e comportamento real, no total**: nenhuma estrutural. As duas únicas surpresas — o `monthsRemaining` do passo 7 e o gate de dois níveis do passo 13 — são os próprios mecanismos do §4.6/§4.7 funcionando como projetados, expostos por um roteiro de teste que não previa a interação entre eles. A lacuna de invalidação de query do `QuickTransactionDialog` é a única descoberta que sobra como possível trabalho futuro, e é de UX/polimento, não de corretude — o dado no servidor sempre esteve certo, só a tela aberta ficava desatualizada por até 30s.
+
 ### 5.4 Verificação de colisão de arquivos (lição da Fase 2)
 
 | Arquivo | Único dono |
