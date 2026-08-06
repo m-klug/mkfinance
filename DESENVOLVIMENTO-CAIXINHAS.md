@@ -348,6 +348,20 @@ Cenário canônico coberto: bases 6.000/4.500 e rendimento de R$ 100,01 → R$ 5
   5. **As 10 chaves `error.VAULT_*`**, usando os `params` de `VAULT_INSUFFICIENT_BALANCE` e `VAULT_NOT_EMPTY` para dizer quanto falta. Hoje esses erros caem no fallback genérico.
   6. Testes com `server.use(...)` local, **sem tocar `mocks/handlers.ts`** (é da FE-8).
 
+#### ✅ FE-9 concluída — 06/08/2026 (branch `worktree-agent-a177ac7989a6fadb3`, 6 commits incrementais)
+
+`npm test` **142/142** (os 128 anteriores intactos, sem edição, + 14 novos) e `npm run build` verdes. Os seis passos da ficha, mais o que o fecho da FE-8 já sinalizava: `VaultYieldDialog.tsx` criado em `features/vaults/` e acionado por um botão "Lançar rendimento" na `VaultsPage` — única exceção de propriedade fora de `features/transactions/**`, prevista na ficha.
+
+**Decisões tomadas sozinho, registradas para as próximas fichas (INT-3):**
+
+1. **`vaultId` explícito e omitido são indistinguíveis no back** (`TransferUpdateInput.vaultId` é `UUID` puro, não `JsonNullable`), então o front nunca precisa decidir entre "omitir" e "mandar null" — sempre manda `form.vaultId || null`, e o resultado é o mesmo dos dois jeitos. Confirmado lendo `TransferService.update` antes de implementar, não supondo.
+2. **`lib/errors.ts` deixou de ser arquivo morto para os `params`**: `translateApiError` passa `error.body.params` para `t()`, formatando `shortfallCents`/`balanceCents` em BRL antes (as duas chaves que a ficha exige interpolar). Não é dono exclusivo de ninguém na tabela 5.4 — extensão de infra compartilhada, comportamento aditivo (códigos antigos com `params` não usados continuam ignorando-os).
+3. **Badge do extrato resolve o nome da caixinha**, não só marca a presença de `vaultId` — um `useQueries` batching `getListVaultsQueryOptions` por conta que tem `hasVaults`, normalmente zero requests extras.
+4. **Prévia do rendimento é local (`yieldPreviewShares` em `vaultOptions.ts`)**, espelhando o `YieldDistributor` do BE-11 (mesmo desempate: maior resto, depois saldo, depois nome, depois id) — mas a tela deixa explícito que `VaultYield.shares` da resposta é quem manda.
+5. **Nenhuma string literal nova em JSX** fora das exigidas pela ficha; as 10 chaves `error.VAULT_*` e as chaves `vaults.yield*`/`transactions.*` novas estão documentadas com o porquê no próprio `common.json` (via os componentes que as usam).
+
+**Divergência que apareceu só em teste, não no código**: o primeiro teste do badge do extrato falhou de forma intermitente por pura lentidão do ambiente de sandbox (múltiplos `useQueries` + `useListTransactions`/`useListAccounts`/`useListCategories` em paralelo passando de 1000 ms, o timeout default do RTL) — não por um handler MSW sendo sobrescrito incorretamente, hipótese descartada com um `console.log` temporário no componente antes de ajustar o timeout daquele `findByText` para 3000 ms. Documentado aqui para quem depurar o próximo teste "pending para sempre" não repetir a mesma investigação.
+
 ### INT-3 — Integração & gate `[E12 · java-architect, sequencial]`
 
 - **Passos**: `npm run api:generate` e conferência contrato × springdoc `/v3/api-docs`; gate completo (seção 6); estender `web/e2e/smoke.spec.ts` com o roteiro da seção 8; conferir i18n sem chave faltando; **revisar que o diff de `BalanceCalculator.java` e de `aggregateBalanceBuckets` é vazio**.
