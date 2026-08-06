@@ -304,6 +304,15 @@ Decisões que a FE-8 tomou sozinha e ficam valendo: o extrato usa o `Dialog` exi
   6. `VaultContributionIntegrationTest` cobrindo a matriz inteira.
 - **Regra dura**: **nenhum teste existente de `TransferIntegrationTest` pode ser editado.** Se algum quebrar, a regra está errada — não o teste.
 
+#### ✅ BE-10 concluída — 05/08/2026 (merge `9984c1f`, 9 commits incrementais)
+
+Gate: `./mvnw verify` **334 testes** (311 anteriores intactos + 22 da ficha + 1 acrescentado na revisão). A matriz da §4.4 inteira implementada e coberta, incluindo resgate simétrico, `shortfallCents` e os fluxos de update/delete/settle.
+
+**Duas correções feitas na revisão, ambas com teste:**
+
+1. **Criar a primeira caixinha travava a edição dos aportes anteriores.** A BE-10 sinalizou que a §4.4 não dizia qual perna a exigência cobre no `update` quando as duas divergem, e escolheu revalidar sempre. O efeito: quem usa o app há meses e cria a primeira caixinha na corretora passava a receber `VAULT_REQUIRED` ao editar qualquer aporte lançado antes disso — inclusive mexendo só na perna de origem. Contradizia a decisão de produto "nada migra em produção", e era desnecessário: esses aportes já consumiram o pilar, e o dinheiro deles fica na fatia não alocada, que existe exatamente para isso. **Regra corrigida e agora vinculante: a exigência vale só para a perna que está sendo re-apontada** — movida de conta, ou recebendo `vaultId` explícito. Perna deixada em paz mantém o que tem, inclusive nada.
+2. **Construtores "legados" nos records.** Efeito colateral da regra dura: lida ao pé da letra, levou a criar construtores de aridade antiga em `TransferRequest`/`TransferUpdateRequest`/`TransferInput`/`TransferUpdateInput` para os ~36 call sites antigos compilarem — superfície de produção mantida por conveniência de teste, com risco real de uma ficha futura perder o `vaultId` em silêncio. Removidos; os call sites dizem `null` explicitamente. **A regra queria dizer "não afrouxe asserção para o seu código passar", não "não toque no arquivo"** — vale enunciá-la assim nas próximas fichas.
+
 ### BE-11 — Rendimento distribuível `[E11 · spring-boot-engineer]`
 
 - **Objetivo**: lançar o rendimento do mês rateado entre as caixinhas.
