@@ -151,7 +151,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
         session.patch(
                 path("/transfers/" + outgoing.id()),
                 new TransferUpdateRequest(
-                        null, 40_000L, day, "aporte", null, TransactionStatus.PENDING, ContributionPillar.GOALS),
+                        null, 40_000L, day, "aporte", null, TransactionStatus.PENDING, ContributionPillar.GOALS, null),
                 TransactionResponse.class);
 
         PillarAllocationReportResponse allocation = pillarAllocation("2026-09");
@@ -315,7 +315,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
             AccountResponse from, AccountResponse to, long amountCents, ContributionPillar pillar, LocalDate date) {
         return session.post(
                         path("/transfers"),
-                        new TransferRequest(from.id(), to.id(), amountCents, date, "aporte", pillar),
+                        new TransferRequest(from.id(), to.id(), amountCents, date, "aporte", pillar, null, null),
                         TransactionResponse.class)
                 .getBody();
     }
@@ -323,7 +323,7 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
     private void transfer(AccountResponse from, AccountResponse to, long amountCents, LocalDate date) {
         session.post(
                 path("/transfers"),
-                new TransferRequest(from.id(), to.id(), amountCents, date, "transfer", null),
+                new TransferRequest(from.id(), to.id(), amountCents, date, "transfer", null, null, null),
                 TransactionResponse.class);
     }
 

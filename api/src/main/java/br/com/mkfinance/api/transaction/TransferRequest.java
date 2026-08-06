@@ -26,15 +26,4 @@ public record TransferRequest(
         ContributionPillar contributionPillar,
         UUID fromVaultId,
         UUID toVaultId) {
-
-    /** Pre-Caixinhas shape — kept so callers/tests that predate BE-10 keep compiling with no vaults. */
-    public TransferRequest(
-            UUID fromAccountId,
-            UUID toAccountId,
-            Long amountCents,
-            LocalDate date,
-            String description,
-            ContributionPillar contributionPillar) {
-        this(fromAccountId, toAccountId, amountCents, date, description, contributionPillar, null, null);
-    }
 }

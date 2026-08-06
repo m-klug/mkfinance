@@ -36,16 +36,4 @@ public record TransferUpdateRequest(
         TransactionStatus status,
         ContributionPillar contributionPillar,
         UUID vaultId) {
-
-    /** Pre-Caixinhas shape — kept so callers/tests that predate BE-10 keep compiling with no vaults. */
-    public TransferUpdateRequest(
-            UUID accountId,
-            Long amountCents,
-            LocalDate date,
-            String description,
-            String note,
-            TransactionStatus status,
-            ContributionPillar contributionPillar) {
-        this(accountId, amountCents, date, description, note, status, contributionPillar, null);
-    }
 }
