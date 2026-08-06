@@ -105,16 +105,19 @@ public class VaultBalanceService {
      * therefore works the same regardless of which write path got here. A PENDING movement never
      * trips it by itself, since it does not move {@code currentCents}.
      *
-     * @throws AppException VAULT_INSUFFICIENT_BALANCE, carrying the vault's actual settled balance
-     *     (negative, once this fires) as {@code availableCents} — the caller's surrounding
-     *     {@code @Transactional} unit of work is expected to roll back, so nothing about the
-     *     offending write survives regardless of what this reports
+     * @throws AppException VAULT_INSUFFICIENT_BALANCE, carrying how far the vault went under as
+     *     {@code shortfallCents} (always positive). It reports the shortfall rather than what was
+     *     available because, checking after the write, the pre-write balance is no longer knowable
+     *     here without the caller telling us how much it just moved — and the client already knows
+     *     the amount it sent, so it can say either "faltam X" or "só há amount − X" from this. The
+     *     caller's surrounding {@code @Transactional} unit of work is expected to roll back, so
+     *     nothing about the offending write survives regardless of what this reports.
      */
     @Transactional(readOnly = true)
     public void assertNotOverdrawn(UUID workspaceId, UUID vaultId) {
         Balance balance = balanceOf(workspaceId, vaultId);
         if (balance.currentCents() < 0) {
-            throw AppException.vaultInsufficientBalance(vaultId, balance.currentCents());
+            throw AppException.vaultInsufficientBalance(vaultId, -balance.currentCents());
         }
     }
 }

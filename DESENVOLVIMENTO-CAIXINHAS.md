@@ -121,7 +121,7 @@ Duas guardas, propositalmente assimétricas:
 
 | Situação | Tratamento |
 |---|---|
-| Uma **caixinha** ficaria negativa | **Bloqueado** — `VAULT_INSUFFICIENT_BALANCE` (409, `params: {vaultId, availableCents}`), via `VaultBalanceService.assertNotOverdrawn(vaultId)` chamado **ao fim** de toda mutação que toca a caixinha. Como lê o pós-estado do razão, funciona igual para qualquer caminho de escrita |
+| Uma **caixinha** ficaria negativa | **Bloqueado** — `VAULT_INSUFFICIENT_BALANCE` (409, `params: {vaultId, shortfallCents}`), via `VaultBalanceService.assertNotOverdrawn(vaultId)` chamado **ao fim** de toda mutação que toca a caixinha. Como lê o pós-estado do razão, funciona igual para qualquer caminho de escrita |
 | **Não alocado** ficaria negativo | **Só exibido** (fatia vermelha + "R$ X a descoberto"). Bloquear acoplaria *todo* caminho de escrita do app à feature — despesa direta na conta, pagamento de fatura debitando ela, edição do `initialBalanceCents`. O app já exibe saldo de conta negativo em vez de proibir |
 
 Movimento PENDING não derruba o saldo corrente, então nunca é bloqueado na criação — é bloqueado **no settle**, pela mesma chamada.
@@ -240,7 +240,7 @@ A terceira linha é **obrigatória para a feature existir**: sem ela, quem já t
 
 #### ✅ CT-2 concluída — 05/08/2026 (branch `feat/ct-2-contrato-caixinhas`, commit `d0e3e1e`)
 
-Gate verde: `api:generate` gerou `lib/api/generated/vaults/` com `useListVaults`, `useListVaultEntries` e os 7 hooks de mutação + mocks MSW; `npm run build`, `npm test` **98/98** e `./mvnw compile` passaram. As 10 constantes estão em `ErrorCode` com o *porquê* de cada uma no javadoc, e as factories em `AppException` — `vaultInsufficientBalance(vaultId, availableCents)` e `vaultNotEmpty(balanceCents)` levam params para o cliente poder dizer *quanto* falta em vez de só recusar.
+Gate verde: `api:generate` gerou `lib/api/generated/vaults/` com `useListVaults`, `useListVaultEntries` e os 7 hooks de mutação + mocks MSW; `npm run build`, `npm test` **98/98** e `./mvnw compile` passaram. As 10 constantes estão em `ErrorCode` com o *porquê* de cada uma no javadoc, e as factories em `AppException` — `vaultInsufficientBalance(vaultId, shortfallCents)` e `vaultNotEmpty(balanceCents)` levam params para o cliente poder dizer *quanto* falta em vez de só recusar.
 
 **Decisões que a CT-2 fechou além da ficha — vinculantes para as fichas seguintes:**
 
@@ -286,7 +286,7 @@ Gate verde: `api:generate` gerou `lib/api/generated/vaults/` com `useListVaults`
 
 **Duas lacunas que a FE-8 revelou e que a FE-9 herda** (estavam no plano, não na execução):
 
-1. **Os códigos `VAULT_*` não têm chave em `error.*`.** O namespace `error` é da FE-9 pela tabela 5.4, então a FE-8 corretamente não o tocou. Até lá, todo erro de caixinha cai no fallback genérico de `translateApiError` — seguro, mas mudo: "nome já usado" e "saldo insuficiente" saem como "algo deu errado". **A FE-9 é obrigada a preencher as 10 chaves**, e `VAULT_INSUFFICIENT_BALANCE` e `VAULT_NOT_EMPTY` devem usar os `params` (`availableCents`, `balanceCents`) que a CT-2 colocou neles — o valor existe justamente para a mensagem poder dizer *quanto*.
+1. **Os códigos `VAULT_*` não têm chave em `error.*`.** O namespace `error` é da FE-9 pela tabela 5.4, então a FE-8 corretamente não o tocou. Até lá, todo erro de caixinha cai no fallback genérico de `translateApiError` — seguro, mas mudo: "nome já usado" e "saldo insuficiente" saem como "algo deu errado". **A FE-9 é obrigada a preencher as 10 chaves**, e `VAULT_INSUFFICIENT_BALANCE` e `VAULT_NOT_EMPTY` devem usar os `params` (`shortfallCents`, `balanceCents`) que a CT-2 colocou neles — o valor existe justamente para a mensagem poder dizer *quanto*.
 2. **`VaultYieldDialog` não existe.** A seção 4 deste plano listava o arquivo sob `features/vaults/`, mas os passos da ficha FE-8 não o incluíam — inconsistência minha, não da execução. **Resolvido: o `VaultYieldDialog` passa a ser da FE-9**, que o cria em `features/vaults/`. Não há colisão porque a FE-8 está fechada e mergeada antes da E11 começar; a regra da tabela 5.4 vale para frentes *simultâneas*.
 
 Decisões que a FE-8 tomou sozinha e ficam valendo: o extrato usa o `Dialog` existente (não há primitivo `Sheet` em `components/ui/` e criar um não era da alçada da ficha); as strings da ação "Caixinhas" na `AccountsPage` vivem em `vaults.accountAction` em vez de `accounts.*`, para não invadir namespace alheio; `contributionPillarOptions` foi reaproveitado de `accountOptions.ts` em vez de duplicado; e o campo de prazo só aparece quando há valor-alvo, evitando na origem o estado que o servidor rejeitaria.
@@ -455,7 +455,7 @@ Cada passo prova uma decisão da seção 4:
 5. Aporte sem `vaultId` → **`VAULT_REQUIRED`**.
 6. Aporte na "Viagem" com pilar `FINANCIAL_FREEDOM` → **`VAULT_PILLAR_CONFLICT`**. Sem pilar → aceito, e o dashboard mostra **GOALS +500** — a prova de que o pilar migrou para a caixinha.
 7. Meta da "Viagem": 4.500/12.000 = 37,5%, "faltam R$ 625,00/mês" (§4.6).
-8. Resgate de R$ 8.000 da "Reserva" (saldo 6.000) → **`VAULT_INSUFFICIENT_BALANCE`** com `availableCents: 600000`.
+8. Resgate de R$ 8.000 da "Reserva" (saldo 6.000) → **`VAULT_INSUFFICIENT_BALANCE`** com `shortfallCents: 200000` (faltam R$ 2.000 para o resgate caber).
 9. Aporte PENDING de R$ 1.000: `balanceCents` não muda, `projectedBalanceCents` sobe (§4.2).
 10. Rendimento de R$ 100,01 com bases 6.000/4.500 → R$ 57,15 + R$ 42,86 = **exatamente 10001**. Saldo da conta sobe; **tile "receitas do mês" não muda** (§4.5).
 11. `DELETE` da transação do rendimento → as duas linhas do razão somem sozinhas (cascade, §4.1).
