@@ -318,6 +318,18 @@ Gate: `./mvnw verify` **334 testes** (311 anteriores intactos + 22 da ficha + 1 
 - **Objetivo**: lançar o rendimento do mês rateado entre as caixinhas.
 - **Dono de**: `domain/service/YieldDistributor`, `application/vault/{VaultYieldService, VaultYieldCategoryProvider}`, `api/vault/VaultYield*`, `application/dashboard/DashboardAggregateRepository`.
 - **Não toca `PillarAllocationCalculator`** — rendimento é INCOME e nunca chega lá.
+
+#### ✅ BE-11 concluída — 06/08/2026 (merge `7b8d967`, 5 commits incrementais)
+
+Gate: `./mvnw verify` **353 testes** (334 anteriores intactos + 19), conferido na `main` após o merge. `PillarAllocationCalculator` e `BalanceCalculator` com diff **vazio**, como a §7 exige.
+
+O `sumIncome` passou a juntar `Category` e filtrar `c.system = false`. O join é INNER, e isso é seguro porque `ck_transaction_category` obriga categoria em INCOME/EXPENSE — nenhuma receita cai fora por causa do join. O teste de regressão trava o comportamento inteiro: lançar rendimento sobe o saldo da conta e **não** move o tile "receitas do mês" nem os percentuais dos seis pilares.
+
+O `YieldDistributor` documenta no javadoc, em parágrafo próprio, por que a sobra vai para o maior resto e **não** para a última parte como no `InstallmentSplitter` — com um "não simplifique isto de volta" explícito. Era o risco de alguém uniformizar os dois algoritmos depois e quebrar a justiça do rateio.
+
+Cenário canônico coberto: bases 6.000/4.500 e rendimento de R$ 100,01 → R$ 57,15 e R$ 42,86, somando **exatamente** 10001. Mais os casos de nenhuma caixinha com saldo positivo (rateio vazio, o dinheiro fica no não alocado, nada é inventado) e o `DELETE /transactions/{id}` levando as duas linhas do razão por cascade.
+
+**Nota operacional**: a ficha caiu por limite de sessão **depois** de commitar os cinco passos, faltando só rodar o gate e reportar. A cadência de commit por arquivo funcionou — nada se perdeu, e a retomada foi verificar, não recodar.
 - **Passos**:
   1. `YieldDistributor` + teste exaustivo: soma exata, empates, base zero, caixinha com saldo negativo excluída.
   2. Categoria de sistema lazy, cópia estrutural de `StatementPaymentCategoryProvider`.
