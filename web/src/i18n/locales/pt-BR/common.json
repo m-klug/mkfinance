@@ -478,7 +478,20 @@
       "WITHDRAWAL": "Resgate",
       "YIELD": "Rendimento",
       "REALLOCATION": "Remanejo"
-    }
+    },
+    "yieldAction": "Lançar rendimento",
+    "yieldTitle": "Lançar rendimento",
+    "yieldSubtitle": "Entra como receita na conta e se reparte entre as caixinhas com saldo positivo, proporcional ao saldo de cada uma.",
+    "yieldAmount": "Valor do rendimento",
+    "yieldDate": "Data",
+    "yieldDescription": "Descrição",
+    "yieldDescriptionPlaceholder": "Rendimento de investimentos",
+    "yieldPreviewTitle": "Prévia do rateio",
+    "yieldPreviewHint": "O valor final aplicado vem do servidor ao confirmar — esta prévia pode variar por centavos de arredondamento.",
+    "yieldPreviewEmpty": "Nenhuma caixinha tem saldo positivo — o valor inteiro cairá no não alocado.",
+    "yieldPreviewUnallocated": "Não alocado",
+    "yieldConfirm": "Lançar rendimento",
+    "yieldCreated": "Rendimento lançado."
   },
   "error": {
     "UNKNOWN_ERROR": "Algo deu errado. Tente novamente.",
