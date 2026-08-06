@@ -392,6 +392,32 @@ class VaultContributionIntegrationTest extends AbstractTransactionIntegrationTes
         }
 
         @Test
+        @DisplayName("a contribution made before the account had vaults stays editable afterwards")
+        void contributionOlderThanTheFirstVaultStaysEditable() {
+            AccountResponse brokerage = createAccount("Corretora", AccountType.INVESTMENT, 0L);
+            // The aporte happens while the account still has no vaults — the pre-Caixinhas world,
+            // which is where every row already in production lives.
+            transfer(checking.id(), brokerage.id(), 40_000L, ContributionPillar.GOALS, null, null);
+            TransactionResponse incoming = legOn(brokerage.id());
+            VaultResponse vault = createVault(brokerage.id(), "Viagem", ContributionPillar.GOALS);
+
+            ResponseEntity<TransactionResponse> response = session.patch(
+                    path("/transfers/" + incoming.id()),
+                    new TransferUpdateRequest(null, 60_000L, DATE, "Aporte maior", null, null, null, null),
+                    TransactionResponse.class);
+
+            // Creating the first vault must not retroactively demand one from rows that predate it:
+            // "nada migra em produção" (§4.0) would be a dead letter if the first caixinha made every
+            // older aporte uneditable. The money simply stays in the unallocated slice, which is
+            // exactly what that slice is for (§4.3).
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody().vaultId()).isNull();
+            assertThat(response.getBody().contributionPillar()).isEqualTo(ContributionPillar.GOALS);
+            assertThat(balanceOfVault(brokerage.id(), vault.id())).isZero();
+            assertThat(composition(brokerage.id()).unallocatedCents()).isEqualTo(60_000L);
+        }
+
+        @Test
         @DisplayName("an explicit vaultId re-targets the addressed leg to another vault of the same account")
         void explicitVaultIdRetargets() {
             AccountResponse brokerage = createAccount("Corretora", AccountType.INVESTMENT, 0L);
