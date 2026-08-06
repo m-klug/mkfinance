@@ -28,14 +28,28 @@ import org.springframework.data.repository.query.Param;
  */
 public interface DashboardAggregateRepository extends Repository<Transaction, UUID> {
 
-    /** The month's income (INCOME entries only — transfers are type TRANSFER and never counted, R4). */
+    /**
+     * The month's income (INCOME entries only — transfers are type TRANSFER and never counted, R4).
+     *
+     * <p>Joins {@code Category} and excludes {@code c.system = true} (BE-11, DESENVOLVIMENTO-CAIXINHAS.md
+     * §4.5): a distributed investment yield is booked as INCOME under the system "Rendimento de
+     * investimentos" category so the account balance and the extrato both reflect it, but the money
+     * was not earned this month in the sense R10 measures pillars against — it stays out of this sum,
+     * the same denominator {@code expenseTransactionsByCategory} already excludes system categories
+     * from on the expense side (the statement-payment category, R2). This is the one query in this
+     * class that doubles as both R10's denominator and the dashboard's "receitas do mês" tile
+     * ({@code DashboardSummaryResponse.incomeCents}) — excluding system categories here keeps both
+     * readings of "income" the same single definition, so they can never quietly disagree.
+     */
     @Query(
             """
             select coalesce(sum(t.amountCents), 0)
-            from Transaction t
-            where t.workspaceId = :workspaceId
+            from Transaction t, Category c
+            where t.categoryId = c.id
+              and t.workspaceId = :workspaceId
               and t.type = br.com.mkfinance.domain.model.TransactionType.INCOME
               and t.status = br.com.mkfinance.domain.model.TransactionStatus.SETTLED
+              and c.system = false
               and t.date between :from and :to
             """)
     long sumIncome(@Param("workspaceId") UUID workspaceId, @Param("from") LocalDate from, @Param("to") LocalDate to);
