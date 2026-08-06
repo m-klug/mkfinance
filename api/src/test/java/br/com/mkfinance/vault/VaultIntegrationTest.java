@@ -335,8 +335,16 @@ class VaultIntegrationTest extends AbstractVaultIntegrationTest {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> manualContribution(
                             account.id(), reserva.id(), TransferDirection.OUT, 800_000L, TransactionStatus.SETTLED))
                     .isInstanceOf(br.com.mkfinance.domain.exception.AppException.class)
-                    .satisfies(ex -> assertThat(((br.com.mkfinance.domain.exception.AppException) ex).getCode())
-                            .isEqualTo("VAULT_INSUFFICIENT_BALANCE"));
+                    .satisfies(ex -> {
+                        br.com.mkfinance.domain.exception.AppException app =
+                                (br.com.mkfinance.domain.exception.AppException) ex;
+                        assertThat(app.getCode()).isEqualTo("VAULT_INSUFFICIENT_BALANCE");
+                        // 8.000 tirados de 6.000 faltam 2.000 — positivo, e a diferença, não o saldo
+                        // que sobrou (que seria negativo e tornaria a mensagem do cliente absurda).
+                        // O cliente conhece o valor que enviou, então daqui ele deriva tanto
+                        // "faltam R$ 2.000" quanto "só há R$ 6.000 disponíveis".
+                        assertThat(app.getParams()).containsEntry("shortfallCents", 200_000L);
+                    });
 
             VaultResponse refreshed = session.get(
                             path("/accounts/" + account.id() + "/vaults"), VaultCompositionResponse.class)

@@ -202,14 +202,16 @@ public class AppException extends RuntimeException {
     }
 
     /**
-     * @param availableCents what the vault actually holds, so the client can say how much short the
-     *     movement is instead of just refusing it
+     * @param shortfallCents how much the movement exceeded the vault, always positive — so the
+     *     client can say how much short it is instead of just refusing it. The shortfall, and not
+     *     the available balance, because the guard runs after the write and no longer knows the
+     *     pre-write balance; the client knows the amount it sent, so both readings follow from this.
      */
-    public static AppException vaultInsufficientBalance(UUID vaultId, long availableCents) {
+    public static AppException vaultInsufficientBalance(UUID vaultId, long shortfallCents) {
         return of(
                 ErrorCode.VAULT_INSUFFICIENT_BALANCE,
                 HttpStatus.CONFLICT,
-                Map.of("vaultId", vaultId, "availableCents", availableCents));
+                Map.of("vaultId", vaultId, "shortfallCents", shortfallCents));
     }
 
     public static AppException vaultNameDuplicate(String name) {
