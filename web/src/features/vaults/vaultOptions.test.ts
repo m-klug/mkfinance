@@ -16,6 +16,7 @@ import {
   selectValueToVaultId,
   vaultBarSegments,
   vaultSelectOptions,
+  yieldPreviewShares,
 } from "@/features/vaults/vaultOptions";
 
 // Minimal fake t(): returns the key, or "key|{...opts}" when interpolation
@@ -200,5 +201,34 @@ describe("goalMonthlyLabel", () => {
     expect(
       goalMonthlyLabel(fakeT, { status: VaultGoalStatus.IN_PROGRESS, monthlyNeededCents: 62500 }),
     ).toBe(`vaults.goal.monthlyNeeded|${JSON.stringify({ amount: formatCents(62500) })}`);
+  });
+});
+
+// FE-9/BE-11 §4.5 — the dialog's local mirror of YieldDistributor, for preview only.
+describe("yieldPreviewShares", () => {
+  it("splits pro-rata by settled balance, largest remainder taking the leftover cent (canonical 100,01 scenario)", () => {
+    const shares = yieldPreviewShares([reserveVault, tripVault], 10001);
+    // Bases 600.000/400.000 → exact 6.000,60 / 4.000,40 → floors 6000/4000,
+    // remainder 1 to distribute goes to the larger fractional remainder (Reserva's .60).
+    expect(shares).toEqual([
+      { vaultId: "vault-reserve", name: "Reserva", cents: 6001 },
+      { vaultId: "vault-trip", name: "Viagem 2027", cents: 4000 },
+    ]);
+    expect(shares.reduce((sum, share) => sum + share.cents, 0)).toBe(10001);
+  });
+
+  it("excludes archived vaults and vaults with a zero or negative balance", () => {
+    const negativeVault: Vault = { ...tripVault, id: "vault-negative", balanceCents: -100 };
+    const zeroVault: Vault = { ...tripVault, id: "vault-zero", balanceCents: 0 };
+    const shares = yieldPreviewShares(
+      [reserveVault, archivedVault, negativeVault, zeroVault],
+      1000,
+    );
+    expect(shares).toEqual([{ vaultId: "vault-reserve", name: "Reserva", cents: 1000 }]);
+  });
+
+  it("returns no shares when there is nothing with a positive balance to divide by", () => {
+    expect(yieldPreviewShares([archivedVault], 1000)).toEqual([]);
+    expect(yieldPreviewShares([reserveVault], 0)).toEqual([]);
   });
 });

@@ -116,6 +116,53 @@ export function entryAmountClass(amountCents: number): string {
   return amountCents < 0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-400";
 }
 
+export interface VaultYieldPreviewShare {
+  vaultId: string;
+  name: string;
+  cents: number;
+}
+
+/**
+ * Client-side mirror of `YieldDistributor` (BE-11, §4.5), for VaultYieldDialog's preview only — the
+ * response's `VaultYield.shares` is what the server actually applies, and the dialog says so. Same
+ * pro-rata + largest-remainder (Hamilton) rule: floor each active vault's proportional share of
+ * `amountCents` from its settled balance, then hand the leftover cents one at a time to the largest
+ * fractional remainder — ties broken by balance desc, then name (case-insensitive), then id, the
+ * same order YieldDistributor's javadoc documents. A vault with a zero or negative balance never
+ * takes part (§4.5), and an empty base (nothing to divide by) returns no shares at all rather than
+ * inventing an allocation — the whole amount would land in the unallocated slice, same as the server.
+ */
+export function yieldPreviewShares(vaults: Vault[], amountCents: number): VaultYieldPreviewShare[] {
+  const bases = activeVaults(vaults).filter((vault) => vault.balanceCents > 0);
+  const totalBase = bases.reduce((sum, vault) => sum + vault.balanceCents, 0);
+  if (amountCents <= 0 || totalBase <= 0) return [];
+
+  const entries = bases.map((vault) => {
+    const exact = (amountCents * vault.balanceCents) / totalBase;
+    const cents = Math.floor(exact);
+    return { vault, cents, remainder: exact - cents };
+  });
+
+  const distributed = entries.reduce((sum, entry) => sum + entry.cents, 0);
+  const leftover = amountCents - distributed;
+
+  const byRemainder = [...entries].sort((a, b) => {
+    if (b.remainder !== a.remainder) return b.remainder - a.remainder;
+    if (b.vault.balanceCents !== a.vault.balanceCents) return b.vault.balanceCents - a.vault.balanceCents;
+    const nameCompare = a.vault.name.localeCompare(b.vault.name, "pt-BR", { sensitivity: "base" });
+    return nameCompare !== 0 ? nameCompare : a.vault.id.localeCompare(b.vault.id);
+  });
+  for (let i = 0; i < leftover; i += 1) {
+    byRemainder[i].cents += 1;
+  }
+
+  return entries.map((entry) => ({
+    vaultId: entry.vault.id,
+    name: entry.vault.name,
+    cents: entry.cents,
+  }));
+}
+
 /**
  * The goal bar renders only what §4.6 sends: REACHED and "no deadline" are
  * their own copy, and monthlyNeededCents is never null just because the
