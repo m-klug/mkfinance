@@ -15,6 +15,7 @@ import {
   isUnallocatedOverdrawn,
   selectValueToVaultId,
   vaultBarSegments,
+  vaultCompositionQueryFilter,
   vaultSelectOptions,
   yieldPreviewShares,
 } from "@/features/vaults/vaultOptions";
@@ -230,5 +231,29 @@ describe("yieldPreviewShares", () => {
   it("returns no shares when there is nothing with a positive balance to divide by", () => {
     expect(yieldPreviewShares([archivedVault], 1000)).toEqual([]);
     expect(yieldPreviewShares([reserveVault], 0)).toEqual([]);
+  });
+});
+
+describe("vaultCompositionQueryFilter", () => {
+  const filter = vaultCompositionQueryFilter("ws-1");
+
+  it("matches the composition query of any account in the workspace", () => {
+    expect(filter.predicate({ queryKey: ["/workspaces/ws-1/accounts/acc-1/vaults"] })).toBe(true);
+    expect(filter.predicate({ queryKey: ["/workspaces/ws-1/accounts/acc-2/vaults"] })).toBe(true);
+    // The generated key carries params as a second element when the caller passes any.
+    expect(
+      filter.predicate({ queryKey: ["/workspaces/ws-1/accounts/acc-1/vaults", { includeArchived: true }] }),
+    ).toBe(true);
+  });
+
+  it("leaves another workspace's composition alone", () => {
+    expect(filter.predicate({ queryKey: ["/workspaces/ws-2/accounts/acc-1/vaults"] })).toBe(false);
+  });
+
+  it("does not match neighbouring account queries that merely share the prefix", () => {
+    // The endsWith check is what keeps this from invalidating half the accounts API.
+    expect(filter.predicate({ queryKey: ["/workspaces/ws-1/accounts"] })).toBe(false);
+    expect(filter.predicate({ queryKey: ["/workspaces/ws-1/accounts/acc-1/vaults/v-1/entries"] })).toBe(false);
+    expect(filter.predicate({ queryKey: [["not", "a", "string"]] })).toBe(false);
   });
 });

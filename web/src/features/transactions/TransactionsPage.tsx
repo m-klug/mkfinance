@@ -49,6 +49,7 @@ import {
   signedAmountCents,
   transactionTypeOptions,
 } from "@/features/transactions/transactionUtils";
+import { vaultCompositionQueryFilter } from "@/features/vaults/vaultOptions";
 
 const PAGE_SIZE = 20;
 
@@ -150,6 +151,9 @@ export default function TransactionsPage() {
     if (!workspaceId) return;
     void queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey(workspaceId) });
     void queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey(workspaceId) });
+    // A caixinha muda de saldo com o mesmo lançamento que muda a conta — sem isto uma
+    // composição aberta segue mostrando o número de antes até o staleTime vencer.
+    void queryClient.invalidateQueries(vaultCompositionQueryFilter(workspaceId));
   }
 
   // R5: settling a pending entry is a single click, no confirmation step.

@@ -56,6 +56,7 @@ import {
 } from "@/features/transactions/transactionUtils";
 import { TagsInput } from "@/features/transactions/TagsInput";
 import { INSTALLMENT_COUNTS, splitInstallments } from "@/features/cards/cardOptions";
+import { vaultCompositionQueryFilter } from "@/features/vaults/vaultOptions";
 
 // The things a user can register from anywhere in the app. A contribution
 // (aporte, R9) is a transfer into a savings/investment account, so it shares
@@ -266,6 +267,9 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     void queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey(workspaceId) });
     // Balances move with every write (R5).
     void queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey(workspaceId) });
+    // A caixinha muda de saldo com o mesmo lançamento que muda a conta — sem isto uma
+    // composição aberta segue mostrando o número de antes até o staleTime vencer.
+    void queryClient.invalidateQueries(vaultCompositionQueryFilter(workspaceId));
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
