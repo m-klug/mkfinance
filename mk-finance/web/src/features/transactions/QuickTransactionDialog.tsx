@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyField, SelectField, TextField } from "@/components/form/fields";
 import { formatCents } from "@/lib/format";
@@ -33,6 +34,7 @@ import {
   useCreateTransaction,
 } from "@/lib/api/generated/transactions/transactions";
 import { useCreateTransfer } from "@/lib/api/generated/transfers/transfers";
+import { useListVaults } from "@/lib/api/generated/vaults/vaults";
 import {
   CategoryType,
   ContributionPillar,
@@ -74,6 +76,8 @@ interface FormErrors {
   category?: string;
   accounts?: string;
   card?: string;
+  fromVault?: string;
+  toVault?: string;
 }
 
 export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionDialogProps) {
@@ -94,6 +98,11 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
   const [pending, setPending] = useState(false);
   // Null means "follow the destination account default" (R9).
   const [pillarOverride, setPillarOverride] = useState<ContributionPillar | null>(null);
+  // Which vault each leg names (§4.4) — required, not optional, once the
+  // corresponding account has any active vault; a brand-new transfer/aporte
+  // has no "leave it as is" escape hatch the way editing one does.
+  const [fromVaultId, setFromVaultId] = useState("");
+  const [toVaultId, setToVaultId] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
 
   const enabled = Boolean(workspaceId) && open;
@@ -154,9 +163,21 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     setInstallmentCount(1);
     setTags([]);
     setPillarOverride(null);
+    setFromVaultId("");
+    setToVaultId("");
     setPending(false);
     setErrors({});
   }, [open]);
+
+  // A vault belongs to the account it was created under — moving either leg
+  // to a different account invalidates whatever was selected before.
+  useEffect(() => {
+    setFromVaultId("");
+  }, [accountId]);
+
+  useEffect(() => {
+    setToVaultId("");
+  }, [toAccountId]);
 
   useEffect(() => {
     if (!open || accounts.length === 0) return;
@@ -185,6 +206,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     );
   }, [open, mode, accounts, contributionAccounts, accountId]);
 
+  const origin: Account | undefined = accounts.find((account) => account.id === accountId);
   const destination: Account | undefined = accounts.find((account) => account.id === toAccountId);
   // R9: a transfer into an INVESTMENT/SAVINGS account consumes a pillar. The
   // selector shows up automatically and comes pre-filled from the account.
@@ -193,6 +215,27 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     pillarOverride ??
     destination?.defaultContributionPillar ??
     ContributionPillar.FINANCIAL_FREEDOM;
+
+  // §4.4: once an account has any active vault, every leg touching it must
+  // name one — the origin for a withdrawal, the destination for a
+  // contribution, and with it the pillar the vault (not the account) decides.
+  const originHasVault = Boolean(origin?.hasVaults);
+  const destinationHasVault = Boolean(destination?.hasVaults);
+  const { data: originVaultsData } = useListVaults(workspaceId ?? "", accountId, undefined, {
+    query: { enabled: enabled && isTransferLike && originHasVault },
+  });
+  const { data: destinationVaultsData } = useListVaults(workspaceId ?? "", toAccountId, undefined, {
+    query: { enabled: enabled && isTransferLike && destinationHasVault },
+  });
+  const originVaults = useMemo(
+    () => (originVaultsData?.vaults ?? []).filter((vault) => !vault.archived),
+    [originVaultsData],
+  );
+  const destinationVaults = useMemo(
+    () => (destinationVaultsData?.vaults ?? []).filter((vault) => !vault.archived),
+    [destinationVaultsData],
+  );
+  const selectedToVault = destinationVaults.find((vault) => vault.id === toVaultId);
 
   const createTransaction = useCreateTransaction();
   const createTransfer = useCreateTransfer();
@@ -210,6 +253,8 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     } else if (isTransferLike) {
       if (!accountId || !toAccountId) next.accounts = t("validation.transferAccountsRequired");
       else if (accountId === toAccountId) next.accounts = t("validation.transferAccountsDistinct");
+      if (originHasVault && !fromVaultId) next.fromVault = t("validation.vaultRequired");
+      if (destinationHasVault && !toVaultId) next.toVault = t("validation.vaultRequired");
     } else if (!accountId) {
       next.accounts = t("validation.required");
     }
@@ -273,7 +318,11 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
         amountCents,
         date,
         description: description.trim(),
-        contributionPillar: isContribution ? contributionPillar : null,
+        // Once the destination has a vault, the vault's own pillar decides
+        // (§4.4) — sending one here would only risk VAULT_PILLAR_CONFLICT.
+        contributionPillar: isContribution && !destinationHasVault ? contributionPillar : null,
+        fromVaultId: originHasVault ? fromVaultId || null : null,
+        toVaultId: destinationHasVault ? toVaultId || null : null,
       };
       createTransfer.mutate({ workspaceId, data }, { onSuccess, onError });
       return;
@@ -372,6 +421,33 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
             </div>
           )}
 
+          {isTransferLike && (originHasVault || destinationHasVault) && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {originHasVault && (
+                <SelectField
+                  id="quick-from-vault"
+                  label={t("transactions.fromVault")}
+                  placeholder={t("transactions.vaultPlaceholder")}
+                  options={originVaults.map((vault) => ({ value: vault.id, label: vault.name }))}
+                  value={fromVaultId}
+                  error={errors.fromVault}
+                  onChange={(event) => setFromVaultId(event.target.value)}
+                />
+              )}
+              {destinationHasVault && (
+                <SelectField
+                  id="quick-to-vault"
+                  label={t("transactions.toVault")}
+                  placeholder={t("transactions.vaultPlaceholder")}
+                  options={destinationVaults.map((vault) => ({ value: vault.id, label: vault.name }))}
+                  value={toVaultId}
+                  error={errors.toVault}
+                  onChange={(event) => setToVaultId(event.target.value)}
+                />
+              )}
+            </div>
+          )}
+
           {isCardMode && (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -430,16 +506,35 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
           )}
 
           {isTransferLike && isContribution && (
-            <SelectField
-              id="quick-contribution-pillar"
-              label={t("transactions.contributionPillar")}
-              hint={t("transactions.contributionPillarHint")}
-              options={contributionPillarOptions(t)}
-              value={contributionPillar}
-              onChange={(event) =>
-                setPillarOverride(event.target.value as ContributionPillar)
-              }
-            />
+            destinationHasVault ? (
+              // §4.4: with a vault, the pillar is the vault's to decide, not
+              // an editable field — it stops being a choice the moment a
+              // vault is picked above.
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="quick-contribution-pillar-derived">
+                  {t("transactions.contributionPillar")}
+                </Label>
+                <p id="quick-contribution-pillar-derived" className="text-sm">
+                  {selectedToVault
+                    ? t(`pillar.${selectedToVault.contributionPillar}`)
+                    : t("transactions.contributionPillarPendingVault")}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t("transactions.contributionPillarFromVaultHint")}
+                </p>
+              </div>
+            ) : (
+              <SelectField
+                id="quick-contribution-pillar"
+                label={t("transactions.contributionPillar")}
+                hint={t("transactions.contributionPillarHint")}
+                options={contributionPillarOptions(t)}
+                value={contributionPillar}
+                onChange={(event) =>
+                  setPillarOverride(event.target.value as ContributionPillar)
+                }
+              />
+            )
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">

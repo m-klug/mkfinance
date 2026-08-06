@@ -18,7 +18,8 @@
     "amountPositive": "Informe um valor maior que zero.",
     "transferAccountsRequired": "Selecione a conta de origem e a de destino.",
     "transferAccountsDistinct": "A conta de destino deve ser diferente da de origem.",
-    "invalid": "Valor inválido."
+    "invalid": "Valor inválido.",
+    "vaultRequired": "Selecione uma caixinha."
   },
   "accountType": {
     "CHECKING": "Conta corrente",
@@ -125,6 +126,13 @@
     "categoryPlaceholder": "Selecione uma categoria",
     "contributionPillar": "Pilar do aporte",
     "contributionPillarHint": "Pré-preenchido com o pilar padrão da conta de destino.",
+    "contributionPillarFromVaultHint": "O pilar vem da caixinha escolhida — para trocar, mude a caixinha.",
+    "contributionPillarPendingVault": "Selecione uma caixinha para ver o pilar.",
+    "fromVault": "Caixinha de origem",
+    "toVault": "Caixinha de destino",
+    "vault": "Caixinha",
+    "vaultPlaceholder": "Selecione uma caixinha",
+    "vaultKeepHint": "Deixe em branco para manter a caixinha atual (ou nenhuma).",
     "type": "Tipo",
     "status": "Situação",
     "schedulePending": "Agendar como pendente",
@@ -477,7 +485,20 @@
       "WITHDRAWAL": "Resgate",
       "YIELD": "Rendimento",
       "REALLOCATION": "Remanejo"
-    }
+    },
+    "yieldAction": "Lançar rendimento",
+    "yieldTitle": "Lançar rendimento",
+    "yieldSubtitle": "Entra como receita na conta e se reparte entre as caixinhas com saldo positivo, proporcional ao saldo de cada uma.",
+    "yieldAmount": "Valor do rendimento",
+    "yieldDate": "Data",
+    "yieldDescription": "Descrição",
+    "yieldDescriptionPlaceholder": "Rendimento de investimentos",
+    "yieldPreviewTitle": "Prévia do rateio",
+    "yieldPreviewHint": "O valor final aplicado vem do servidor ao confirmar — esta prévia pode variar por centavos de arredondamento.",
+    "yieldPreviewEmpty": "Nenhuma caixinha tem saldo positivo — o valor inteiro cairá no não alocado.",
+    "yieldPreviewUnallocated": "Não alocado",
+    "yieldConfirm": "Lançar rendimento",
+    "yieldCreated": "Rendimento lançado."
   },
   "error": {
     "UNKNOWN_ERROR": "Algo deu errado. Tente novamente.",
@@ -503,6 +524,16 @@
     "PILLAR_TARGETS_MUST_SUM_100": "A soma dos seis pilares precisa ser 100%.",
     "RECURRENCE_NOT_FOUND": "Esta recorrência não foi encontrada.",
     "RECURRENCE_OCCURRENCE_NOT_FOUND": "Essa data não corresponde a uma ocorrência desta série.",
-    "TAG_NAME_DUPLICATE": "Já existe uma tag com esse nome."
+    "TAG_NAME_DUPLICATE": "Já existe uma tag com esse nome.",
+    "VAULT_NOT_FOUND": "Esta caixinha não foi encontrada.",
+    "VAULT_REQUIRED": "Selecione uma caixinha para este lançamento.",
+    "VAULT_PILLAR_CONFLICT": "O pilar informado não é o desta caixinha — o pilar de quem decide é o da caixinha.",
+    "VAULT_ACCOUNT_MISMATCH": "Esta caixinha pertence a outra conta.",
+    "VAULT_INSUFFICIENT_BALANCE": "Saldo insuficiente na caixinha: faltam {{shortfallAmount}}.",
+    "VAULT_NAME_DUPLICATE": "Já existe uma caixinha com esse nome nesta conta.",
+    "VAULT_NOT_EMPTY": "Esta caixinha ainda tem {{balanceAmount}} — esvazie antes de arquivar.",
+    "VAULT_HAS_ENTRIES": "Esta caixinha tem lançamentos e não pode ser excluída — arquive em vez de excluir.",
+    "VAULT_ARCHIVED": "Esta caixinha está arquivada e não aceita novos lançamentos.",
+    "VAULT_REALLOCATION_NOT_FOUND": "Este remanejo não foi encontrado."
   }
 }

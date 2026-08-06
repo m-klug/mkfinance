@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, Pencil, Trash2 } from "lucide-react";
 
@@ -31,6 +31,7 @@ import {
   useListTransactions,
   useSettleTransaction,
 } from "@/lib/api/generated/transactions/transactions";
+import { getListVaultsQueryOptions } from "@/lib/api/generated/vaults/vaults";
 import {
   TransactionStatus,
   TransactionType,
@@ -95,6 +96,30 @@ export default function TransactionsPage() {
 
   const accounts = useMemo(() => accountsData ?? [], [accountsData]);
   const categories = useMemo(() => categoriesData ?? [], [categoriesData]);
+
+  // §4.4 badge (Transaction.vaultId): one composition request per account
+  // that actually has vaults, batched — most accounts have none, so this is
+  // usually zero requests. Only the name is needed here, VaultsPage owns the
+  // full composition view.
+  const vaultedAccountIds = useMemo(
+    () => accounts.filter((account) => account.hasVaults).map((account) => account.id),
+    [accounts],
+  );
+  const vaultCompositionQueries = useQueries({
+    queries: vaultedAccountIds.map((vaultedAccountId) => ({
+      ...getListVaultsQueryOptions(workspaceId ?? "", vaultedAccountId),
+      enabled,
+    })),
+  });
+  const vaultNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const query of vaultCompositionQueries) {
+      for (const vault of query.data?.vaults ?? []) {
+        map.set(vault.id, vault.name);
+      }
+    }
+    return map;
+  }, [vaultCompositionQueries]);
 
   const params: ListTransactionsParams = {
     from: filters.from || undefined,
@@ -274,6 +299,13 @@ export default function TransactionsPage() {
                     <TableCell>{formatDate(transaction.date)}</TableCell>
                     <TableCell className="font-medium">
                       {transaction.description}
+                      {transaction.vaultId && vaultNameById.get(transaction.vaultId) && (
+                        <div className="mt-1">
+                          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-normal text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
+                            {vaultNameById.get(transaction.vaultId)}
+                          </span>
+                        </div>
+                      )}
                       {transaction.tags && transaction.tags.length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {transaction.tags.map((tag) => (

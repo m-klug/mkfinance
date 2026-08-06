@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { MoneyField, SelectField, TextField } from "@/components/form/fields";
 import { translateApiError } from "@/lib/errors";
 import { getListAccountsQueryKey } from "@/lib/api/generated/accounts/accounts";
@@ -20,6 +21,7 @@ import {
   useUpdateTransaction,
 } from "@/lib/api/generated/transactions/transactions";
 import { useUpdateTransfer } from "@/lib/api/generated/transfers/transfers";
+import { useListVaults } from "@/lib/api/generated/vaults/vaults";
 import {
   CategoryType,
   ContributionPillar,
@@ -59,6 +61,8 @@ interface FormState {
   note: string;
   status: TransactionStatus;
   contributionPillar: string;
+  /** This leg's own vault (§4.4), "" meaning none — never forced (see BE-10's fix). */
+  vaultId: string;
   tags: string[];
 }
 
@@ -73,6 +77,7 @@ function toFormState(transaction: Transaction): FormState {
     status: transaction.status,
     contributionPillar:
       transaction.contributionPillar ?? ContributionPillar.FINANCIAL_FREEDOM,
+    vaultId: transaction.vaultId ?? "",
     // Transaction.tags is optional in the generated type only so pre-Phase 2
     // clients keep type-checking — the server always sends it (empty when none).
     tags: transaction.tags?.map((tag) => tag.name) ?? [],
@@ -90,9 +95,12 @@ export function TransactionFormDialog({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(() => toFormState(transaction));
-  const [errors, setErrors] = useState<{ amount?: string; description?: string; category?: string }>(
-    {},
-  );
+  const [errors, setErrors] = useState<{
+    amount?: string;
+    description?: string;
+    category?: string;
+    vault?: string;
+  }>({});
 
   const isTransfer = transaction.type === TransactionType.TRANSFER;
 
@@ -122,6 +130,24 @@ export function TransactionFormDialog({
     transaction.transferDirection === TransferDirection.IN &&
     Boolean(selectedAccount && isContributionAccount(selectedAccount));
 
+  // §4.4: once this leg's account has an active vault, the leg names one —
+  // the withdrawal side just as much as the contribution side. Moving the
+  // leg to another account discards whatever vault it had (BE-10's update
+  // rule); leaving it on the same account never forces a pick (BE-10's
+  // review fix — an aporte booked before the account had any vault must stay
+  // editable without one).
+  const legHasVault = Boolean(selectedAccount?.hasVaults);
+  const legMoved = form.accountId !== transaction.accountId;
+  const { data: legVaultsData } = useListVaults(workspaceId, form.accountId, undefined, {
+    query: { enabled: open && isTransfer && legHasVault },
+  });
+  const legVaults = useMemo(
+    () => (legVaultsData?.vaults ?? []).filter((vault) => !vault.archived),
+    [legVaultsData],
+  );
+  const selectedVault = legVaults.find((vault) => vault.id === form.vaultId);
+  const pillarIsDerived = showPillar && legHasVault && Boolean(form.vaultId);
+
   function invalidateAfterWrite() {
     void queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey(workspaceId) });
     void queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey(workspaceId) });
@@ -129,10 +155,17 @@ export function TransactionFormDialog({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextErrors: { amount?: string; description?: string; category?: string } = {};
+    const nextErrors: { amount?: string; description?: string; category?: string; vault?: string } =
+      {};
     if (form.amountCents <= 0) nextErrors.amount = t("validation.amountPositive");
     if (!form.description.trim()) nextErrors.description = t("validation.required");
     if (!isTransfer && !form.categoryId) nextErrors.category = t("validation.required");
+    // The requirement only bites the leg actually being re-pointed — moved to
+    // another account, since a vault untouched by this edit simply carries
+    // forward, including having none (BE-10's review fix, §4.4).
+    if (isTransfer && legHasVault && legMoved && !form.vaultId) {
+      nextErrors.vault = t("validation.vaultRequired");
+    }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -155,9 +188,13 @@ export function TransactionFormDialog({
         description: form.description.trim(),
         note: form.note.trim() || null,
         status: form.status,
-        contributionPillar: showPillar
-          ? (form.contributionPillar as ContributionPillar)
-          : null,
+        // Once the vault decides the pillar (§4.4), sending one back here
+        // would only risk VAULT_PILLAR_CONFLICT for no reason.
+        contributionPillar:
+          showPillar && !pillarIsDerived ? (form.contributionPillar as ContributionPillar) : null,
+        // Symmetric to accountId: re-points this leg's own vault. "" means
+        // "carry the current one forward" (or none) — see legMoved above.
+        vaultId: form.vaultId || null,
       };
       updateTransferMutation.mutate(
         { workspaceId, transactionId: transaction.id, data },
@@ -232,7 +269,11 @@ export function TransactionFormDialog({
               label={isTransfer ? t("transactions.legAccount") : t("transactions.account")}
               options={accounts.map((account) => ({ value: account.id, label: account.name }))}
               value={form.accountId}
-              onChange={(event) => setForm({ ...form, accountId: event.target.value })}
+              // Moving the leg to another account discards whatever vault it
+              // had — the old one belongs to the old account (§4.4).
+              onChange={(event) =>
+                setForm({ ...form, accountId: event.target.value, vaultId: "" })
+              }
             />
             <TextField
               id="transaction-date"
@@ -242,17 +283,43 @@ export function TransactionFormDialog({
               onChange={(event) => setForm({ ...form, date: event.target.value })}
             />
           </div>
-          {showPillar && (
+          {isTransfer && legHasVault && (
             <SelectField
-              id="transaction-contribution-pillar"
-              label={t("transactions.contributionPillar")}
-              hint={t("transactions.contributionPillarHint")}
-              options={contributionPillarOptions(t)}
-              value={form.contributionPillar}
-              onChange={(event) =>
-                setForm({ ...form, contributionPillar: event.target.value })
-              }
+              id="transaction-vault"
+              label={t("transactions.vault")}
+              placeholder={t("transactions.vaultPlaceholder")}
+              hint={t("transactions.vaultKeepHint")}
+              options={legVaults.map((vault) => ({ value: vault.id, label: vault.name }))}
+              value={form.vaultId}
+              error={errors.vault}
+              onChange={(event) => setForm({ ...form, vaultId: event.target.value })}
             />
+          )}
+          {showPillar && (
+            pillarIsDerived ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="transaction-contribution-pillar-derived">
+                  {t("transactions.contributionPillar")}
+                </Label>
+                <p id="transaction-contribution-pillar-derived" className="text-sm">
+                  {selectedVault ? t(`pillar.${selectedVault.contributionPillar}`) : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t("transactions.contributionPillarFromVaultHint")}
+                </p>
+              </div>
+            ) : (
+              <SelectField
+                id="transaction-contribution-pillar"
+                label={t("transactions.contributionPillar")}
+                hint={t("transactions.contributionPillarHint")}
+                options={contributionPillarOptions(t)}
+                value={form.contributionPillar}
+                onChange={(event) =>
+                  setForm({ ...form, contributionPillar: event.target.value })
+                }
+              />
+            )
           )}
           <SelectField
             id="transaction-status"
