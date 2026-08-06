@@ -41,6 +41,7 @@ import {
   contributionPillarOptions,
   isContributionAccount,
 } from "@/features/accounts/accountOptions";
+import { vaultCompositionQueryFilter } from "@/features/vaults/vaultOptions";
 
 interface TransactionFormDialogProps {
   workspaceId: string;
@@ -151,6 +152,9 @@ export function TransactionFormDialog({
   function invalidateAfterWrite() {
     void queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey(workspaceId) });
     void queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey(workspaceId) });
+    // A caixinha muda de saldo com o mesmo lançamento que muda a conta — sem isto uma
+    // composição aberta segue mostrando o número de antes até o staleTime vencer.
+    void queryClient.invalidateQueries(vaultCompositionQueryFilter(workspaceId));
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

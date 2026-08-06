@@ -305,11 +305,11 @@ test("caixinhas: allocate existing balance, contribute by vault, dashboard credi
   await dialog.getByRole("button", { name: "Salvar" }).click();
   await expect(dialog).toBeHidden();
 
-  // The header's quick entry only invalidates the transactions/accounts caches
-  // (invalidateAfterWrite in QuickTransactionDialog), not the vaults composition
-  // query this page holds — a genuine 30s staleTime gap (main.tsx), same class of
-  // issue the canonical happy-path test above works around for the dashboard. A
-  // full reload bypasses the client-side cache instead of racing it.
+  // A composição já se atualiza sozinha: invalidateAfterWrite invalida a query de
+  // caixinhas junto com as de transação e conta (vaultCompositionQueryFilter). O
+  // reload aqui é redundância barata para o E2E não depender do timing do refetch —
+  // se a invalidação regredir, o teste unitário do filtro em vaultOptions.test.ts
+  // falha primeiro e diz exatamente o quê.
   await page.reload();
   await expect(page.getByRole("heading", { name: "Corretora", level: 1 })).toBeVisible();
 

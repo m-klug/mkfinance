@@ -542,6 +542,18 @@ Cada passo prova uma decisão da seção 4:
 
 ---
 
+### Achado da INT-3 resolvido na revisão — invalidação da composição
+
+A INT-3 registrou como "lacuna de UX pré-existente" que o lançamento rápido do cabeçalho não atualizava a composição de caixinhas aberta, deixando número velho por até 30s (o `staleTime`), e contornou isso no E2E com `page.reload()`.
+
+**A classificação estava errada e o contorno escondia o defeito.** A query de composição nasceu nesta fatia (FE-8) e a FE-9 ensinou justamente aquele diálogo a escrever em caixinha — ensinar um caminho de escrita a invalidar a query que ele afeta é parte do mesmo trabalho, não item de polimento futuro. Os **três** caminhos de escrita de `features/transactions/` tinham o mesmo buraco: lançamento rápido, edição no extrato e excluir/efetivar.
+
+Corrigido com `vaultCompositionQueryFilter(workspaceId)` em `features/vaults/vaultOptions.ts`, usado nos três. Ele precisa ser um `predicate` e não uma chave: a chave gerada pelo orval é **uma string única** (`/workspaces/{ws}/accounts/{id}/vaults`), então o casamento por prefixo do TanStack não a alcança a partir do workspace. É exatamente o tipo de coisa que falha em silêncio — a invalidação simplesmente não acha nada e ninguém percebe — então o filtro tem teste próprio cobrindo o que ele casa e, principalmente, o que ele **não** pode casar (outra workspace, `/accounts` sem sufixo, o extrato da caixinha).
+
+Front: **145 testes**.
+
+---
+
 ## 9. Fora do escopo desta fatia
 
 - **Rentabilidade na projeção da meta** — a projeção é linear. O simulador de renda fixa é Fase 3 e é ele que trará indexadores, IR regressivo e IOF.

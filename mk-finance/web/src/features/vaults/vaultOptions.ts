@@ -180,3 +180,22 @@ export function goalMonthlyLabel(
   }
   return t("vaults.goal.monthlyNeeded", { amount: formatCents(goal.monthlyNeededCents) });
 }
+
+/**
+ * Matches every mounted vault-composition query of a workspace, whatever account it is for.
+ *
+ * <p>The generated key is a single URL string ({@code /workspaces/{ws}/accounts/{id}/vaults}), so
+ * TanStack's usual "shorter key is a prefix" invalidation cannot reach it by workspace alone — hence
+ * the predicate. Every write that moves money has to use this: a contribution booked from the
+ * header's quick entry changes a vault's balance just as much as one booked from the vaults screen,
+ * and without it an open composition keeps showing pre-write numbers until the 30s staleTime lapses.
+ */
+export function vaultCompositionQueryFilter(workspaceId: string) {
+  const prefix = `/workspaces/${workspaceId}/accounts/`;
+  return {
+    predicate: (query: { queryKey: readonly unknown[] }) => {
+      const [key] = query.queryKey;
+      return typeof key === "string" && key.startsWith(prefix) && key.endsWith("/vaults");
+    },
+  };
+}
