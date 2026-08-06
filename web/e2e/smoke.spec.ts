@@ -220,3 +220,128 @@ test("phase 2: pillar targets, recurrence settle and tag filter", async ({ page 
   await page.getByRole("button", { name: /Remover tag mercado/ }).click();
   await expect(salaryRow).toHaveCount(1);
 });
+
+// INT-3 — the caixinhas surface end to end: create an investment account with a
+// pre-existing balance, create a vault with a goal, allocate that existing balance
+// through a reallocation (null -> vault, §4.7), contribute choosing the vault, confirm
+// the dashboard credits the vault's pillar (not the account's default one), then book
+// a yield and see it split into the vault. Same real stack, no MSW.
+test("caixinhas: allocate existing balance, contribute by vault, dashboard credit, yield split", async ({
+  page,
+}) => {
+  const email = uniqueEmail();
+
+  await page.goto("/register");
+  await page.locator("#register-name").fill("Vaults Tester");
+  await page.locator("#register-email").fill(email);
+  await page.locator("#register-password").fill("password123");
+  await page.getByRole("button", { name: "Criar conta", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
+
+  // --- A checking account (the aporte's origin) ---
+  await page.getByRole("link", { name: "Contas" }).click();
+  await page.getByRole("button", { name: "Nova conta" }).click();
+  let dialog = page.getByRole("dialog");
+  await page.locator("#account-name").fill("Conta Corrente");
+  await page.locator("#account-type").selectOption("CHECKING");
+  await fillMoney(page, "account-initial-balance", "2000000"); // R$ 20.000,00
+  await dialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByRole("cell", { name: "Conta Corrente", exact: true })).toBeVisible();
+
+  // --- An investment account that already has money in it (§4.7's "quem já tem
+  // R$ 50 mil na conta" scenario, scaled down) ---
+  await page.getByRole("button", { name: "Nova conta" }).click();
+  dialog = page.getByRole("dialog");
+  await page.locator("#account-name").fill("Corretora");
+  await page.locator("#account-type").selectOption("INVESTMENT");
+  await fillMoney(page, "account-initial-balance", "500000"); // R$ 5.000,00
+  await page.locator("#account-contribution-pillar").selectOption("FINANCIAL_FREEDOM");
+  await dialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByRole("cell", { name: "Corretora", exact: true })).toBeVisible();
+
+  // --- Open the account's vaults screen (the "Caixinhas de <conta>" row action) ---
+  await page.getByRole("link", { name: "Caixinhas de Corretora" }).click();
+  await expect(page.getByRole("heading", { name: "Corretora", level: 1 })).toBeVisible();
+  // No vault yet: the whole R$ 5.000,00 already sits in the unallocated slice.
+  await expect(page.getByText(/Não alocado/).first()).toBeVisible();
+  await expect(page.getByText(/5\.000,00/).first()).toBeVisible();
+
+  // --- Create a vault with a goal (GOALS pillar, distinct from the account's
+  // own FINANCIAL_FREEDOM default — the point of the whole scenario is proving
+  // the pillar comes from the vault, not the account) ---
+  await page.getByRole("button", { name: "Nova caixinha" }).click();
+  dialog = page.getByRole("dialog");
+  await page.locator("#vault-name").fill("Viagem");
+  await page.locator("#vault-pillar").selectOption("GOALS");
+  await fillMoney(page, "vault-target-amount", "1200000"); // R$ 12.000,00
+  await page.locator("#vault-target-date").fill("2027-12-31");
+  await dialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("Viagem")).toBeVisible();
+
+  // --- Allocate part of the pre-existing balance into the vault (null -> Viagem,
+  // §4.7's third row — the onboarding path for money that predates any vault) ---
+  await page.getByRole("button", { name: "Remanejar" }).click();
+  dialog = page.getByRole("dialog");
+  // "De" is left as "Não alocado" (the default, empty-string option) on purpose.
+  await dialog.locator("#reallocate-to").selectOption({ label: "Viagem" });
+  await fillMoney(page, "reallocate-amount", "300000"); // R$ 3.000,00
+  await dialog.getByRole("button", { name: "Remanejar", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  const viagemRow = page.locator("li").filter({ hasText: "Viagem" }).first();
+  await expect(viagemRow).toContainText("3.000,00");
+  // The account's own balance never moved — a reallocation is bookkeeping only.
+  await expect(page.getByText(/5\.000,00/).first()).toBeVisible();
+
+  // --- Contribute choosing the vault, from the header quick entry ---
+  await page.getByRole("button", { name: "Novo lançamento" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByRole("tab", { name: "Aporte" }).click();
+  await dialog.locator("#quick-account").selectOption({ label: "Conta Corrente" });
+  await dialog.locator("#quick-to-account").selectOption({ label: "Corretora" });
+  await dialog.locator("#quick-to-vault").selectOption({ label: "Viagem" });
+  await fillMoney(page, "quick-amount", "50000"); // R$ 500,00
+  await page.locator("#quick-description").fill("Aporte viagem");
+  await dialog.getByRole("button", { name: "Salvar" }).click();
+  await expect(dialog).toBeHidden();
+
+  // The header's quick entry only invalidates the transactions/accounts caches
+  // (invalidateAfterWrite in QuickTransactionDialog), not the vaults composition
+  // query this page holds — a genuine 30s staleTime gap (main.tsx), same class of
+  // issue the canonical happy-path test above works around for the dashboard. A
+  // full reload bypasses the client-side cache instead of racing it.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Corretora", level: 1 })).toBeVisible();
+
+  // The vault grew by exactly the contribution (3.000,00 + 500,00 = 3.500,00).
+  await expect(viagemRow).toContainText("3.500,00");
+
+  // --- The dashboard credits the vault's pillar (GOALS), not the account's own
+  // default (FINANCIAL_FREEDOM) — the whole point of the caixinhas feature ---
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
+  await expect(page.getByText("Alocação por pilar")).toBeVisible();
+  const goalsRow = page.locator("li").filter({ hasText: "Metas" }).first();
+  await expect(goalsRow).toContainText("500,00");
+  // FINANCIAL_FREEDOM (Liberdade Financeira) got nothing from this contribution —
+  // only the reallocation's account-level no-op and the vault's own pillar moved.
+  const freedomRow = page.locator("li").filter({ hasText: "Liberdade Financeira" }).first();
+  await expect(freedomRow).toContainText("R$ 0,00");
+
+  // --- Book a yield and see the split (§4.5): with a single vault holding all the
+  // money, it takes the whole yield ---
+  await page.getByRole("link", { name: "Contas" }).click();
+  await page.getByRole("link", { name: "Caixinhas de Corretora" }).click();
+  await page.getByRole("button", { name: "Lançar rendimento" }).click();
+  dialog = page.getByRole("dialog");
+  await fillMoney(page, "vault-yield-amount", "10000"); // R$ 100,00
+  await page.locator("#vault-yield-description").fill("Rendimento de agosto");
+  // The preview mirrors YieldDistributor locally, before the server confirms it.
+  await expect(dialog.getByText("Prévia do rateio")).toBeVisible();
+  await expect(dialog.getByText("Viagem")).toBeVisible();
+  await dialog.getByRole("button", { name: "Lançar rendimento", exact: true }).click();
+  await expect(dialog).toBeHidden();
+
+  // The vault absorbed the whole yield: 3.500,00 + 100,00 = 3.600,00.
+  await expect(viagemRow).toContainText("3.600,00");
+});
