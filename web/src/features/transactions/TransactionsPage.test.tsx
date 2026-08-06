@@ -21,6 +21,7 @@ import {
   transactionPage,
   urgentTag,
 } from "@/test/financeFixtures";
+import { reserveVault, tripVault, vaultReadHandlers } from "@/test/vaultFixtures";
 import {
   ContributionPillar,
   TransactionStatus,
@@ -356,5 +357,141 @@ describe("TransactionsPage", () => {
       expect(screen.getByText(settledExpense.description)).toBeInTheDocument();
       expect(screen.getByText(taggedExpense.description)).toBeInTheDocument();
     });
+  });
+});
+
+// BE-10/§4.4: editing a transfer leg on an account with vaults.
+describe("TransactionsPage → editing a transfer leg with vaults (§4.4)", () => {
+  const vaultedInvestment = { ...investmentAccount, hasVaults: true };
+
+  // The IN leg already links Viagem 2027 (GOALS) — matches contributionLeg's
+  // own pillar, so the round trip is consistent with the fixture.
+  const contributionLegWithVault: Transaction = {
+    ...contributionLeg,
+    accountId: vaultedInvestment.id,
+    vaultId: tripVault.id,
+  };
+
+  // A contribution booked before the account ever had a vault (§4.0's "nada
+  // migra em produção") — vaultId absent even though the account now has one.
+  const contributionLegNoVault: Transaction = {
+    ...contributionLeg,
+    id: "tx-transfer-in-legacy",
+    accountId: vaultedInvestment.id,
+    vaultId: null,
+  };
+
+  const checkingOutLeg: Transaction = {
+    id: "tx-transfer-out-checking",
+    accountId: checkingAccount.id,
+    categoryId: null,
+    type: TransactionType.TRANSFER,
+    amountCents: 100000,
+    date: "2026-07-10",
+    description: "Aporte mensal",
+    status: TransactionStatus.SETTLED,
+    transferPairId: contributionLegWithVault.id,
+    transferDirection: TransferDirection.OUT,
+    contributionPillar: null,
+  };
+
+  beforeEach(() => {
+    server.use(...vaultReadHandlers());
+  });
+
+  it("shows the leg's own vault, pre-filled, and derives the pillar from it instead of an editable selector", async () => {
+    server.use(
+      ...financeReadHandlers({
+        accounts: [checkingAccount, vaultedInvestment],
+        categories: defaultCategories,
+        transactions: [contributionLegWithVault],
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Editar Aporte mensal" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByLabelText("Caixinha")).toHaveValue(tripVault.id);
+    expect(within(dialog).queryByLabelText("Pilar do aporte")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Metas")).toBeInTheDocument();
+  });
+
+  it("does not force a vault on a leg that already has none, even though the account now has vaults", async () => {
+    const updates: TransferUpdateRequest[] = [];
+    server.use(
+      ...financeReadHandlers({
+        accounts: [checkingAccount, vaultedInvestment],
+        categories: defaultCategories,
+        transactions: [contributionLegNoVault],
+      }),
+      http.patch(
+        "*/workspaces/:workspaceId/transfers/:transactionId",
+        async ({ request }) => {
+          updates.push((await request.json()) as TransferUpdateRequest);
+          return HttpResponse.json(contributionLegNoVault);
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Editar Aporte mensal" }));
+    const dialog = await screen.findByRole("dialog");
+
+    // The account has vaults, so the field shows up — but starts empty, and
+    // the (legacy, editable) pillar selector is still offered, not derived.
+    expect(within(dialog).getByLabelText("Caixinha")).toHaveValue("");
+    expect(within(dialog).getByLabelText("Pilar do aporte")).toHaveValue(
+      ContributionPillar.GOALS,
+    );
+
+    await user.click(within(dialog).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(updates).toHaveLength(1));
+    expect(updates[0].vaultId ?? null).toBeNull();
+    // No validation error blocked the save.
+    expect(screen.queryByText("Selecione uma caixinha.")).not.toBeInTheDocument();
+  });
+
+  it("requires a vault once the leg is moved onto a different account that has vaults", async () => {
+    const updates: TransferUpdateRequest[] = [];
+    server.use(
+      ...financeReadHandlers({
+        accounts: [checkingAccount, vaultedInvestment],
+        categories: defaultCategories,
+        transactions: [checkingOutLeg],
+      }),
+      http.patch(
+        "*/workspaces/:workspaceId/transfers/:transactionId",
+        async ({ request }) => {
+          updates.push((await request.json()) as TransferUpdateRequest);
+          return HttpResponse.json(checkingOutLeg);
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Editar Aporte mensal" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByLabelText("Caixinha")).not.toBeInTheDocument();
+
+    await user.selectOptions(
+      within(dialog).getByLabelText("Conta desta perna"),
+      vaultedInvestment.id,
+    );
+    expect(await within(dialog).findByLabelText("Caixinha")).toHaveValue("");
+
+    await user.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(await within(dialog).findByText("Selecione uma caixinha.")).toBeInTheDocument();
+    expect(updates).toHaveLength(0);
+
+    await user.selectOptions(within(dialog).getByLabelText("Caixinha"), reserveVault.id);
+    await user.click(within(dialog).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(updates).toHaveLength(1));
+    expect(updates[0].vaultId).toBe(reserveVault.id);
   });
 });
