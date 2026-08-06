@@ -495,3 +495,48 @@ describe("TransactionsPage → editing a transfer leg with vaults (§4.4)", () =
     expect(updates[0].vaultId).toBe(reserveVault.id);
   });
 });
+
+// §4.4/CT-2: Transaction.vaultId badges the extrato row with the vault's name.
+describe("TransactionsPage → vault badge in the extrato", () => {
+  const vaultedInvestment = { ...investmentAccount, hasVaults: true };
+  const contributionLegWithVault: Transaction = {
+    ...contributionLeg,
+    accountId: vaultedInvestment.id,
+    vaultId: tripVault.id,
+  };
+
+  it("badges a leg linked to a vault with the vault's name, resolved from the account's composition", async () => {
+    server.use(
+      ...financeReadHandlers({
+        accounts: [checkingAccount, vaultedInvestment],
+        categories: defaultCategories,
+        transactions: [contributionLegWithVault],
+      }),
+      ...vaultReadHandlers(),
+    );
+    renderPage();
+
+    const row = (await screen.findByText(contributionLegWithVault.description)).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(await within(row).findByText(tripVault.name, {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+
+  it("shows no badge for a leg with no vault, even on an account that has them", async () => {
+    server.use(
+      ...financeReadHandlers({
+        accounts: [checkingAccount, vaultedInvestment],
+        categories: defaultCategories,
+        transactions: [{ ...contributionLegWithVault, vaultId: null }],
+      }),
+      ...vaultReadHandlers(),
+    );
+    renderPage();
+
+    const row = (await screen.findByText(contributionLegWithVault.description)).closest(
+      "tr",
+    ) as HTMLElement;
+    expect(within(row).queryByText(tripVault.name)).not.toBeInTheDocument();
+    expect(within(row).queryByText(reserveVault.name)).not.toBeInTheDocument();
+  });
+});
