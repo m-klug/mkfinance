@@ -1,5 +1,7 @@
 package br.com.mkfinance.application.transaction;
 
+import br.com.mkfinance.application.vault.VaultBalanceService;
+import br.com.mkfinance.application.vault.VaultLinkService;
 import br.com.mkfinance.domain.exception.AppException;
 import br.com.mkfinance.domain.model.Account;
 import br.com.mkfinance.domain.model.AccountType;
@@ -8,11 +10,19 @@ import br.com.mkfinance.domain.model.Transaction;
 import br.com.mkfinance.domain.model.TransactionStatus;
 import br.com.mkfinance.domain.model.TransactionType;
 import br.com.mkfinance.domain.model.TransferDirection;
+import br.com.mkfinance.domain.model.Vault;
+import br.com.mkfinance.domain.model.VaultEntry;
+import br.com.mkfinance.domain.model.VaultEntrySource;
 import br.com.mkfinance.infrastructure.persistence.AccountRepository;
 import br.com.mkfinance.infrastructure.persistence.TransactionRepository;
+import br.com.mkfinance.infrastructure.persistence.VaultEntryRepository;
+import br.com.mkfinance.infrastructure.persistence.VaultRepository;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +44,14 @@ import org.springframework.transaction.annotation.Transactional;
  * the next. It is stored on the IN leg only (DB check constraint), so summing it per pillar can
  * never count a single transfer twice.
  *
+ * <p><strong>Caixinhas (BE-10, DESENVOLVIMENTO-CAIXINHAS.md §4.4).</strong> Once an account has at
+ * least one non-archived vault, every transfer leg touching it must name one: the contribution leg
+ * because that is where the pillar now lives (the vault's, not the account's default anymore), and
+ * the withdrawal leg symmetrically, so a resgate can never drain money the composition never counted
+ * as allocated. An account with no vaults — or only archived ones — keeps working exactly as before
+ * BE-10; nothing here changes for it. The vault ledger itself is never written by this class —
+ * {@link #vaultLinkService} owns that (§4.4: "TransferService não ganha segunda responsabilidade").
+ *
  * <p>This service deliberately does not depend on {@code TransactionService}: the dependency runs
  * the other way, so there is no cycle.
  */
@@ -44,11 +62,20 @@ public class TransferService {
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
+    private final VaultRepository vaultRepository;
+    private final VaultEntryRepository vaultEntryRepository;
+    private final VaultLinkService vaultLinkService;
+    private final VaultBalanceService vaultBalanceService;
 
     /**
      * Creates both legs atomically and returns them. Transfers start SETTLED — the contract's
      * {@code TransferRequest} has no status field; a transfer can still be moved to PENDING later
      * through the transaction PATCH endpoint.
+     *
+     * <p>Caixinhas (§4.4): the source leg is inspected too, not just the destination — "resgate
+     * também exige caixinha". The ledger rows are only written once both legs exist ({@link #link}
+     * flushes them first): {@code vault_entry}'s FK needs a real {@code transaction_id} (armadilha 5,
+     * §7 — a three-step {@code saveAndFlush} dance, mirrored here one level up).
      */
     public TransferPair create(UUID workspaceId, TransferInput input) {
         if (input.fromAccountId() == null
@@ -58,7 +85,10 @@ public class TransferService {
         }
         Account source = TransactionLookup.ownedAccount(accountRepository, workspaceId, input.fromAccountId());
         Account destination = TransactionLookup.ownedAccount(accountRepository, workspaceId, input.toAccountId());
-        ContributionPillar pillar = resolveContributionPillar(destination, input.contributionPillar());
+        Vault sourceVault = resolveVault(workspaceId, source.getId(), input.fromVaultId());
+        Vault destinationVault = resolveVault(workspaceId, destination.getId(), input.toVaultId());
+        checkVaultRequirement(source.getId(), sourceVault);
+        ContributionPillar pillar = resolveContributionPillar(destination, destinationVault, input.contributionPillar());
 
         Transaction outgoing = leg(
                 workspaceId,
@@ -79,7 +109,16 @@ public class TransferService {
                 TransactionStatus.SETTLED,
                 pillar);
 
-        return link(outgoing, incoming);
+        TransferPair pair = link(outgoing, incoming);
+
+        if (sourceVault != null) {
+            vaultLinkService.link(workspaceId, sourceVault.getId(), outgoing.getId(), VaultEntrySource.WITHDRAWAL);
+        }
+        if (destinationVault != null) {
+            vaultLinkService.link(workspaceId, destinationVault.getId(), incoming.getId(), VaultEntrySource.CONTRIBUTION);
+        }
+
+        return pair;
     }
 
     /**
@@ -94,7 +133,18 @@ public class TransferService {
      * forward against whatever account the IN leg now points at: moving a contribution to a checking
      * account drops it, while moving it to another investment account keeps the pillar already
      * chosen (falling back to the new account's default only when there is none), so a deliberate
-     * choice is never silently overwritten by a destination's default.
+     * choice is never silently overwritten by a destination's default. This is always about the
+     * <em>incoming</em> leg, regardless of which leg the caller addressed — a pillar has never had
+     * meaning on the outgoing side.
+     *
+     * <p>Caixinhas (§4.4): {@code vaultId} is symmetric to {@code accountId} — it only ever re-points
+     * the <em>addressed</em> leg's own vault (contribution or withdrawal, whichever direction that
+     * leg is). Omitted, the leg's current link carries forward while it stays on the same account;
+     * once {@code accountId} moves it, the old link is discarded and the requirement is evaluated
+     * fresh against the new account, exactly like the pillar rule one level up already does. Once
+     * either side's account has an active vault, that side's link is re-validated on every edit that
+     * reaches it — the same "re-derive from the ledger's current truth" discipline
+     * {@code VaultBalanceService.assertNotOverdrawn} documents for the balance guard.
      *
      * <p>Loads the addressed leg itself (through {@code transactionRepository}, not
      * {@code TransactionService}) so the endpoint needs a single call and this service keeps its
@@ -113,12 +163,15 @@ public class TransferService {
             throw AppException.transactionNotFound();
         }
         Transaction sibling = requireSibling(leg);
+
+        boolean legMoved = false;
         if (input.accountId() != null && !input.accountId().equals(leg.getAccountId())) {
             Account account = TransactionLookup.ownedAccount(accountRepository, workspaceId, input.accountId());
             if (account.getId().equals(sibling.getAccountId())) {
                 throw AppException.insufficientTransferAccounts();
             }
             leg.setAccountId(account.getId());
+            legMoved = true;
         }
 
         for (Transaction side : List.of(leg, sibling)) {
@@ -133,35 +186,75 @@ public class TransferService {
 
         Transaction incoming = leg.getTransferDirection() == TransferDirection.IN ? leg : sibling;
         Transaction outgoing = incoming == leg ? sibling : leg;
+        boolean addressedIsIncoming = leg == incoming;
         Account destination = TransactionLookup.ownedAccount(accountRepository, workspaceId, incoming.getAccountId());
+        Account source = TransactionLookup.ownedAccount(accountRepository, workspaceId, outgoing.getAccountId());
+
+        Vault currentAddressedVault = currentVaultOf(workspaceId, leg.getId());
+        UUID targetVaultId = input.vaultId() != null
+                ? input.vaultId()
+                : (legMoved || currentAddressedVault == null ? null : currentAddressedVault.getId());
+        Account addressedAccount = addressedIsIncoming ? destination : source;
+        Vault addressedVault = resolveVault(workspaceId, addressedAccount.getId(), targetVaultId);
+
+        Vault destinationVault = addressedIsIncoming ? addressedVault : currentVaultOf(workspaceId, incoming.getId());
+        Vault sourceVault = addressedIsIncoming ? currentVaultOf(workspaceId, outgoing.getId()) : addressedVault;
+
         // An explicit pillar re-targets the contribution; omitting it carries the current one forward
-        // while the destination still accepts one (dropped, not rejected, on a plain account). Either
-        // way resolveContributionPillar has the final say, so the create/edit rule stays in one place.
+        // while the destination still accepts one (dropped, not rejected, on a plain account) and has
+        // no vault of its own to decide instead — either way resolveContributionPillar has the final
+        // say, so the create/edit rule stays in one place.
+        ContributionPillar legacyPillar = isContributionTarget(destination) ? incoming.getContributionPillar() : null;
         ContributionPillar requested = input.contributionPillar() != null
                 ? input.contributionPillar()
-                : (isContributionTarget(destination) ? incoming.getContributionPillar() : null);
+                : (destinationVault == null ? legacyPillar : null);
         outgoing.setContributionPillar(null);
-        incoming.setContributionPillar(resolveContributionPillar(destination, requested));
+        incoming.setContributionPillar(resolveContributionPillar(destination, destinationVault, requested));
+        if (!addressedIsIncoming) {
+            // resolveContributionPillar above only ever inspects the destination; the source's own
+            // vault requirement (§4.4's symmetric "resgate também exige caixinha") is checked here
+            // when it is the leg actually being edited.
+            checkVaultRequirement(source.getId(), sourceVault);
+        }
 
         transactionRepository.saveAll(List.of(outgoing, incoming));
+
+        VaultEntrySource addressedSource = addressedIsIncoming ? VaultEntrySource.CONTRIBUTION : VaultEntrySource.WITHDRAWAL;
+        vaultLinkService.relink(
+                workspaceId, leg.getId(), addressedVault != null ? addressedVault.getId() : null, addressedSource);
+
         return new TransferPair(outgoing, incoming);
     }
 
-    /** Settles both legs — a half-settled transfer would make one account's balance wrong. */
+    /**
+     * Settles both legs — a half-settled transfer would make one account's balance wrong.
+     *
+     * <p>Caixinhas (§4.4): a PENDING contribution never trips a vault's balance guard by itself (it
+     * has not moved {@code currentCents} yet), so the guard is asked here, once both legs are
+     * SETTLED — the same instant a vault can actually go negative for real.
+     */
     public Transaction settle(Transaction leg) {
         Transaction sibling = requireSibling(leg);
         leg.setStatus(TransactionStatus.SETTLED);
         sibling.setStatus(TransactionStatus.SETTLED);
         transactionRepository.saveAll(List.of(leg, sibling));
+        assertLinkedVaultsNotOverdrawn(leg.getWorkspaceId(), leg.getId(), sibling.getId());
         return leg;
     }
 
     /**
      * Deletes both legs. The two rows reference each other, so the mutual foreign key has to be
      * broken and flushed before either row can go.
+     *
+     * <p>Caixinhas (§7 armadilha 6): {@link VaultLinkService#unlink} is called <strong>before</strong>
+     * the transaction rows are deleted, not after — deleting first would leave a stale
+     * {@code VaultEntry} in this same transaction's persistence context even though the database's
+     * {@code ON DELETE CASCADE} already dropped the row underneath it.
      */
     public void delete(Transaction leg) {
         Transaction sibling = requireSibling(leg);
+        vaultLinkService.unlink(leg.getId());
+        vaultLinkService.unlink(sibling.getId());
         leg.setTransferPairId(null);
         sibling.setTransferPairId(null);
         transactionRepository.saveAllAndFlush(List.of(leg, sibling));
@@ -170,24 +263,121 @@ public class TransferService {
     }
 
     /**
-     * R9. Returns the pillar the destination account's contribution consumes, or null when the
-     * destination is not a contribution target at all.
+     * Batch lookup of each transaction's linked vault, if any (contract {@code Transaction.vaultId})
+     * — mirrors {@code TagService.tagsOf(Collection)}: one query for a whole page of the extrato
+     * instead of one per row. Only CONTRIBUTION/WITHDRAWAL legs ever resolve — {@code amount_cents IS
+     * NULL} is the mirror marker (V19) — so a YIELD transaction's id never comes back here, since it
+     * cannot collapse a 1-transaction-to-N-vaults split into a single {@code vaultId}.
      */
-    private ContributionPillar resolveContributionPillar(Account destination, ContributionPillar requested) {
+    @Transactional(readOnly = true)
+    public Map<UUID, UUID> vaultIdsOf(Collection<UUID> transactionIds) {
+        if (transactionIds.isEmpty()) {
+            return Map.of();
+        }
+        return vaultEntryRepository.findByTransactionIdInAndAmountCentsIsNull(transactionIds).stream()
+                .collect(Collectors.toMap(VaultEntry::getTransactionId, VaultEntry::getVaultId));
+    }
+
+    /**
+     * R9 + DESENVOLVIMENTO-CAIXINHAS.md §4.4. Returns the pillar the destination account's
+     * contribution consumes, or null when the destination is not a contribution target at all.
+     *
+     * <p>Once the destination has at least one active vault, {@code destinationVault} — already
+     * resolved and scoped to this account by {@link #resolveVault} — takes over deciding the pillar:
+     * {@code requested} only still matters as an advisory check that must agree with it
+     * (VAULT_PILLAR_CONFLICT otherwise). Accepting a {@code requested} that merely repeats the
+     * vault's own pillar is deliberate, not laxity — the client round-trips the value it just read
+     * back, and refusing an unchanged answer would break editing (armadilha 8, §7).
+     */
+    private ContributionPillar resolveContributionPillar(
+            Account destination, Vault destinationVault, ContributionPillar requested) {
         if (!isContributionTarget(destination)) {
-            // A pillar on a plain checking/cash destination would silently inflate that pillar.
+            // A pillar — or a vault — on a plain checking/cash destination would silently inflate
+            // that pillar, or claim a caixinha a non-investment account can never have.
             if (requested != null) {
                 throw AppException.invalidContributionPillar();
             }
+            if (destinationVault != null) {
+                throw AppException.vaultNotFound();
+            }
             return null;
         }
-        ContributionPillar resolved = requested != null
-                ? requested
-                : ContributionPillar.fromPillar(destination.getDefaultContributionPillar());
-        if (resolved == null) {
-            throw AppException.contributionPillarRequired();
+        checkVaultRequirement(destination.getId(), destinationVault);
+        if (destinationVault == null) {
+            ContributionPillar resolved = requested != null
+                    ? requested
+                    : ContributionPillar.fromPillar(destination.getDefaultContributionPillar());
+            if (resolved == null) {
+                throw AppException.contributionPillarRequired();
+            }
+            return resolved;
         }
-        return resolved;
+        if (requested != null && requested != destinationVault.getContributionPillar()) {
+            throw AppException.vaultPillarConflict();
+        }
+        return destinationVault.getContributionPillar();
+    }
+
+    /**
+     * §4.4's "hasVaults" gate, shared by both legs of a transfer: once an account has any
+     * non-archived vault, every leg touching it — contribution or withdrawal alike — must name one.
+     * An account with no vaults, or only archived ones, is untouched by this (comportamento de hoje).
+     *
+     * @param vault already resolved via {@link #resolveVault}, scoped to this same account — so one
+     *     of the account's own <em>archived</em> vaults can still reach here when {@code hasVaults} is
+     *     false (every one of its vaults is archived): that combination is treated as "not found",
+     *     the same doorway back to "sem caixinha" mode that archiving the last vault promises (§4.7)
+     */
+    private void checkVaultRequirement(UUID accountId, Vault vault) {
+        boolean hasVaults = vaultRepository.existsByAccountIdAndArchivedFalse(accountId);
+        if (!hasVaults) {
+            if (vault != null) {
+                throw AppException.vaultNotFound();
+            }
+            return;
+        }
+        if (vault == null) {
+            throw AppException.vaultRequired();
+        }
+        if (vault.isArchived()) {
+            throw AppException.vaultArchived();
+        }
+    }
+
+    /**
+     * Resolves a vault addressed by id, scoped to both the workspace (R8) and the account it must
+     * belong to. {@code null} in means "no vault addressed", which is still a valid outcome — most
+     * accounts have none.
+     *
+     * @throws AppException VAULT_NOT_FOUND for an unknown id, another workspace's, or one that
+     *     belongs to a different account than the leg being resolved
+     */
+    private Vault resolveVault(UUID workspaceId, UUID accountId, UUID vaultId) {
+        if (vaultId == null) {
+            return null;
+        }
+        Vault vault = vaultRepository.findByIdAndWorkspaceId(vaultId, workspaceId).orElseThrow(AppException::vaultNotFound);
+        if (!vault.getAccountId().equals(accountId)) {
+            throw AppException.vaultNotFound();
+        }
+        return vault;
+    }
+
+    /** The vault currently mirrored by a transfer leg's ledger row, if any — used by {@link #update}. */
+    private Vault currentVaultOf(UUID workspaceId, UUID transactionId) {
+        return vaultEntryRepository
+                .findByTransactionIdAndAmountCentsIsNull(transactionId)
+                .map(entry -> vaultRepository.findByIdAndWorkspaceId(entry.getVaultId(), workspaceId).orElse(null))
+                .orElse(null);
+    }
+
+    /** §4.4 — asked once both legs are SETTLED, since a PENDING movement cannot overdraw a vault yet. */
+    private void assertLinkedVaultsNotOverdrawn(UUID workspaceId, UUID... transactionIds) {
+        for (UUID transactionId : transactionIds) {
+            vaultEntryRepository
+                    .findByTransactionIdAndAmountCentsIsNull(transactionId)
+                    .ifPresent(entry -> vaultBalanceService.assertNotOverdrawn(workspaceId, entry.getVaultId()));
+        }
     }
 
     /** R9 — only investment/reserve accounts receive contributions. */
