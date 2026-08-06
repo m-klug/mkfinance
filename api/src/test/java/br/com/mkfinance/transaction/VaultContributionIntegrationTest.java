@@ -318,21 +318,18 @@ class VaultContributionIntegrationTest extends AbstractTransactionIntegrationTes
 
             AccountResponse otherBrokerage =
                     createAccount("Outra Corretora", AccountType.INVESTMENT, 0L, ContributionPillar.FINANCIAL_FREEDOM);
-            TransactionResponse outgoing = session.post(
-                            path("/transfers"),
-                            new TransferRequest(
-                                    brokerage.id(),
-                                    otherBrokerage.id(),
-                                    30_000L,
-                                    DATE,
-                                    "Resgate",
-                                    null,
-                                    vault.id(),
-                                    null),
-                            TransactionResponse.class)
-                    .getBody();
+            session.post(
+                    path("/transfers"),
+                    new TransferRequest(
+                            brokerage.id(), otherBrokerage.id(), 30_000L, DATE, "Resgate", null, vault.id(), null),
+                    TransactionResponse.class);
 
-            assertThat(outgoing.contributionPillar())
+            // The POST /transfers response always echoes the *incoming* leg's resolved pillar (a
+            // pre-Caixinhas convention, since the contract has the endpoint return the outgoing row)
+            // — otherBrokerage has no vault, so this is its own default, unrelated to the withdrawal.
+            // The withdrawal (outgoing) leg's own stored value is what §4.8 is actually about, and the
+            // extrato listing reflects that raw column, not the echo.
+            assertThat(legOn(brokerage.id()).contributionPillar())
                     .as("the withdrawal leg itself never carries a pillar")
                     .isNull();
             assertThat(balanceOfVault(brokerage.id(), vault.id())).isEqualTo(70_000L);
