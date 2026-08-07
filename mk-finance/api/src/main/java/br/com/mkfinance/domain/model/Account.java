@@ -51,7 +51,7 @@ public class Account {
     @Column(name = "initial_balance_cents", nullable = false)
     private long initialBalanceCents = 0L;
 
-    /** Only meaningful for INVESTMENT/SAVINGS; only GOALS/FINANCIAL_FREEDOM allowed (R9). */
+    /** Only meaningful for INVESTMENT/SAVINGS; restricted to {@link ContributionPillar} (R9). */
     @Enumerated(EnumType.STRING)
     @Column(name = "default_contribution_pillar", length = 20)
     private Pillar defaultContributionPillar;

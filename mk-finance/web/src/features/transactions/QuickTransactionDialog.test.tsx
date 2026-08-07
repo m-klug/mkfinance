@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 
@@ -200,6 +200,27 @@ describe("QuickTransactionDialog", () => {
 
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0].contributionPillar).toBe(ContributionPillar.FINANCIAL_FREEDOM);
+  });
+
+  // The three pillars whose money is set aside before being spent (R9) — study
+  // money is saved up for a course exactly the way a goal is.
+  it("offers Conhecimento as a contribution pillar", async () => {
+    const calls: TransferRequest[] = [];
+    server.use(captureTransfers(calls));
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByRole("tab", { name: "Aporte" }));
+    const pillar = await screen.findByLabelText("Pilar do aporte");
+    expect(within(pillar).getByRole("option", { name: "Conhecimento" })).toBeInTheDocument();
+
+    await user.selectOptions(pillar, ContributionPillar.KNOWLEDGE);
+    await user.type(screen.getByLabelText("Valor"), "30000");
+    await user.type(screen.getByLabelText("Descrição"), "Reserva de cursos");
+    await user.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0].contributionPillar).toBe(ContributionPillar.KNOWLEDGE);
   });
 
   it("hides the pillar selector on a plain transfer between non-investment accounts", async () => {

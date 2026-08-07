@@ -16,10 +16,11 @@ export const ACCOUNT_TYPES: AccountType[] = [
   AccountType.OTHER,
 ];
 
-// Only these two pillars can receive a contribution (R9).
+// The pillars whose money is set aside before being spent are the ones an aporte can feed (R9).
 export const CONTRIBUTION_PILLARS: ContributionPillar[] = [
   ContributionPillar.GOALS,
   ContributionPillar.FINANCIAL_FREEDOM,
+  ContributionPillar.KNOWLEDGE,
 ];
 
 /** Accounts that hold savings/investments — destination of a contribution (R9). */

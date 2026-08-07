@@ -24,9 +24,9 @@ import java.util.Map;
  *       purchase date, so an {@link ExpenseEntry} flagged {@code systemCategory} is dropped here —
  *       otherwise the whole card would be counted twice, once per purchase and once at payment.
  *   <li><strong>R9 (contributions):</strong> an aporte into an investment/savings account is not an
- *       expense (it is a transfer, R4), but it must still consume its pillar (GOALS or
- *       FINANCIAL_FREEDOM) or those two pillars would never fill. Contributions are added to their
- *       pillar's spent total alongside expenses.
+ *       expense (it is a transfer, R4), but it must still consume its pillar (the ones whose money
+ *       is set aside before being spent: GOALS, FINANCIAL_FREEDOM, KNOWLEDGE) or those pillars would
+ *       never fill. Contributions are added to their pillar's spent total alongside expenses.
  * </ul>
  *
  * <p>Transfers that are not contributions never reach this function at all (R4) — the caller filters
@@ -44,7 +44,7 @@ public final class PillarAllocationCalculator {
     public record ExpenseEntry(Pillar pillar, long amountCents, boolean systemCategory) {
     }
 
-    /** One contribution (aporte, R9) directed at a pillar — GOALS or FINANCIAL_FREEDOM. */
+    /** One contribution (aporte, R9) directed at a pillar — see {@code ContributionPillar}. */
     public record ContributionEntry(Pillar pillar, long amountCents) {
     }
 

@@ -68,6 +68,20 @@ class VaultIntegrationTest extends AbstractVaultIntegrationTest {
         }
 
         @Test
+        @DisplayName("a caixinha can be a KNOWLEDGE one (V20) — money set aside for a course")
+        void takesTheKnowledgePillar() {
+            AccountResponse account = createAccount("Corretora", AccountType.INVESTMENT, 0L);
+
+            ResponseEntity<VaultResponse> created = session.post(
+                    path("/accounts/" + account.id() + "/vaults"),
+                    new VaultRequest("Cursos 2027", ContributionPillar.KNOWLEDGE, null, null, null),
+                    VaultResponse.class);
+
+            assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(created.getBody().contributionPillar()).isEqualTo(ContributionPillar.KNOWLEDGE);
+        }
+
+        @Test
         void onlyInvestmentAndSavingsAccountsTakeVaults() {
             AccountResponse checking = createAccount("Conta corrente", AccountType.CHECKING, 0L);
 

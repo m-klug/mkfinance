@@ -505,6 +505,27 @@ class TransferIntegrationTest extends AbstractTransactionIntegrationTest {
     }
 
     @Test
+    @DisplayName("KNOWLEDGE is a contribution pillar too (V20): study money is set aside before it is spent")
+    void knowledgeIsAContributionPillar() {
+        // Exercises both places the schema pins the subset down: the account's own default
+        // (account_default_contribution_pillar_check) and the leg it produces
+        // (transaction_contribution_pillar_check).
+        AccountResponse studies =
+                createAccount("Reserva de Estudos", AccountType.SAVINGS, 0L, ContributionPillar.KNOWLEDGE);
+
+        TransactionResponse outgoing = session.post(
+                        path("/transfers"),
+                        new TransferRequest(
+                                checking.id(), studies.id(), 30_000L, DATE, "Aporte estudos", null, null, null),
+                        TransactionResponse.class)
+                .getBody();
+
+        assertThat(outgoing.contributionPillar()).isEqualTo(ContributionPillar.KNOWLEDGE);
+        assertThat(legOn(studies.id()).contributionPillar()).isEqualTo(ContributionPillar.KNOWLEDGE);
+        assertThat(legOn(checking.id()).contributionPillar()).isNull();
+    }
+
+    @Test
     @DisplayName("an investment account with no default pillar demands one")
     void contributionWithoutAnyPillarIsRejected() {
         AccountResponse brokerage = createAccount("Corretora Sem Pilar", AccountType.INVESTMENT, 0L);

@@ -146,7 +146,7 @@ erDiagram
 
 - **Usuario**: id, nome, e-mail, hash de senha, criado_em.
 - **Espaco**: id, nome. **Membro**: usuario_id, espaco_id, papel (`dono` | `membro`).
-- **Conta**: espaco_id, nome, tipo (`corrente` | `poupanca` | `dinheiro` | `investimento` | `outra`), saldo_inicial, cor/ícone, arquivada. Contas de tipo `investimento`/`poupanca` podem indicar um `pilar_aporte` (Liberdade Financeira ou Metas) — ver regra 9.
+- **Conta**: espaco_id, nome, tipo (`corrente` | `poupanca` | `dinheiro` | `investimento` | `outra`), saldo_inicial, cor/ícone, arquivada. Contas de tipo `investimento`/`poupanca` podem indicar um `pilar_aporte` (Liberdade Financeira, Metas ou Conhecimento) — ver regra 9.
 - **Pilar** (enum fixo, não editável nem excluível): **Custos Fixos, Conforto, Metas, Prazeres, Liberdade Financeira, Conhecimento**. Toda categoria de despesa pertence obrigatoriamente a um pilar.
 - **Categoria**: espaco_id, pilar (obrigatório quando tipo = `despesa`), nome, tipo (`receita` | `despesa`), categoria_pai (subcategorias), cor/ícone. Categorias de receita não têm pilar. Seed inicial já distribuído nos pilares (ex.: Aluguel, Mercado, Luz → Custos Fixos; iFood, streaming → Prazeres; livros, cursos → Conhecimento; assinatura de academia → Conforto…).
 - **AlocacaoPilar**: espaco_id, pilar, percentual_alvo. No MVP os valores são fixos: **Custos Fixos 30%, Conforto 10%, Metas 20%, Prazeres 10%, Liberdade Financeira 25%, Conhecimento 5%** (a entidade já existe para viabilizar a personalização prevista na Fase 2).
@@ -169,7 +169,7 @@ Estas regras são o coração do app e onde a maioria dos apps de finanças erra
 6. **Edição de parcelamento**: editar/excluir uma compra parcelada afeta todas as parcelas não pagas; faturas já pagas são imutáveis (correções via lançamento de ajuste).
 7. **Datas em timezone local (America/Sao_Paulo)** armazenadas como data (não timestamp UTC), evitando compras "pulando" de dia/fatura.
 8. **Isolamento por espaço**: toda query filtra por espaco_id — regra de autorização central da API.
-9. **Aporte conta como alocação, não como despesa**: transferir dinheiro para uma conta de investimento/reserva não é despesa (regra 4), mas **precisa contar no pilar** (Liberdade Financeira ou Metas) no relatório de alocação do mês — senão esses dois pilares nunca "consomem" seu percentual e o método não fecha. Daí o campo `pilar_aporte` na conta: transferências destinadas a ela entram no cálculo de alocação do pilar, sem virar despesa. O pilar padrão vem da conta, mas pode ser ajustado em cada transferência — a mesma conta de corretora pode receber aporte de Metas num mês e de Liberdade Financeira no outro. (Na Fase 2, com as Caixinhas, o pilar passa a vir da caixinha de destino do aporte.)
+9. **Aporte conta como alocação, não como despesa**: transferir dinheiro para uma conta de investimento/reserva não é despesa (regra 4), mas **precisa contar no pilar** (Liberdade Financeira, Metas ou Conhecimento) no relatório de alocação do mês — senão esses pilares nunca "consomem" seu percentual e o método não fecha. São esses três porque o dinheiro deles é **guardado antes de ser gasto**; Custos Fixos, Conforto e Prazeres se consomem no próprio gasto, e reservar dinheiro para eles contaria a mesma quantia duas vezes. Daí o campo `pilar_aporte` na conta: transferências destinadas a ela entram no cálculo de alocação do pilar, sem virar despesa. O pilar padrão vem da conta, mas pode ser ajustado em cada transferência — a mesma conta de corretora pode receber aporte de Metas num mês e de Liberdade Financeira no outro. (Na Fase 2, com as Caixinhas, o pilar passa a vir da caixinha de destino do aporte.)
 10. **Base do cálculo de alocação**: % de cada pilar = (despesas do pilar no mês + aportes do pilar, por competência) ÷ receitas do mês. Meses sem receita (ou atípicos) mostram o valor absoluto com aviso, em vez de percentuais distorcidos.
 
 ## 6. Escopo do MVP (Fase 1)
@@ -180,13 +180,13 @@ Estas regras são o coração do app e onde a maioria dos apps de finanças erra
 
 ### 6.2 Contas
 - CRUD de contas com saldo inicial, tipo (corrente, poupança, dinheiro, **investimento**, outra), cor/ícone; arquivar (não excluir se houver transações).
-- Contas de investimento/reserva definem um **pilar de aporte padrão** (Liberdade Financeira ou Metas).
+- Contas de investimento/reserva definem um **pilar de aporte padrão** (Liberdade Financeira, Metas ou Conhecimento).
 - Saldo atual e projetado por conta; saldo total do espaço (com e sem investimentos).
 
 ### 6.3 Transações
 - Lançar receita/despesa: valor, data, conta, categoria, descrição — em no máximo ~5 toques.
 - Transferência entre contas.
-- **Aporte**: transferência para conta de investimento/reserva — não conta como despesa, mas consome o percentual do pilar escolhido (pré-preenchido com o pilar padrão da conta, ajustável no lançamento entre Liberdade Financeira e Metas).
+- **Aporte**: transferência para conta de investimento/reserva — não conta como despesa, mas consome o percentual do pilar escolhido (pré-preenchido com o pilar padrão da conta, ajustável no lançamento entre Liberdade Financeira, Metas e Conhecimento).
 - Transação pendente/agendada (ex.: conta a pagar) com efetivação em um clique.
 - Listagem com filtros (período, conta, categoria, tipo, texto) e edição/exclusão.
 
@@ -219,7 +219,7 @@ Estas regras são o coração do app e onde a maioria dos apps de finanças erra
 - **Personalização dos percentuais-alvo dos pilares**: editar os valores fixos do MVP (30/10/20/10/25/5) por espaço, com validação de soma = 100%.
 - **Orçamento mensal por categoria** com barra de progresso e alerta de estouro — desce ao nível de categoria a visão por pilar que o MVP já entrega.
 - **Recorrências**: assinaturas, salário, aluguel — lançamentos automáticos ou sugeridos, com visão "gastos fixos vs variáveis".
-- **Caixinhas** — subdivisões virtuais de contas de investimento/reserva: o saldo real da conta (que no banco é um montante único) se reparte logicamente entre caixinhas (ex.: "Reserva de emergência", "Viagem 2027", "Aposentadoria") + uma fatia "não alocado". Cada caixinha define seu pilar (Metas ou Liberdade Financeira) — o pilar do aporte passa a vir da caixinha de destino, refinando a regra 9 — e pode ter valor-alvo e prazo com barra de progresso e projeção (isso absorve o conceito de "metas de economia"). Inclui: aporte/resgate por caixinha, movimentação entre caixinhas sem sair da conta, composição da conta por caixinha no dashboard e lançamento de rendimento distribuível entre caixinhas.
+- **Caixinhas** — subdivisões virtuais de contas de investimento/reserva: o saldo real da conta (que no banco é um montante único) se reparte logicamente entre caixinhas (ex.: "Reserva de emergência", "Viagem 2027", "Aposentadoria") + uma fatia "não alocado". Cada caixinha define seu pilar (Metas, Liberdade Financeira ou Conhecimento) — o pilar do aporte passa a vir da caixinha de destino, refinando a regra 9 — e pode ter valor-alvo e prazo com barra de progresso e projeção (isso absorve o conceito de "metas de economia"). Inclui: aporte/resgate por caixinha, movimentação entre caixinhas sem sair da conta, composição da conta por caixinha no dashboard e lançamento de rendimento distribuível entre caixinhas.
 - **Calendário financeiro**: contas a pagar/receber, vencimentos de fatura.
 - Tags livres nas transações (além de categoria).
 
