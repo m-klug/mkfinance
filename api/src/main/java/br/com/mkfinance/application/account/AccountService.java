@@ -3,6 +3,7 @@ package br.com.mkfinance.application.account;
 import br.com.mkfinance.domain.exception.AppException;
 import br.com.mkfinance.domain.model.Account;
 import br.com.mkfinance.domain.model.AccountType;
+import br.com.mkfinance.domain.model.ContributionPillar;
 import br.com.mkfinance.domain.model.Pillar;
 import br.com.mkfinance.infrastructure.persistence.AccountRepository;
 import java.util.List;
@@ -79,8 +80,7 @@ public class AccountService {
             return;
         }
         boolean allowedType = type == AccountType.INVESTMENT || type == AccountType.SAVINGS;
-        boolean allowedPillar = pillar == Pillar.GOALS || pillar == Pillar.FINANCIAL_FREEDOM;
-        if (!allowedType || !allowedPillar) {
+        if (!allowedType || !ContributionPillar.accepts(pillar)) {
             throw AppException.invalidContributionPillar();
         }
     }

@@ -41,6 +41,7 @@ export type ContributionPillar = typeof ContributionPillar[keyof typeof Contribu
 export const ContributionPillar = {
   GOALS: 'GOALS',
   FINANCIAL_FREEDOM: 'FINANCIAL_FREEDOM',
+  KNOWLEDGE: 'KNOWLEDGE',
 } as const;
 
 export type AccountType = typeof AccountType[keyof typeof AccountType];
@@ -826,7 +827,7 @@ export interface Vault {
   id: string;
   accountId: string;
   name: string;
-  /** The pillar a contribution into this vault consumes (R9). This is the refinement the Caixinhas bring: the pillar belongs to where the money is going, not to the account holding it, so one brokerage account can feed GOALS and FINANCIAL_FREEDOM at once.
+  /** The pillar a contribution into this vault consumes (R9). This is the refinement the Caixinhas bring: the pillar belongs to where the money is going, not to the account holding it, so one brokerage account can feed GOALS, FINANCIAL_FREEDOM and KNOWLEDGE at once.
  */
   contributionPillar: ContributionPillar;
   /**

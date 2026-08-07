@@ -132,6 +132,28 @@ class DashboardIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("a KNOWLEDGE aporte consumes the KNOWLEDGE pillar, alongside what was spent on studies (R9, V20)")
+    void knowledgeContributionConsumesItsPillar() {
+        AccountResponse checking = createAccount("Conta", AccountType.CHECKING);
+        AccountResponse investment = createAccount("Corretora", AccountType.INVESTMENT);
+        LocalDate day = LocalDate.of(2026, 5, 12);
+
+        income(checking, incomeCategory(), 500_000L, day);
+        // R$ 200 spent on studies this month, plus R$ 300 set aside for a course later. Both consume
+        // KNOWLEDGE: an aporte is not an expense (R4), but it still fills its pillar (R9).
+        expense(checking, expenseCategory(Pillar.KNOWLEDGE), 20_000L, day);
+        aporte(checking, investment, 30_000L, ContributionPillar.KNOWLEDGE, day);
+
+        PillarAllocationReportResponse allocation = pillarAllocation("2026-05");
+        assertPillar(allocation, Pillar.KNOWLEDGE, 5, 50_000L, 10.0);
+        assertPillar(allocation, Pillar.GOALS, 20, 0L, 0.0);
+        assertPillar(allocation, Pillar.FINANCIAL_FREEDOM, 25, 0L, 0.0);
+
+        // R4 holds: the aporte moved money without becoming an expense.
+        assertThat(summary("2026-05").expenseCents()).isEqualTo(20_000L);
+    }
+
+    @Test
     @DisplayName("BE-6 regression: PENDING entries never move the allocation — only SETTLED counts (R5)")
     void pendingEntriesDoNotMoveAllocation() {
         AccountResponse checking = createAccount("Conta", AccountType.CHECKING);

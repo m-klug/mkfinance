@@ -1266,7 +1266,10 @@ components:
       enum: [FIXED_COSTS, COMFORT, GOALS, PLEASURES, FINANCIAL_FREEDOM, KNOWLEDGE]
     ContributionPillar:
       type: string
-      enum: [GOALS, FINANCIAL_FREEDOM]
+      # The subset of Pillar an aporte can consume (R9): the pillars whose money is set aside
+      # before it is spent. KNOWLEDGE joined GOALS and FINANCIAL_FREEDOM because study money is
+      # saved up the same way — put aside now, spent on a course later.
+      enum: [GOALS, FINANCIAL_FREEDOM, KNOWLEDGE]
     AccountType:
       type: string
       enum: [CHECKING, SAVINGS, CASH, INVESTMENT, OTHER]
@@ -1888,7 +1891,8 @@ components:
           description: >
             The pillar a contribution into this vault consumes (R9). This is the refinement the
             Caixinhas bring: the pillar belongs to where the money is going, not to the account
-            holding it, so one brokerage account can feed GOALS and FINANCIAL_FREEDOM at once.
+            holding it, so one brokerage account can feed GOALS, FINANCIAL_FREEDOM and KNOWLEDGE
+            at once.
         targetAmountCents:
           type: integer
           format: int64
