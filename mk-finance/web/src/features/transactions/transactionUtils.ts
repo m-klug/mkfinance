@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import type { SelectOption } from "@/components/form/fields";
 import {
   TransactionType,
+  TransferDirection,
   type Account,
   type Category,
   type Transaction,
@@ -58,8 +59,20 @@ export function transactionTypeOptions(t: TFunction): SelectOption[] {
   ];
 }
 
-/** Signed amount for display: expenses and outgoing transfer legs are negative. */
+/**
+ * Signed amount for display: expenses and outgoing transfer legs are negative.
+ *
+ * <p>A transfer is a mirrored pair (R4) — the OUT leg leaves the source account, the IN leg lands on
+ * the destination — so the sign has to come from {@code transferDirection}, never from the type
+ * alone. Signing both legs negative made an aporte read as a deduction on the very account that
+ * received the money.
+ */
 export function signedAmountCents(transaction: Transaction): number {
+  if (transaction.type === TransactionType.TRANSFER) {
+    return transaction.transferDirection === TransferDirection.OUT
+      ? -transaction.amountCents
+      : transaction.amountCents;
+  }
   return transaction.type === TransactionType.INCOME
     ? transaction.amountCents
     : -transaction.amountCents;

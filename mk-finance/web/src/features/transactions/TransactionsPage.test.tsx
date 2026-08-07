@@ -87,6 +87,41 @@ describe("TransactionsPage", () => {
     expect(within(pendingRow).getByText("Pendente")).toBeInTheDocument();
   });
 
+  // R4: the two legs of an aporte share everything but their account and their
+  // direction, so the sign has to come from the direction. Signing both legs
+  // negative made the destination account look like it had been debited too.
+  it("signs each transfer leg by its own direction, not by the type", async () => {
+    const withdrawalLeg: Transaction = {
+      ...contributionLeg,
+      id: "tx-transfer-out",
+      accountId: checkingAccount.id,
+      transferPairId: contributionLeg.id,
+      transferDirection: TransferDirection.OUT,
+      contributionPillar: null,
+    };
+    server.use(
+      ...financeReadHandlers({
+        accounts: defaultAccounts,
+        categories: defaultCategories,
+        transactions: [contributionLeg, withdrawalLeg],
+      }),
+    );
+    renderPage();
+
+    const legRows = (await screen.findAllByText(contributionLeg.description)).map(
+      (cell) => cell.closest("tr") as HTMLElement,
+    );
+    const incomingRow = legRows.find((row) =>
+      within(row).queryByText(investmentAccount.name),
+    ) as HTMLElement;
+    const outgoingRow = legRows.find((row) =>
+      within(row).queryByText(checkingAccount.name),
+    ) as HTMLElement;
+
+    expect(within(incomingRow).getByText(/^R\$\s*1\.000,00$/)).toBeInTheDocument();
+    expect(within(outgoingRow).getByText(/^-R\$\s*1\.000,00$/)).toBeInTheDocument();
+  });
+
   it("settles a pending transaction in a single click (R5)", async () => {
     const settled: string[] = [];
     server.use(
