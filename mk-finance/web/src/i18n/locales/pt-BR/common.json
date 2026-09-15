@@ -103,6 +103,9 @@
     "parent": "Categoria pai",
     "noParent": "Nenhuma (categoria principal)",
     "systemBadge": "Sistema",
+    "systemNote": "Categorias de sistema (Pagamento de fatura, Transferência, Rendimento) são criadas pelo app e não podem ser editadas ou excluídas.",
+    "pillarCount_one": "{{count}} categoria",
+    "pillarCount_other": "{{count}} categorias",
     "emptyGroup": "Nenhuma categoria neste pilar.",
     "created": "Categoria criada.",
     "updated": "Categoria atualizada.",
@@ -309,6 +312,11 @@
     "direction": {
       "IN": "A receber",
       "OUT": "A pagar"
+    },
+    "legend": {
+      "pending": "Dia com pendência",
+      "statementDue": "Dia com fatura a vencer",
+      "recurrence": "Veio de recorrência"
     }
   },
   "nav": {
@@ -357,6 +365,7 @@
       "inForceSince": "Valores em vigor desde {{date}}.",
       "effectiveFromWarning": "A alteração vale a partir do mês corrente em diante — meses fechados mantêm o percentual com que foram avaliados.",
       "sumLabel": "Soma: {{sum}}%",
+      "sumOk": "Fecha em 100%",
       "sumError": "A soma dos seis pilares precisa ser 100%.",
       "updated": "Percentuais-alvo atualizados."
     }

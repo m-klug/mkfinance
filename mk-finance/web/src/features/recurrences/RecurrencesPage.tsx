@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Repeat, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -143,12 +144,19 @@ export default function RecurrencesPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{t("nav.recurrences")}</h1>
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-label">
+            {t("nav.recurrences")}
+          </p>
+          <h1 className="text-[26px] font-extrabold tracking-[-0.025em] text-ink-primary">
+            {t("nav.recurrences")}
+          </h1>
+        </div>
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink-secondary">
             <input
               type="checkbox"
-              className="size-4"
+              className="size-4 accent-[color:var(--mint)]"
               checked={showClosed}
               onChange={(event) => setShowClosed(event.target.checked)}
             />
@@ -161,40 +169,61 @@ export default function RecurrencesPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent>
-          {isPending && <p className="text-muted-foreground">{t("common.loading")}</p>}
+      <Card className="gap-0 rounded-card border border-divider-card bg-card p-5">
+        <CardContent className="p-0">
+          {isPending && <p className="text-ink-tertiary">{t("common.loading")}</p>}
           {!isPending && (recurrences?.length ?? 0) === 0 && (
-            <p className="text-muted-foreground">{t("recurrences.empty")}</p>
+            <p className="text-ink-tertiary">{t("recurrences.empty")}</p>
           )}
           {!isPending && (recurrences?.length ?? 0) > 0 && (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("recurrences.description")}</TableHead>
-                    <TableHead>{t("recurrences.frequency")}</TableHead>
-                    <TableHead>{t("recurrences.account")}</TableHead>
-                    <TableHead>{t("recurrences.category")}</TableHead>
-                    <TableHead className="text-right">{t("recurrences.amount")}</TableHead>
-                    <TableHead className="text-right">{t("common.actions")}</TableHead>
+                  <TableRow className="border-divider-row hover:bg-transparent">
+                    <TableHead className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-label">
+                      {t("recurrences.description")}
+                    </TableHead>
+                    <TableHead className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-label">
+                      {t("recurrences.frequency")}
+                    </TableHead>
+                    <TableHead className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-label">
+                      {t("recurrences.account")}
+                    </TableHead>
+                    <TableHead className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-label">
+                      {t("recurrences.category")}
+                    </TableHead>
+                    <TableHead className="text-right text-[11px] font-bold uppercase tracking-[0.04em] text-ink-label">
+                      {t("recurrences.amount")}
+                    </TableHead>
+                    <TableHead className="text-right text-[11px] font-bold uppercase tracking-[0.04em] text-ink-label">
+                      {t("common.actions")}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(recurrences ?? []).map((recurrence) => (
-                    <TableRow key={recurrence.id}>
-                      <TableCell className="font-medium">
-                        {recurrence.description}
-                        {!recurrence.active && (
-                          <span className="ml-2 rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                            {t("recurrences.statusClosed")}
+                    <TableRow key={recurrence.id} className="border-divider-row">
+                      <TableCell className="py-3 font-bold text-ink-primary">
+                        <span className="flex items-center gap-2">
+                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral text-ink-tertiary">
+                            <Repeat className="size-3.5" aria-hidden />
                           </span>
-                        )}
+                          {recurrence.description}
+                          {!recurrence.active && (
+                            <Badge variant="neutral">{t("recurrences.statusClosed")}</Badge>
+                          )}
+                        </span>
                       </TableCell>
-                      <TableCell>{scheduleLabel(recurrence, t)}</TableCell>
-                      <TableCell>{lookupName(accountList, recurrence.accountId) ?? "—"}</TableCell>
-                      <TableCell>{lookupName(categoryList, recurrence.categoryId) ?? "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell className="text-ink-secondary">
+                        {scheduleLabel(recurrence, t)}
+                      </TableCell>
+                      <TableCell className="text-ink-secondary">
+                        {lookupName(accountList, recurrence.accountId) ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-ink-secondary">
+                        {lookupName(categoryList, recurrence.categoryId) ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-bold tabular-nums text-ink-primary">
                         {formatCents(recurrence.amountCents)}
                       </TableCell>
                       <TableCell className="text-right">
@@ -203,6 +232,7 @@ export default function RecurrencesPage() {
                             <Button
                               variant="ghost"
                               size="icon-sm"
+                              className="rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
                               aria-label={t("recurrences.editAction", {
                                 description: recurrence.description,
                               })}
@@ -213,6 +243,7 @@ export default function RecurrencesPage() {
                             <Button
                               variant="ghost"
                               size="icon-sm"
+                              className="rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
                               aria-label={t("recurrences.deleteAction", {
                                 description: recurrence.description,
                               })}
