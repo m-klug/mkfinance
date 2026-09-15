@@ -78,6 +78,24 @@ export function signedAmountCents(transaction: Transaction): number {
     : -transaction.amountCents;
 }
 
+/**
+ * "2026-07-10" → "2026-07". Sliced, never parsed through `Date`, for the same
+ * day-jump reasons as {@link toIsoDate} — used to look up the pillar
+ * allocation report behind the quick-entry pillar-impact preview.
+ */
+export function monthOf(dateIso: string): string {
+  return dateIso.slice(0, 7);
+}
+
+/** Shared field styling for the reskinned form inputs (design_handoff_mk_finance/README.md
+ * §Design Tokens — field radius/background, 11/700 uppercase labels). Passed as
+ * `fieldClassName`/`className` to the shared TextField/SelectField primitives so
+ * their DOM (labels, roles) stays exactly as before for tests. */
+export const FORM_FIELD_CLASSNAME =
+  "[&_label]:text-[11px] [&_label]:font-bold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-ink-label " +
+  "[&_input]:h-11 [&_input]:rounded-field [&_input]:border-none [&_input]:bg-field [&_input]:px-3.5 [&_input]:text-[13px] [&_input]:font-semibold [&_input]:shadow-none [&_input]:text-ink-primary " +
+  "[&_select]:h-11 [&_select]:rounded-field [&_select]:border-none [&_select]:bg-field [&_select]:px-3.5 [&_select]:text-[13px] [&_select]:font-semibold [&_select]:shadow-none [&_select]:text-ink-primary";
+
 export function lookupName<T extends { id: string; name: string }>(
   items: T[],
   id: string | null | undefined,
