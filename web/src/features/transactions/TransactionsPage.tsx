@@ -2,10 +2,22 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Pencil, Trash2 } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Equal,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Table,
   TableBody,
@@ -35,6 +47,7 @@ import { getListVaultsQueryOptions } from "@/lib/api/generated/vaults/vaults";
 import {
   TransactionStatus,
   TransactionType,
+  type Category,
   type ListTransactionsParams,
   type Transaction,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
@@ -48,7 +61,9 @@ import {
   lookupName,
   signedAmountCents,
   transactionTypeOptions,
+  FORM_FIELD_CLASSNAME,
 } from "@/features/transactions/transactionUtils";
+import { PILLAR_COLORS } from "@/features/dashboard/dashboardFormat";
 import { vaultCompositionQueryFilter } from "@/features/vaults/vaultOptions";
 
 const PAGE_SIZE = 20;
@@ -64,15 +79,8 @@ interface Filters {
   tags: string[];
 }
 
-export default function TransactionsPage() {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const workspaceId = useCurrentWorkspaceId();
-
-  // Defaults to the whole running month, not "up to today": a competency includes what is already
-  // scheduled inside it — a recurrence occurrence, a bill entered with "agendar como pendente" —
-  // and ending the window on today hid those rows even though they existed.
-  const [filters, setFilters] = useState<Filters>(() => ({
+function defaultFilters(): Filters {
+  return {
     from: firstDayOfCurrentMonthIso(),
     to: lastDayOfCurrentMonthIso(),
     accountId: "",
@@ -81,7 +89,27 @@ export default function TransactionsPage() {
     status: "",
     search: "",
     tags: [],
-  }));
+  };
+}
+
+/** Category color marker (design_handoff_mk_finance/README.md — table "Categoria"
+ * column dot): the category's own color when set, otherwise its pillar's fixed
+ * color, falling back to a neutral gray for transfers/system categories. */
+function categoryTone(category: Category | undefined): string {
+  if (category?.color) return category.color;
+  if (category?.pillar) return PILLAR_COLORS[category.pillar];
+  return "var(--chart-gray-2, #CFD4D1)";
+}
+
+export default function TransactionsPage() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const workspaceId = useCurrentWorkspaceId();
+
+  // Defaults to the whole running month, not "up to today": a competency includes what is already
+  // scheduled inside it — a recurrence occurrence, a bill entered with "agendar como pendente" —
+  // and ending the window on today hid those rows even though they existed.
+  const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [page, setPage] = useState(0);
   const [quickOpen, setQuickOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | undefined>();
@@ -97,6 +125,10 @@ export default function TransactionsPage() {
 
   const accounts = useMemo(() => accountsData ?? [], [accountsData]);
   const categories = useMemo(() => categoriesData ?? [], [categoriesData]);
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories],
+  );
 
   // §4.4 badge (Transaction.vaultId): one composition request per account
   // that actually has vaults, batched — most accounts have none, so this is
@@ -147,6 +179,11 @@ export default function TransactionsPage() {
     setPage(0);
   }
 
+  function handleClearFilters() {
+    setFilters(defaultFilters());
+    setPage(0);
+  }
+
   function invalidateAfterWrite() {
     if (!workspaceId) return;
     void queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey(workspaceId) });
@@ -194,25 +231,89 @@ export default function TransactionsPage() {
   const totalElements = pageData?.totalElements ?? 0;
   const hasNextPage = (page + 1) * PAGE_SIZE < totalElements;
 
+  // KPI strip (design_handoff_mk_finance/README.md — screen 02): entradas/saídas/resultado
+  // for the transactions currently loaded on screen. There is no dedicated aggregate
+  // endpoint for the filtered extrato, so this reads off the same page already fetched
+  // above instead of adding a new one — a page-scoped total, not a new business figure.
+  const { incomeCents, expenseCents } = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    for (const transaction of transactions) {
+      const signed = signedAmountCents(transaction);
+      if (signed >= 0) income += signed;
+      else expense += Math.abs(signed);
+    }
+    return { incomeCents: income, expenseCents: expense };
+  }, [transactions]);
+  const netCents = incomeCents - expenseCents;
+
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-8">
+    <div className="flex flex-1 flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{t("nav.transactions")}</h1>
-        <Button onClick={() => setQuickOpen(true)}>{t("quickEntry.open")}</Button>
+        <div className="flex flex-col gap-0.5">
+          <h1 className="text-2xl font-extrabold tracking-tight text-ink-primary">
+            {t("nav.transactions")}
+          </h1>
+          <p className="text-[13px] text-ink-secondary">
+            {t("transactions.total", { count: totalElements })}
+          </p>
+        </div>
+        <Button onClick={() => setQuickOpen(true)}>
+          <Plus className="size-4" />
+          {t("quickEntry.open")}
+        </Button>
       </div>
 
-      <Card>
-        <CardContent className="flex flex-col gap-4">
+      <div className="grid gap-3.5 sm:grid-cols-3">
+        <Card className="flex-row items-center gap-3.5 rounded-card p-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-success-bg text-success-ink">
+            <ArrowDownRight className="size-4" />
+          </span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-xs text-ink-secondary">{t("transactions.kpiIncome")}</span>
+            <span className="tabular-nums text-xl font-extrabold tracking-tight text-ink-primary">
+              {formatCents(incomeCents)}
+            </span>
+          </span>
+        </Card>
+        <Card className="flex-row items-center gap-3.5 rounded-card p-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-neutral text-ink-secondary">
+            <ArrowUpRight className="size-4" />
+          </span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-xs text-ink-secondary">{t("transactions.kpiExpense")}</span>
+            <span className="tabular-nums text-xl font-extrabold tracking-tight text-ink-primary">
+              {formatCents(expenseCents)}
+            </span>
+          </span>
+        </Card>
+        <Card className="flex-row items-center gap-3.5 rounded-card bg-hero p-4 text-hero-foreground">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-mint text-mint-ink">
+            <Equal className="size-4" />
+          </span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-xs text-hero-foreground/60">{t("transactions.kpiNet")}</span>
+            <span className="tabular-nums text-xl font-extrabold tracking-tight text-hero-foreground">
+              {netCents >= 0 ? "+ " : ""}
+              {formatCents(netCents)}
+            </span>
+          </span>
+        </Card>
+      </div>
+
+      <Card className="rounded-card">
+        <CardContent className="flex flex-col gap-3.5">
           {/* Date range, account and category share the top row — the four
               fields a user reaches for first. Type/status/tags sit below;
               tags gets a double column because it is a chip input, not a
               single-line control. Free-text search moves to its own
               full-width row instead of squeezing into the grid. */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
             <TextField
               id="filter-from"
               label={t("transactions.filterFrom")}
               type="date"
+              fieldClassName={FORM_FIELD_CLASSNAME}
               value={filters.from}
               onChange={(event) => updateFilter("from", event.target.value)}
             />
@@ -220,6 +321,7 @@ export default function TransactionsPage() {
               id="filter-to"
               label={t("transactions.filterTo")}
               type="date"
+              fieldClassName={FORM_FIELD_CLASSNAME}
               value={filters.to}
               onChange={(event) => updateFilter("to", event.target.value)}
             />
@@ -227,6 +329,7 @@ export default function TransactionsPage() {
               id="filter-account"
               label={t("transactions.account")}
               placeholder={t("transactions.allAccounts")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
               options={accounts.map((account) => ({ value: account.id, label: account.name }))}
               value={filters.accountId}
               onChange={(event) => updateFilter("accountId", event.target.value)}
@@ -235,6 +338,7 @@ export default function TransactionsPage() {
               id="filter-category"
               label={t("transactions.category")}
               placeholder={t("transactions.allCategories")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
               options={categoryOptions(categories)}
               value={filters.categoryId}
               onChange={(event) => updateFilter("categoryId", event.target.value)}
@@ -243,21 +347,26 @@ export default function TransactionsPage() {
               id="filter-type"
               label={t("transactions.type")}
               placeholder={t("transactions.allTypes")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
               options={transactionTypeOptions(t)}
               value={filters.type}
               onChange={(event) => updateFilter("type", event.target.value)}
             />
-            <SelectField
-              id="filter-status"
-              label={t("transactions.status")}
-              placeholder={t("transactions.allStatuses")}
-              options={[
-                { value: TransactionStatus.SETTLED, label: t("transactionStatus.SETTLED") },
-                { value: TransactionStatus.PENDING, label: t("transactionStatus.PENDING") },
-              ]}
-              value={filters.status}
-              onChange={(event) => updateFilter("status", event.target.value)}
-            />
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-bold tracking-wide text-ink-label uppercase">
+                {t("transactions.status")}
+              </span>
+              <SegmentedControl
+                className="w-full"
+                options={[
+                  { value: "", label: t("transactions.allStatuses") },
+                  { value: TransactionStatus.SETTLED, label: t("transactionStatus.SETTLED") },
+                  { value: TransactionStatus.PENDING, label: t("transactionStatus.PENDING") },
+                ]}
+                value={filters.status}
+                onChange={(value) => updateFilter("status", value)}
+              />
+            </div>
             <TagsInput
               id="filter-tags"
               label={t("transactions.tags")}
@@ -267,156 +376,203 @@ export default function TransactionsPage() {
               onChange={(tags) => updateFilter("tags", tags)}
             />
           </div>
-          <TextField
-            id="filter-search"
-            label={t("transactions.search")}
-            type="search"
-            autoComplete="off"
-            value={filters.search}
-            onChange={(event) => updateFilter("search", event.target.value)}
-          />
+          <div className="flex items-center gap-3 border-t border-divider-card pt-3.5">
+            <TextField
+              id="filter-search"
+              label={t("transactions.search")}
+              type="search"
+              autoComplete="off"
+              fieldClassName={cn(FORM_FIELD_CLASSNAME, "flex-1")}
+              value={filters.search}
+              onChange={(event) => updateFilter("search", event.target.value)}
+            />
+            <button
+              type="button"
+              className="mt-6 shrink-0 text-xs font-bold text-link hover:text-link-hover"
+              onClick={handleClearFilters}
+            >
+              {t("transactions.clearFilters")}
+            </button>
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-card">
         <CardContent>
-          {isPending && <p className="text-muted-foreground">{t("common.loading")}</p>}
+          {isPending && <p className="text-ink-secondary">{t("common.loading")}</p>}
           {!isPending && transactions.length === 0 && (
-            <p className="text-muted-foreground">{t("transactions.empty")}</p>
+            <p className="text-ink-secondary">{t("transactions.empty")}</p>
           )}
           {!isPending && transactions.length > 0 && (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>{t("transactions.date")}</TableHead>
-                  <TableHead>{t("transactions.description")}</TableHead>
-                  <TableHead>{t("transactions.account")}</TableHead>
-                  <TableHead>{t("transactions.category")}</TableHead>
-                  <TableHead className="text-right">{t("transactions.amount")}</TableHead>
-                  <TableHead>{t("transactions.status")}</TableHead>
-                  <TableHead className="text-right">{t("common.actions")}</TableHead>
+                <TableRow className="border-divider-card hover:bg-transparent">
+                  <TableHead className="text-[11px] font-bold text-ink-label uppercase">
+                    {t("transactions.date")}
+                  </TableHead>
+                  <TableHead className="text-[11px] font-bold text-ink-label uppercase">
+                    {t("transactions.description")}
+                  </TableHead>
+                  <TableHead className="text-[11px] font-bold text-ink-label uppercase">
+                    {t("transactions.account")}
+                  </TableHead>
+                  <TableHead className="text-[11px] font-bold text-ink-label uppercase">
+                    {t("transactions.category")}
+                  </TableHead>
+                  <TableHead className="text-right text-[11px] font-bold text-ink-label uppercase">
+                    {t("transactions.amount")}
+                  </TableHead>
+                  <TableHead className="text-[11px] font-bold text-ink-label uppercase">
+                    {t("transactions.status")}
+                  </TableHead>
+                  <TableHead className="text-right text-[11px] font-bold text-ink-label uppercase">
+                    {t("common.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>{formatDate(transaction.date)}</TableCell>
-                    <TableCell className="font-medium">
-                      {transaction.description}
-                      {transaction.vaultId && vaultNameById.get(transaction.vaultId) && (
-                        <div className="mt-1">
-                          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-normal text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
-                            {vaultNameById.get(transaction.vaultId)}
-                          </span>
-                        </div>
-                      )}
-                      {transaction.tags && transaction.tags.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {transaction.tags.map((tag) => (
-                            <span
-                              key={tag.id}
-                              className="rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground"
-                            >
-                              {tag.name}
+                {transactions.map((transaction) => {
+                  const category = categoryById.get(transaction.categoryId ?? "");
+                  return (
+                    <TableRow key={transaction.id} className="border-divider-row hover:bg-neutral/40">
+                      <TableCell className="text-xs tabular-nums text-ink-label">
+                        {formatDate(transaction.date)}
+                      </TableCell>
+                      <TableCell className="font-bold text-ink-primary">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[13px]">{transaction.description}</span>
+                          {transaction.vaultId && vaultNameById.get(transaction.vaultId) && (
+                            <Badge variant="success" className="normal-case">
+                              <span aria-hidden>{t("transactions.vaultBadgePrefix")}</span>
+                              {vaultNameById.get(transaction.vaultId)}
+                            </Badge>
+                          )}
+                          {transaction.tags && transaction.tags.length > 0 && (
+                            <span className="flex flex-wrap gap-1">
+                              {transaction.tags.map((tag) => (
+                                <span
+                                  key={tag.id}
+                                  className="text-[11px] font-semibold text-placeholder"
+                                >
+                                  <span aria-hidden>#</span>
+                                  {tag.name}
+                                </span>
+                              ))}
                             </span>
-                          ))}
+                          )}
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{lookupName(accounts, transaction.accountId) ?? "—"}</TableCell>
-                    <TableCell>
-                      {transaction.type === TransactionType.TRANSFER
-                        ? t("transactionType.TRANSFER")
-                        : (lookupName(categories, transaction.categoryId) ?? "—")}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right tabular-nums",
-                        transaction.type === TransactionType.INCOME && "text-emerald-600",
-                        transaction.type === TransactionType.EXPENSE && "text-destructive",
-                      )}
-                    >
-                      {formatCents(signedAmountCents(transaction))}
-                    </TableCell>
-                    <TableCell>
-                      <span
+                      </TableCell>
+                      <TableCell className="text-xs text-ink-secondary">
+                        {lookupName(accounts, transaction.accountId) ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <span className="flex min-w-0 items-center gap-2 text-xs text-ink-secondary">
+                          <span
+                            className="size-2 shrink-0 rounded-[3px]"
+                            style={{ backgroundColor: categoryTone(category) }}
+                            aria-hidden
+                          />
+                          <span className="truncate">
+                            {transaction.type === TransactionType.TRANSFER
+                              ? t("transactionType.TRANSFER")
+                              : (category?.name ?? "—")}
+                          </span>
+                        </span>
+                      </TableCell>
+                      <TableCell
                         className={cn(
-                          "rounded px-2 py-0.5 text-xs",
-                          transaction.status === TransactionStatus.PENDING
-                            ? "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
-                            : "bg-muted text-muted-foreground",
+                          "text-right text-sm font-extrabold tabular-nums",
+                          signedAmountCents(transaction) > 0 ? "text-success-ink" : "text-ink-primary",
                         )}
                       >
-                        {t(`transactionStatus.${transaction.status}`)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {transaction.status === TransactionStatus.PENDING && (
+                        {formatCents(signedAmountCents(transaction))}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            transaction.status === TransactionStatus.PENDING ? "alert" : "neutral"
+                          }
+                        >
+                          {t(`transactionStatus.${transaction.status}`)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1.5">
+                          {transaction.status === TransactionStatus.PENDING && (
+                            <Button
+                              size="icon-sm"
+                              className="rounded-full"
+                              aria-label={t("transactions.settleAction", {
+                                description: transaction.description,
+                              })}
+                              disabled={settleMutation.isPending}
+                              onClick={() => handleSettle(transaction)}
+                            >
+                              <Check className="size-3.5" />
+                            </Button>
+                          )}
+                          {/* Transfer legs are mirrored pairs (R4); editing one
+                              updates its sibling atomically through the dedicated
+                              PATCH /transfers endpoint (§6.6). */}
                           <Button
-                            variant="ghost"
+                            variant="secondary"
                             size="icon-sm"
-                            aria-label={t("transactions.settleAction", {
+                            className="rounded-full"
+                            aria-label={t("transactions.editAction", {
                               description: transaction.description,
                             })}
-                            disabled={settleMutation.isPending}
-                            onClick={() => handleSettle(transaction)}
+                            onClick={() => setEditing(transaction)}
                           >
-                            <Check className="size-4" />
+                            <Pencil className="size-3.5" />
                           </Button>
-                        )}
-                        {/* Transfer legs are mirrored pairs (R4); editing one
-                            updates its sibling atomically through the dedicated
-                            PATCH /transfers endpoint (§6.6). */}
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={t("transactions.editAction", {
-                            description: transaction.description,
-                          })}
-                          onClick={() => setEditing(transaction)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={t("transactions.deleteAction", {
-                            description: transaction.description,
-                          })}
-                          onClick={() => setDeleting(transaction)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          <Button
+                            variant="secondary"
+                            size="icon-sm"
+                            className="rounded-full"
+                            aria-label={t("transactions.deleteAction", {
+                              description: transaction.description,
+                            })}
+                            onClick={() => setDeleting(transaction)}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
 
           {totalElements > PAGE_SIZE && (
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <span className="text-sm text-muted-foreground">
-                {t("transactions.total", { count: totalElements })}
+            <div className="mt-3.5 flex items-center justify-between gap-2 pt-1">
+              <span className="text-xs text-ink-secondary">
+                {t("transactions.showingCount", {
+                  shown: transactions.length,
+                  total: totalElements,
+                })}
               </span>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-1.5">
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
+                  size="icon-sm"
+                  className="rounded-full"
                   disabled={page === 0}
+                  aria-label={t("common.previous")}
                   onClick={() => setPage((current) => Math.max(0, current - 1))}
                 >
-                  {t("common.previous")}
+                  <ChevronLeft className="size-3.5" />
                 </Button>
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
+                  size="icon-sm"
+                  className="rounded-full"
                   disabled={!hasNextPage}
+                  aria-label={t("common.next")}
                   onClick={() => setPage((current) => current + 1)}
                 >
-                  {t("common.next")}
+                  <ChevronRight className="size-3.5" />
                 </Button>
               </div>
             </div>

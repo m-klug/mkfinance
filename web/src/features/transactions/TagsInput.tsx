@@ -77,20 +77,23 @@ export function TagsInput({
 
   return (
     <div className={cn("flex flex-col gap-2", fieldClassName)}>
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className="text-[11px] font-bold tracking-wide text-ink-label uppercase">
+        {label}
+      </Label>
       <div className="relative">
-        <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2 py-1.5 shadow-xs dark:bg-input/30">
+        <div className="flex min-h-11 flex-wrap items-center gap-1.5 rounded-field border-none bg-field px-2.5 py-1.5">
           {value.map((tag) => (
             <span
               key={tag}
-              className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs text-foreground"
+              className="flex items-center gap-1 rounded-pill bg-hero px-3 py-1.5 text-xs font-bold text-hero-foreground"
             >
+              <span aria-hidden>#</span>
               {tag}
               <button
                 type="button"
                 aria-label={t("tags.remove", { name: tag })}
                 onClick={() => removeTag(tag)}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-hero-foreground/60 hover:text-hero-foreground"
               >
                 <X className="size-3" />
               </button>
@@ -110,14 +113,14 @@ export function TagsInput({
             }}
             placeholder={t("tags.addPlaceholder")}
             autoComplete="off"
-            className="h-6 min-w-[8ch] flex-1 border-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="h-7 min-w-[8ch] flex-1 border-none bg-transparent text-[13px] font-semibold text-ink-primary outline-none placeholder:text-placeholder"
           />
         </div>
         {suggestionsOpen && suggestions.length > 0 && (
           <ul
             role="listbox"
             aria-label={t("tags.suggestions")}
-            className="absolute left-0 top-full z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover p-1 text-sm shadow-md"
+            className="absolute top-full left-0 z-10 mt-1 max-h-48 w-full overflow-auto rounded-field border-none bg-card p-1 text-sm shadow-[var(--shadow-modal)]"
           >
             {suggestions.map((tag) => (
               <li key={tag.id}>
@@ -125,7 +128,7 @@ export function TagsInput({
                   type="button"
                   role="option"
                   aria-selected={false}
-                  className="w-full rounded px-2 py-1 text-left hover:bg-accent"
+                  className="w-full rounded-[10px] px-2.5 py-1.5 text-left text-ink-primary hover:bg-neutral"
                   // mousedown fires before the input's blur, so the click
                   // registers before commit(draft) on blur can run.
                   onMouseDown={(event) => {
@@ -133,6 +136,7 @@ export function TagsInput({
                     commit(tag.name);
                   }}
                 >
+                  <span aria-hidden>#</span>
                   {tag.name}
                 </button>
               </li>
@@ -140,7 +144,7 @@ export function TagsInput({
           </ul>
         )}
       </div>
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-xs text-ink-tertiary">{hint}</p>}
     </div>
   );
 }

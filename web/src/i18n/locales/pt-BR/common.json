@@ -158,7 +158,13 @@
     "deleteAction": "Excluir {{description}}",
     "settleAction": "Efetivar {{description}}",
     "deleteTitle": "Excluir lançamento",
-    "deleteDescription": "O lançamento {{description}} será excluído. Transferências são excluídas nas duas pontas."
+    "deleteDescription": "O lançamento {{description}} será excluído. Transferências são excluídas nas duas pontas.",
+    "kpiIncome": "Entradas",
+    "kpiExpense": "Saídas",
+    "kpiNet": "Resultado do período",
+    "clearFilters": "Limpar filtros",
+    "vaultBadgePrefix": "caixinha · ",
+    "showingCount": "Mostrando {{shown}} de {{total}} lançamentos"
   },
   "quickEntry": {
     "open": "Novo lançamento",
@@ -171,6 +177,8 @@
     "installments": "Parcelas",
     "installmentPreview": "Prévia das parcelas",
     "purchaseDate": "Data da compra",
+    "pillarImpact": "Impacto no pilar",
+    "pillarImpactChange": "{{before}} → {{after}} · alvo {{target}}%",
     "mode": {
       "EXPENSE": "Despesa",
       "INCOME": "Receita",

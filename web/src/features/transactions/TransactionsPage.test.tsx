@@ -163,7 +163,9 @@ describe("TransactionsPage", () => {
     await user.type(screen.getByLabelText("De"), "2026-07-01");
     await user.selectOptions(screen.getByLabelText("Conta"), checkingAccount.id);
     await user.selectOptions(screen.getByLabelText("Tipo"), "EXPENSE");
-    await user.selectOptions(screen.getByLabelText("Situação"), "PENDING");
+    // Status is a segmented control, not a <select>, per the reskin
+    // (design_handoff_mk_finance/README.md screen 02) — target it by role/name.
+    await user.click(screen.getByRole("tab", { name: "Pendente" }));
     await user.type(screen.getByLabelText("Buscar na descrição"), "mercado");
 
     await waitFor(() => {
