@@ -73,4 +73,11 @@ export function isPayable(statement: Pick<Statement, "totalCents" | "paidCents">
   return remainingCents(statement) > 0;
 }
 
+/** Share of the limit already used, 0–100 — display only, for the usage bar. */
+export function usagePercent(card: Card): number {
+  if (card.limitCents <= 0) return 0;
+  const used = card.limitCents - availableLimitCents(card);
+  return Math.min(100, Math.max(0, (used / card.limitCents) * 100));
+}
+
 export { StatementStatus };

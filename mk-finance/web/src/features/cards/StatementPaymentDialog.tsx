@@ -88,10 +88,12 @@ export function StatementPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="rounded-modal">
         <DialogHeader>
-          <DialogTitle>{t("statement.payTitle")}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-[15px] font-extrabold tracking-tight text-ink-primary">
+            {t("statement.payTitle")}
+          </DialogTitle>
+          <DialogDescription className="text-ink-tertiary">
             {t("statement.paySubtitle", { amount: formatCents(remainingCents) })}
           </DialogDescription>
         </DialogHeader>

@@ -41,8 +41,10 @@ describe("VaultsPage", () => {
     expect(screen.getAllByText(tripVault.name).length).toBeGreaterThan(0);
     // Reserva's balance, both as a bar legend entry and on its own card.
     expect(screen.getAllByText(/6\.000,00/).length).toBeGreaterThan(0);
-    // The R$ 500,00 unallocated slice from the fixture composition.
-    expect(screen.getByText("Não alocado")).toBeInTheDocument();
+    // The R$ 500,00 unallocated slice from the fixture composition. It now
+    // shows up twice in the reskinned hero panel: the summary label and the
+    // composition bar's legend entry.
+    expect(screen.getAllByText("Não alocado").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/500,00/).length).toBeGreaterThan(0);
   });
 

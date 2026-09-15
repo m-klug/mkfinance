@@ -12,9 +12,9 @@ interface VaultGoalBarProps {
 }
 
 const FILL_CLASS: Record<VaultGoalStatus, string> = {
-  [VaultGoalStatus.IN_PROGRESS]: "bg-blue-500",
-  [VaultGoalStatus.REACHED]: "bg-emerald-500",
-  [VaultGoalStatus.OVERDUE]: "bg-destructive",
+  [VaultGoalStatus.IN_PROGRESS]: "bg-mint",
+  [VaultGoalStatus.REACHED]: "bg-success-ink",
+  [VaultGoalStatus.OVERDUE]: "bg-alert-ink",
 };
 
 export function VaultGoalBar({ goal, currentCents }: VaultGoalBarProps) {
@@ -22,29 +22,33 @@ export function VaultGoalBar({ goal, currentCents }: VaultGoalBarProps) {
   const width = clampPercent(goal.progressPercent);
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span
-          className={cn("rounded px-1.5 py-0.5 font-medium", goalStatusBadgeClass(goal.status))}
-        >
-          {t(`vaults.goalStatus.${goal.status}`)}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline gap-2">
+        <span className="text-[11px] font-bold text-ink-label">
+          {t("vaults.goal.target", { amount: formatCents(goal.targetAmountCents) })}
         </span>
-        <span className="text-muted-foreground">
+        <span className="ml-auto text-[11px] font-extrabold tabular-nums text-ink-primary">
           {t("vaults.goal.progress", { percent: Math.round(goal.progressPercent) })}
         </span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+      <div className="relative h-2 w-full overflow-hidden rounded-pill bg-neutral">
         <div
-          className={cn("h-full rounded-full", FILL_CLASS[goal.status])}
+          className={cn("h-full rounded-pill transition-[width]", FILL_CLASS[goal.status])}
           style={{ width: `${width}%` }}
         />
       </div>
-      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>
-          {formatCents(currentCents)} / {t("vaults.goal.target", { amount: formatCents(goal.targetAmountCents) })}
+      <div className="flex items-center justify-between gap-2 text-[10px] text-ink-label">
+        <span
+          className={cn(
+            "rounded-pill px-1.5 py-0.5 font-bold uppercase tracking-[0.04em]",
+            goalStatusBadgeClass(goal.status),
+          )}
+        >
+          {t(`vaults.goalStatus.${goal.status}`)}
         </span>
-        <span>{goalMonthlyLabel(t, goal)}</span>
+        <span className="tabular-nums">{goalMonthlyLabel(t, goal)}</span>
       </div>
+      <span className="tabular-nums text-[10px] text-ink-label">{formatCents(currentCents)}</span>
     </div>
   );
 }
