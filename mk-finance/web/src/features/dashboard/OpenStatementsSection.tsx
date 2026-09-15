@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { CalendarClock } from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { formatCents, formatDate } from "@/lib/format";
 import type { Card as CreditCard, Statement } from "@/lib/api/generated/mKFinanceAPI.schemas";
 
@@ -24,50 +24,78 @@ export function OpenStatementsSection({ statements, cards }: OpenStatementsSecti
   const { t } = useTranslation();
   const cardName = new Map(cards.map((card) => [card.id, card.name]));
   const ordered = [...statements].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const totalRemaining = ordered.reduce(
+    (sum, statement) => sum + (statement.totalCents - statement.paidCents),
+    0,
+  );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("dashboard.statements.title")}</CardTitle>
-        <CardDescription>{t("dashboard.statements.subtitle")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {ordered.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("dashboard.statements.empty")}</p>
-        ) : (
-          <ul className="flex flex-col divide-y">
+    <div className="flex flex-col gap-4 rounded-card bg-card p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <h3 className="text-sm font-bold text-ink-primary">{t("dashboard.statements.title")}</h3>
+          <p className="text-xs text-ink-tertiary">{t("dashboard.statements.subtitle")}</p>
+        </div>
+        {ordered.length > 0 && (
+          <span className="shrink-0 rounded-pill bg-neutral px-2.5 py-1 text-[11px] font-bold text-ink-secondary">
+            {t("dashboard.statements.cardsCount", { count: cards.length })}
+          </span>
+        )}
+      </div>
+
+      {ordered.length === 0 ? (
+        <p className="text-sm text-ink-tertiary">{t("dashboard.statements.empty")}</p>
+      ) : (
+        <>
+          <ul className="flex flex-col gap-3">
             {ordered.map((statement) => {
               const remaining = statement.totalCents - statement.paidCents;
               const days = daysUntil(statement.dueDate);
               const dueSoon = days >= 0 && days <= DUE_SOON_DAYS;
               return (
-                <li key={statement.id} className="flex items-center justify-between gap-3 py-2">
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-medium">
+                <li
+                  key={statement.id}
+                  className={cn(
+                    "flex flex-col gap-2 rounded-list-item p-4",
+                    dueSoon ? "bg-hero text-hero-foreground" : "bg-field",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[13px] font-bold">
                       {cardName.get(statement.cardId) ?? statement.referenceMonth}
                     </span>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      {t("dashboard.statements.dueOn", { date: formatDate(statement.dueDate) })}
-                      {dueSoon && (
-                        <span className="flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 font-medium text-amber-700 dark:text-amber-400">
-                          <CalendarClock className="size-3" aria-hidden />
-                          {t("dashboard.statements.dueSoon")}
-                        </span>
-                      )}
-                    </span>
+                    {dueSoon && (
+                      <Badge variant="alert" className="shrink-0 bg-[#3A201A] text-[#FFB4A2]">
+                        {t("dashboard.statements.dueSoon")}
+                      </Badge>
+                    )}
                   </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-sm tabular-nums">{formatCents(remaining)}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {t("dashboard.statements.remaining")}
-                    </span>
+                  <div>
+                    <div className="text-xl font-extrabold tracking-[-0.02em] tabular-nums">
+                      {formatCents(remaining)}
+                    </div>
+                    <div
+                      className={cn(
+                        "text-[11px]",
+                        dueSoon ? "text-[#8D9298]" : "text-ink-tertiary",
+                      )}
+                    >
+                      {t("dashboard.statements.dueOn", { date: formatDate(statement.dueDate) })}
+                    </div>
                   </div>
                 </li>
               );
             })}
           </ul>
-        )}
-      </CardContent>
-    </Card>
+
+          <div className="mt-1 flex items-center justify-between border-t border-divider-card pt-3">
+            <span className="text-xs text-ink-tertiary">{t("dashboard.statements.totalLabel")}</span>
+            <span className="text-sm font-extrabold tabular-nums text-ink-primary">
+              {formatCents(totalRemaining)}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

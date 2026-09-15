@@ -7,15 +7,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AuthShell } from "@/features/auth/AuthShell";
 import { getGetCurrentUserQueryKey, useRegister } from "@/lib/api/generated/auth/auth";
 import { translateApiError } from "@/lib/errors";
+
+const FIELD_CLASS =
+  "h-11 rounded-field border-none bg-field px-3.5 text-sm font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-mint/40";
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -43,63 +40,73 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle asChild>
-            <h1>{t("auth.register")}</h1>
-          </CardTitle>
-          <CardDescription>{t("auth.registerSubtitle")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="register-name">{t("auth.name")}</Label>
-              <Input
-                id="register-name"
-                type="text"
-                autoComplete="name"
-                required
-                maxLength={120}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="register-email">{t("auth.email")}</Label>
-              <Input
-                id="register-email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="register-password">{t("auth.password")}</Label>
-              <Input
-                id="register-password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </div>
-            <Button type="submit" disabled={registerMutation.isPending}>
-              {registerMutation.isPending ? t("auth.submitting") : t("auth.register")}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            {t("auth.hasAccountPrompt")}{" "}
-            <Link to="/login" className="font-medium text-primary hover:underline">
-              {t("auth.login")}
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthShell>
+      <div className="flex w-full flex-col gap-4 rounded-card bg-card p-8">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[22px] font-extrabold tracking-[-0.025em] text-ink-primary">
+            {t("auth.register")}
+          </h1>
+          <p className="text-xs text-ink-tertiary">{t("auth.registerSubtitle")}</p>
+        </div>
+
+        <form className="flex flex-col gap-3.5" onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="register-name" className="text-[11px] font-bold text-ink-label">
+              {t("auth.name")}
+            </Label>
+            <Input
+              id="register-name"
+              type="text"
+              autoComplete="name"
+              required
+              maxLength={120}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className={FIELD_CLASS}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="register-email" className="text-[11px] font-bold text-ink-label">
+              {t("auth.email")}
+            </Label>
+            <Input
+              id="register-email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className={FIELD_CLASS}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="register-password" className="text-[11px] font-bold text-ink-label">
+              {t("auth.password")}
+            </Label>
+            <Input
+              id="register-password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className={FIELD_CLASS}
+            />
+            <span className="text-[11px] text-ink-label">{t("auth.passwordMinLength")}</span>
+          </div>
+          <Button type="submit" disabled={registerMutation.isPending} className="mt-1 w-full">
+            {registerMutation.isPending ? t("auth.submitting") : t("auth.register")}
+          </Button>
+        </form>
+
+        <p className="text-center text-xs text-ink-tertiary">
+          {t("auth.hasAccountPrompt")}{" "}
+          <Link to="/login" className="font-bold text-link hover:text-link-hover">
+            {t("auth.login")}
+          </Link>
+        </p>
+      </div>
+    </AuthShell>
   );
 }
