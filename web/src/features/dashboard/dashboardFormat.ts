@@ -15,13 +15,13 @@ export function formatSignedPercent(value: number): string {
   return `${sign}${percentFormatter.format(value)}%`;
 }
 
-// A fixed color per pillar so charts and legends stay consistent across the
-// dashboard. Tuned to read on both light and dark themes.
+// Fixed color per pillar (design_handoff_mk_finance/README.md — same in both
+// themes), so charts, legends and target bars stay consistent everywhere.
 export const PILLAR_COLORS: Record<Pillar, string> = {
-  [Pillar.FIXED_COSTS]: "#2563eb",
-  [Pillar.COMFORT]: "#0891b2",
-  [Pillar.GOALS]: "#16a34a",
-  [Pillar.PLEASURES]: "#db2777",
-  [Pillar.FINANCIAL_FREEDOM]: "#7c3aed",
-  [Pillar.KNOWLEDGE]: "#ca8a04",
+  [Pillar.FIXED_COSTS]: "#2FBF8F",
+  [Pillar.COMFORT]: "#86CFB6",
+  [Pillar.GOALS]: "#B9E3D4",
+  [Pillar.PLEASURES]: "#F0A68F",
+  [Pillar.FINANCIAL_FREEDOM]: "#5B6B7A",
+  [Pillar.KNOWLEDGE]: "#CFD4D1",
 };
