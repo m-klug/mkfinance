@@ -13,8 +13,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { MoneyField, SelectField, TextField } from "@/components/form/fields";
+import { cn } from "@/lib/utils";
 import { formatCents } from "@/lib/format";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
@@ -28,6 +29,7 @@ import {
   useCreateCardPurchase,
   useListCards,
 } from "@/lib/api/generated/cards/cards";
+import { useGetPillarAllocation } from "@/lib/api/generated/dashboard/dashboard";
 import { getListStatementsQueryKey } from "@/lib/api/generated/statements/statements";
 import {
   getListTransactionsQueryKey,
@@ -42,6 +44,7 @@ import {
   TransactionStatus,
   type Account,
   type CardPurchaseRequest,
+  type Pillar,
   type TransactionRequest,
   type TransferRequest,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
@@ -52,11 +55,14 @@ import {
 import {
   activeAccounts,
   categoryOptions,
+  monthOf,
   todayIso,
+  FORM_FIELD_CLASSNAME,
 } from "@/features/transactions/transactionUtils";
 import { TagsInput } from "@/features/transactions/TagsInput";
 import { INSTALLMENT_COUNTS, splitInstallments } from "@/features/cards/cardOptions";
 import { vaultCompositionQueryFilter } from "@/features/vaults/vaultOptions";
+import { PILLAR_COLORS, formatPercent } from "@/features/dashboard/dashboardFormat";
 
 // The things a user can register from anywhere in the app. A contribution
 // (aporte, R9) is a transfer into a savings/investment account, so it shares
@@ -80,6 +86,14 @@ interface FormErrors {
   fromVault?: string;
   toVault?: string;
 }
+
+// Big 40/800 amount field with the dark "impacto no pilar" panel
+// (design_handoff_mk_finance/README.md screen 03) — only the classes differ
+// from the plain field look, the input/label DOM stays what MoneyField renders.
+const HERO_AMOUNT_FIELD_CLASSNAME =
+  "[&_label]:text-[11px] [&_label]:font-bold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-hero-foreground/55 " +
+  "[&_input]:h-auto [&_input]:border-none [&_input]:bg-transparent [&_input]:p-0 [&_input]:text-[40px] [&_input]:font-extrabold " +
+  "[&_input]:leading-none [&_input]:tracking-tight [&_input]:text-hero-foreground [&_input]:shadow-none [&_input]:focus-visible:ring-0";
 
 export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionDialogProps) {
   const { t } = useTranslation();
@@ -238,6 +252,43 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
   );
   const selectedToVault = destinationVaults.find((vault) => vault.id === toVaultId);
 
+  // Live "impacto no pilar" preview (design_handoff_mk_finance/README.md
+  // §Interactions — "ao escolher categoria, o modal mostra em tempo real o
+  // impacto no pilar"): an expense projects onto its category's pillar, a
+  // contribution onto the pillar it is about to consume (R9). The allocation
+  // report already counts contributions alongside expenses per pillar
+  // (PillarAllocationReportPillarsItem.spentCents), so the projection reuses
+  // that same total instead of inventing a second way to add it up.
+  const previewPillar: Pillar | undefined =
+    mode === "EXPENSE" && categoryId
+      ? (categories.find((category) => category.id === categoryId)?.pillar ?? undefined)
+      : isTransferLike && isContribution
+        ? contributionPillar
+        : undefined;
+
+  const { data: allocationReport } = useGetPillarAllocation(
+    workspaceId ?? "",
+    { month: monthOf(date) },
+    { query: { enabled: enabled && Boolean(previewPillar) } },
+  );
+
+  const pillarPreview = useMemo(() => {
+    if (!previewPillar || !allocationReport || allocationReport.noIncome) return undefined;
+    const entry = allocationReport.pillars.find((item) => item.pillar === previewPillar);
+    if (!entry) return undefined;
+    const income = allocationReport.incomeCents;
+    const beforePercent = entry.actualPercent ?? 0;
+    const projectedCents = entry.spentCents + Math.max(0, amountCents);
+    const afterPercent = income > 0 ? (projectedCents / income) * 100 : beforePercent;
+    return {
+      pillar: previewPillar,
+      beforePercent,
+      afterPercent,
+      targetPercent: entry.targetPercent,
+      over: afterPercent > entry.targetPercent,
+    };
+  }, [previewPillar, allocationReport, amountCents]);
+
   const createTransaction = useCreateTransaction();
   const createTransfer = useCreateTransfer();
   const createCardPurchase = useCreateCardPurchase();
@@ -355,29 +406,63 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
           <DialogDescription>{t("quickEntry.subtitle")}</DialogDescription>
         </DialogHeader>
 
-        <Tabs value={mode} onValueChange={(value) => setMode(value as QuickMode)}>
-          <TabsList className="w-full max-w-full justify-start overflow-x-auto">
-            {QUICK_MODES.map((quickMode) => (
-              <TabsTrigger key={quickMode} value={quickMode} className="flex-none">
-                {t(`quickEntry.mode.${quickMode}`)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <SegmentedControl
+          className="w-full"
+          options={QUICK_MODES.map((quickMode) => ({
+            value: quickMode,
+            label: t(`quickEntry.mode.${quickMode}`),
+          }))}
+          value={mode}
+          onChange={(value) => setMode(value)}
+        />
 
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-          <MoneyField
-            id="quick-amount"
-            label={t("transactions.amount")}
-            value={amountCents}
-            onValueChange={setAmountCents}
-            error={errors.amount}
-          />
+          <div className="flex flex-col items-start gap-4 rounded-card bg-hero p-5 sm:flex-row sm:items-end sm:justify-between">
+            <MoneyField
+              id="quick-amount"
+              label={t("transactions.amount")}
+              value={amountCents}
+              onValueChange={setAmountCents}
+              error={errors.amount}
+              fieldClassName={HERO_AMOUNT_FIELD_CLASSNAME}
+            />
+            {pillarPreview && (
+              <div className="flex flex-col items-start gap-1.5 sm:items-end">
+                <span className="text-[11px] text-hero-foreground/55">
+                  {t("quickEntry.pillarImpact")}
+                </span>
+                <span className="flex items-center gap-2 rounded-pill bg-hero-foreground/10 px-3 py-1.5">
+                  <span
+                    className="size-[7px] shrink-0 rounded-full"
+                    style={{ backgroundColor: PILLAR_COLORS[pillarPreview.pillar] }}
+                    aria-hidden
+                  />
+                  <span className="text-xs font-bold text-hero-foreground">
+                    {t(`pillar.${pillarPreview.pillar}`)}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[11px] font-bold tabular-nums",
+                      pillarPreview.over ? "text-alert-ink" : "text-hero-foreground/70",
+                    )}
+                  >
+                    {t("quickEntry.pillarImpactChange", {
+                      before: formatPercent(pillarPreview.beforePercent),
+                      after: formatPercent(pillarPreview.afterPercent),
+                      target: pillarPreview.targetPercent,
+                    })}
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+
           <TextField
             id="quick-description"
             label={t("transactions.description")}
             maxLength={255}
             autoComplete="off"
+            fieldClassName={FORM_FIELD_CLASSNAME}
             value={description}
             error={errors.description}
             onChange={(event) => setDescription(event.target.value)}
@@ -388,6 +473,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
               id="quick-category"
               label={t("transactions.category")}
               placeholder={t("transactions.categoryPlaceholder")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
               options={categoryOptions(categories)}
               value={categoryId}
               error={errors.category}
@@ -400,6 +486,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
               <SelectField
                 id="quick-account"
                 label={isTransferLike ? t("transactions.fromAccount") : t("transactions.account")}
+                fieldClassName={FORM_FIELD_CLASSNAME}
                 options={accounts.map((account) => ({ value: account.id, label: account.name }))}
                 value={accountId}
                 error={errors.accounts}
@@ -410,6 +497,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                   id="quick-to-account"
                   label={t("transactions.toAccount")}
                   placeholder={t("transactions.toAccountPlaceholder")}
+                  fieldClassName={FORM_FIELD_CLASSNAME}
                   options={destinationAccounts.map((account) => ({
                     value: account.id,
                     label: account.name,
@@ -432,6 +520,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                   id="quick-from-vault"
                   label={t("transactions.fromVault")}
                   placeholder={t("transactions.vaultPlaceholder")}
+                  fieldClassName={FORM_FIELD_CLASSNAME}
                   options={originVaults.map((vault) => ({ value: vault.id, label: vault.name }))}
                   value={fromVaultId}
                   error={errors.fromVault}
@@ -443,6 +532,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                   id="quick-to-vault"
                   label={t("transactions.toVault")}
                   placeholder={t("transactions.vaultPlaceholder")}
+                  fieldClassName={FORM_FIELD_CLASSNAME}
                   options={destinationVaults.map((vault) => ({ value: vault.id, label: vault.name }))}
                   value={toVaultId}
                   error={errors.toVault}
@@ -459,6 +549,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                   id="quick-card"
                   label={t("quickEntry.card")}
                   placeholder={t("quickEntry.cardPlaceholder")}
+                  fieldClassName={FORM_FIELD_CLASSNAME}
                   options={cards.map((card) => ({ value: card.id, label: card.name }))}
                   value={cardId}
                   error={errors.card}
@@ -467,6 +558,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                 <SelectField
                   id="quick-installments"
                   label={t("quickEntry.installments")}
+                  fieldClassName={FORM_FIELD_CLASSNAME}
                   options={INSTALLMENT_COUNTS.map((count) => ({
                     value: String(count),
                     label: String(count),
@@ -476,13 +568,15 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                 />
               </div>
               {installmentPreview.length > 0 && (
-                <div className="rounded-md border p-3 text-sm">
-                  <p className="mb-1 font-medium">{t("quickEntry.installmentPreview")}</p>
-                  <ul className="flex flex-col gap-0.5">
+                <div className="flex flex-col gap-2.5 rounded-card bg-hero p-4">
+                  <p className="text-[11px] font-bold tracking-wide text-hero-foreground/55 uppercase">
+                    {t("quickEntry.installmentPreview")}
+                  </p>
+                  <ul className="flex flex-col gap-1">
                     {installmentPreview.map((cents, index) => (
                       <li
                         key={index}
-                        className="flex justify-between tabular-nums text-muted-foreground"
+                        className="flex justify-between text-sm text-hero-foreground/70"
                       >
                         <span>
                           {t("statement.installmentOf", {
@@ -490,7 +584,9 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                             count: installmentCount,
                           })}
                         </span>
-                        <span>{formatCents(cents)}</span>
+                        <span className="tabular-nums font-bold text-hero-foreground">
+                          {formatCents(cents)}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -518,12 +614,12 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                 <Label htmlFor="quick-contribution-pillar-derived">
                   {t("transactions.contributionPillar")}
                 </Label>
-                <p id="quick-contribution-pillar-derived" className="text-sm">
+                <p id="quick-contribution-pillar-derived" className="text-sm text-ink-primary">
                   {selectedToVault
                     ? t(`pillar.${selectedToVault.contributionPillar}`)
                     : t("transactions.contributionPillarPendingVault")}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-ink-tertiary">
                   {t("transactions.contributionPillarFromVaultHint")}
                 </p>
               </div>
@@ -532,6 +628,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                 id="quick-contribution-pillar"
                 label={t("transactions.contributionPillar")}
                 hint={t("transactions.contributionPillarHint")}
+                fieldClassName={FORM_FIELD_CLASSNAME}
                 options={contributionPillarOptions(t)}
                 value={contributionPillar}
                 onChange={(event) =>
@@ -546,24 +643,33 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
               id="quick-date"
               label={isCardMode ? t("quickEntry.purchaseDate") : t("transactions.date")}
               type="date"
+              fieldClassName={FORM_FIELD_CLASSNAME}
               value={date}
               onChange={(event) => setDate(event.target.value)}
             />
             {!isTransferLike && !isCardMode && (
-              <label className="flex items-end gap-2 pb-2 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  className="size-4"
-                  checked={pending}
-                  onChange={(event) => setPending(event.target.checked)}
-                />
-                {t("transactions.schedulePending")}
+              <label className="flex items-center justify-between gap-3 self-end rounded-field bg-field px-3.5 py-2.5">
+                <span className="text-[13px] font-semibold text-ink-primary">
+                  {t("transactions.schedulePending")}
+                </span>
+                <span className="relative inline-flex h-6 w-[42px] shrink-0 items-center rounded-pill bg-[#d5d9d6] transition-colors has-[:checked]:bg-mint">
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={pending}
+                    onChange={(event) => setPending(event.target.checked)}
+                  />
+                  <span
+                    className="absolute left-[3px] size-[18px] rounded-full bg-white shadow transition-transform peer-checked:translate-x-[18px]"
+                    aria-hidden
+                  />
+                </span>
               </label>
             )}
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
               {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>

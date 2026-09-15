@@ -35,7 +35,7 @@ import {
   type TransactionRequest,
   type TransferUpdateRequest,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
-import { categoryOptions } from "@/features/transactions/transactionUtils";
+import { categoryOptions, FORM_FIELD_CLASSNAME } from "@/features/transactions/transactionUtils";
 import { TagsInput } from "@/features/transactions/TagsInput";
 import {
   contributionPillarOptions,
@@ -245,6 +245,7 @@ export function TransactionFormDialog({
             label={t("transactions.amount")}
             value={form.amountCents}
             error={errors.amount}
+            fieldClassName={FORM_FIELD_CLASSNAME}
             onValueChange={(cents) => setForm({ ...form, amountCents: cents })}
           />
           <TextField
@@ -252,6 +253,7 @@ export function TransactionFormDialog({
             label={t("transactions.description")}
             maxLength={255}
             autoComplete="off"
+            fieldClassName={FORM_FIELD_CLASSNAME}
             value={form.description}
             error={errors.description}
             onChange={(event) => setForm({ ...form, description: event.target.value })}
@@ -261,6 +263,7 @@ export function TransactionFormDialog({
               id="transaction-category"
               label={t("transactions.category")}
               placeholder={t("transactions.categoryPlaceholder")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
               options={categoryOptions(availableCategories)}
               value={form.categoryId}
               error={errors.category}
@@ -271,6 +274,7 @@ export function TransactionFormDialog({
             <SelectField
               id="transaction-account"
               label={isTransfer ? t("transactions.legAccount") : t("transactions.account")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
               options={accounts.map((account) => ({ value: account.id, label: account.name }))}
               value={form.accountId}
               // Moving the leg to another account discards whatever vault it
@@ -283,6 +287,7 @@ export function TransactionFormDialog({
               id="transaction-date"
               label={t("transactions.date")}
               type="date"
+              fieldClassName={FORM_FIELD_CLASSNAME}
               value={form.date}
               onChange={(event) => setForm({ ...form, date: event.target.value })}
             />
@@ -293,6 +298,7 @@ export function TransactionFormDialog({
               label={t("transactions.vault")}
               placeholder={t("transactions.vaultPlaceholder")}
               hint={t("transactions.vaultKeepHint")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
               options={legVaults.map((vault) => ({ value: vault.id, label: vault.name }))}
               value={form.vaultId}
               error={errors.vault}
@@ -305,10 +311,10 @@ export function TransactionFormDialog({
                 <Label htmlFor="transaction-contribution-pillar-derived">
                   {t("transactions.contributionPillar")}
                 </Label>
-                <p id="transaction-contribution-pillar-derived" className="text-sm">
+                <p id="transaction-contribution-pillar-derived" className="text-sm text-ink-primary">
                   {selectedVault ? t(`pillar.${selectedVault.contributionPillar}`) : ""}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-ink-tertiary">
                   {t("transactions.contributionPillarFromVaultHint")}
                 </p>
               </div>
@@ -317,6 +323,7 @@ export function TransactionFormDialog({
                 id="transaction-contribution-pillar"
                 label={t("transactions.contributionPillar")}
                 hint={t("transactions.contributionPillarHint")}
+                fieldClassName={FORM_FIELD_CLASSNAME}
                 options={contributionPillarOptions(t)}
                 value={form.contributionPillar}
                 onChange={(event) =>
@@ -328,6 +335,7 @@ export function TransactionFormDialog({
           <SelectField
             id="transaction-status"
             label={t("transactions.status")}
+            fieldClassName={FORM_FIELD_CLASSNAME}
             options={[
               { value: TransactionStatus.SETTLED, label: t("transactionStatus.SETTLED") },
               { value: TransactionStatus.PENDING, label: t("transactionStatus.PENDING") },
@@ -341,6 +349,7 @@ export function TransactionFormDialog({
             id="transaction-note"
             label={t("transactions.note")}
             autoComplete="off"
+            fieldClassName={FORM_FIELD_CLASSNAME}
             value={form.note}
             onChange={(event) => setForm({ ...form, note: event.target.value })}
           />
@@ -354,7 +363,7 @@ export function TransactionFormDialog({
             />
           )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
               {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isPending}>
