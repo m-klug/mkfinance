@@ -41,27 +41,32 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/settings/pillars", labelKey: "nav.settings", icon: Settings },
 ];
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * Icon-only rail, 9 destinations + theme/logout footer
+ * (design_handoff_mk_finance/README.md §Componentes recorrentes).
+ */
+function NavRail({ onNavigate, className }: { onNavigate?: () => void; className?: string }) {
   const { t } = useTranslation();
   return (
-    <nav className="flex flex-1 flex-col gap-1 p-3">
+    <nav className={cn("flex flex-col items-center gap-1 py-3", className)}>
       {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
           end={to === "/"}
           onClick={onNavigate}
+          title={t(labelKey)}
+          aria-label={t(labelKey)}
           className={({ isActive }) =>
             cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "flex size-10 shrink-0 items-center justify-center rounded-[13px] transition-colors md:size-11",
               isActive
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                ? "bg-success-bg text-success-ink"
+                : "text-ink-tertiary hover:bg-neutral hover:text-ink-secondary",
             )
           }
         >
-          <Icon className="size-4 shrink-0" />
-          {t(labelKey)}
+          <Icon className="size-[18px] shrink-0" />
         </NavLink>
       ))}
     </nav>
@@ -96,63 +101,72 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r bg-card md:flex">
-        <div className="flex h-14 items-center px-4 text-lg font-semibold">{t("app.name")}</div>
-        <NavLinks />
-      </aside>
-
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <button
-            type="button"
-            aria-label={t("nav.closeMenu")}
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="relative flex h-full w-64 flex-col bg-card shadow-lg">
-            <div className="flex h-14 items-center justify-between px-4 text-lg font-semibold">
-              {t("app.name")}
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t("nav.closeMenu")}
-                onClick={() => setMobileOpen(false)}
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-            <NavLinks onNavigate={() => setMobileOpen(false)} />
-          </aside>
-        </div>
-      )}
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between gap-2 border-b bg-card px-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            aria-label={t("nav.openMenu")}
-            onClick={() => setMobileOpen(true)}
-          >
-            <Menu className="size-4" />
-          </Button>
-          <span className="text-sm font-medium md:hidden">{t("app.name")}</span>
-          <div className="ml-auto flex items-center gap-2">
-            <QuickTransactionButton />
-            <ThemeToggle />
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="size-4" />
-              {t("auth.logout")}
-            </Button>
+    <div className="flex min-h-screen bg-page-bg p-3.5">
+      <div className="flex min-h-[calc(100vh-1.75rem)] w-full overflow-hidden rounded-shell bg-shell-bg shadow-[var(--shadow-shell)] md:flex-row">
+        {/* Desktop rail */}
+        <aside className="hidden w-[72px] shrink-0 flex-col items-center border-r border-divider-card bg-card py-4 md:flex">
+          <div className="mb-4 flex size-9 items-center justify-center rounded-[10px] bg-mint text-sm font-extrabold text-mint-ink">
+            M
           </div>
-        </header>
-        <main className="flex flex-1 flex-col">
-          <Outlet />
-        </main>
+          <NavRail className="flex-1" />
+          <div className="flex flex-col items-center gap-2 pt-2">
+            <ThemeToggle />
+          </div>
+        </aside>
+
+        {/* Mobile drawer — scrim covers the whole shell per the handoff's modal rule */}
+        {mobileOpen && (
+          <div className="fixed inset-3.5 z-40 overflow-hidden rounded-shell md:hidden">
+            <button
+              type="button"
+              aria-label={t("nav.closeMenu")}
+              className="absolute inset-0 bg-[var(--scrim)]"
+              onClick={() => setMobileOpen(false)}
+            />
+            <aside className="relative flex h-full w-64 flex-col bg-card">
+              <div className="flex h-14 items-center justify-between px-4 text-lg font-extrabold">
+                {t("app.name")}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("nav.closeMenu")}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+              <NavRail onNavigate={() => setMobileOpen(false)} className="flex-1 items-stretch px-3" />
+            </aside>
+          </div>
+        )}
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-16 items-center justify-between gap-2 border-b border-divider-card px-4 md:px-6">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              aria-label={t("nav.openMenu")}
+              onClick={() => setMobileOpen(true)}
+            >
+              <Menu className="size-4" />
+            </Button>
+            <span className="text-sm font-bold md:hidden">{t("app.name")}</span>
+            <div className="ml-auto flex items-center gap-2">
+              <QuickTransactionButton />
+              <span className="hidden md:contents">
+                <ThemeToggle />
+                <Button variant="secondary" size="sm" onClick={handleLogout}>
+                  <LogOut className="size-4" />
+                  {t("auth.logout")}
+                </Button>
+              </span>
+            </div>
+          </header>
+          <main className="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </div>
   );

@@ -1,56 +1,166 @@
 @import "tailwindcss";
+@import "@fontsource-variable/manrope";
 
-/* Design tokens (shadcn-compatible). FE-1 owns and extends this file. */
+/*
+ * Design tokens from design_handoff_mk_finance/README.md (hifi handoff).
+ * Two "backgrounds" exist in light mode: --page-bg (outside the shell) and
+ * --shell-bg (the app's own floor) — do not collapse them into one.
+ * --hero is the dark panel used INSIDE the light theme (pillar allocation
+ * panel, statement summary, auth left pane) — it does not change with theme.
+ */
 :root {
-  --background: oklch(0.99 0 0);
-  --foreground: oklch(0.2 0.01 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.01 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.01 250);
-  --primary: oklch(0.6 0.15 150);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.005 250);
-  --secondary-foreground: oklch(0.2 0.01 250);
-  --muted: oklch(0.96 0.005 250);
-  --muted-foreground: oklch(0.5 0.01 250);
-  --accent: oklch(0.94 0.02 150);
-  --accent-foreground: oklch(0.2 0.01 250);
-  --border: oklch(0.9 0.005 250);
-  --input: oklch(0.9 0.005 250);
-  --ring: oklch(0.6 0.15 150);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --radius: 0.5rem;
+  --page-bg: #e6e8e6;
+  --shell-bg: #eceeec;
+  --card: #ffffff;
+  --field: #f6f7f6;
+  --neutral: #f1f3f1;
+  --hero: #16181a;
+  --hero-foreground: #f4f6f4;
+
+  --ink-primary: #16181a;
+  --ink-secondary: #4b5056;
+  --ink-tertiary: #6b7076;
+  --ink-label: #7b8086;
+  --placeholder: #9aa0a6;
+
+  --divider-card: #edefed;
+  --divider-row: #f3f4f3;
+
+  --mint: #2fbf8f;
+  --mint-ink: #08130f;
+
+  --success-bg: #d9f5ea;
+  --success-ink: #0d6b50;
+  --alert-bg: #fbe4de;
+  --alert-ink: #a13a2a;
+  --link: #127a5b;
+  --link-hover: #0c5540;
+
+  --pillar-fixed-costs: #2fbf8f;
+  --pillar-comfort: #86cfb6;
+  --pillar-goals: #b9e3d4;
+  --pillar-pleasures: #f0a68f;
+  --pillar-financial-freedom: #5b6b7a;
+  --pillar-knowledge: #cfd4d1;
+
+  --chart-gray-1: #3a4046;
+  --chart-gray-2: #cfd4d1;
+  --chart-gray-3: #e6e9e6;
+  --chart-gray-4: #dfe3e0;
+
+  --radius-shell: 28px;
+  --radius-card: 20px;
+  --radius-modal: 24px;
+  --radius-field: 12px;
+  --radius-list-item: 14px;
+  --radius-pill: 999px;
+  --radius-swatch: 4px;
+
+  --shadow-shell: 0 20px 60px rgba(22, 24, 26, 0.14);
+  --shadow-modal: 0 28px 80px rgba(8, 10, 12, 0.45);
+  --scrim: rgba(22, 24, 26, 0.52);
+
+  /* shadcn-compatible aliases so existing ui/* components keep working */
+  --background: var(--shell-bg);
+  --foreground: var(--ink-primary);
+  --popover: var(--card);
+  --popover-foreground: var(--ink-primary);
+  --primary: var(--mint);
+  --primary-foreground: var(--mint-ink);
+  --secondary: var(--neutral);
+  --secondary-foreground: var(--ink-secondary);
+  --muted: var(--neutral);
+  --muted-foreground: var(--ink-tertiary);
+  --accent: var(--success-bg);
+  --accent-foreground: var(--success-ink);
+  --border: var(--divider-card);
+  --input: var(--field);
+  --ring: var(--mint);
+  --destructive: var(--alert-ink);
+  --destructive-foreground: var(--alert-bg);
+  --radius: var(--radius-field);
 }
 
 .dark {
-  --background: oklch(0.17 0.01 250);
-  --foreground: oklch(0.95 0.005 250);
-  --card: oklch(0.21 0.01 250);
-  --card-foreground: oklch(0.95 0.005 250);
-  --popover: oklch(0.21 0.01 250);
-  --popover-foreground: oklch(0.95 0.005 250);
-  --primary: oklch(0.7 0.15 150);
-  --primary-foreground: oklch(0.15 0.01 250);
-  --secondary: oklch(0.25 0.01 250);
-  --secondary-foreground: oklch(0.95 0.005 250);
-  --muted: oklch(0.25 0.01 250);
-  --muted-foreground: oklch(0.65 0.01 250);
-  --accent: oklch(0.28 0.03 150);
-  --accent-foreground: oklch(0.95 0.005 250);
-  --border: oklch(0.3 0.01 250);
-  --input: oklch(0.3 0.01 250);
-  --ring: oklch(0.7 0.15 150);
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.15 0.01 250);
+  --page-bg: #101214;
+  --shell-bg: #101214;
+  --card: #1d2024;
+  --field: #24282c;
+  --neutral: #2b2f34;
+  --hero: #16181a;
+  --hero-foreground: #f4f6f4;
+
+  --ink-primary: #f4f6f4;
+  --ink-secondary: #c9cdd1;
+  --ink-tertiary: #9aa0a6;
+  --ink-label: #9aa0a6;
+  --placeholder: #6b7076;
+
+  --divider-card: #2b2f34;
+  --divider-row: #2b2f34;
+
+  --success-bg: #14312a;
+  --success-ink: #6fe0b4;
+  --alert-bg: #3a201a;
+  --alert-ink: #ffb4a2;
+
+  --shadow-shell: 0 20px 60px rgba(8, 10, 12, 0.4);
+
+  --background: var(--shell-bg);
+  --foreground: var(--ink-primary);
+  --popover: var(--card);
+  --popover-foreground: var(--ink-primary);
+  --secondary: var(--neutral);
+  --secondary-foreground: var(--ink-secondary);
+  --muted: var(--neutral);
+  --muted-foreground: var(--ink-tertiary);
+  --accent: var(--success-bg);
+  --accent-foreground: var(--success-ink);
+  --border: var(--divider-card);
+  --input: var(--field);
+  --destructive: var(--alert-ink);
+  --destructive-foreground: var(--alert-bg);
 }
 
 @theme inline {
+  --font-sans: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  --color-page-bg: var(--page-bg);
+  --color-shell-bg: var(--shell-bg);
+  --color-card: var(--card);
+  --color-field: var(--field);
+  --color-neutral: var(--neutral);
+  --color-hero: var(--hero);
+  --color-hero-foreground: var(--hero-foreground);
+
+  --color-ink-primary: var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-tertiary: var(--ink-tertiary);
+  --color-ink-label: var(--ink-label);
+  --color-placeholder: var(--placeholder);
+
+  --color-divider-card: var(--divider-card);
+  --color-divider-row: var(--divider-row);
+
+  --color-mint: var(--mint);
+  --color-mint-ink: var(--mint-ink);
+  --color-success-bg: var(--success-bg);
+  --color-success-ink: var(--success-ink);
+  --color-alert-bg: var(--alert-bg);
+  --color-alert-ink: var(--alert-ink);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+
+  --color-pillar-fixed-costs: var(--pillar-fixed-costs);
+  --color-pillar-comfort: var(--pillar-comfort);
+  --color-pillar-goals: var(--pillar-goals);
+  --color-pillar-pleasures: var(--pillar-pleasures);
+  --color-pillar-financial-freedom: var(--pillar-financial-freedom);
+  --color-pillar-knowledge: var(--pillar-knowledge);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
+  --color-card-foreground: var(--ink-primary);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
@@ -66,12 +176,26 @@
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+
+  --radius-shell: var(--radius-shell);
+  --radius-card: var(--radius-card);
+  --radius-modal: var(--radius-modal);
+  --radius-field: var(--radius-field);
+  --radius-list-item: var(--radius-list-item);
+  --radius-pill: var(--radius-pill);
+  --radius-swatch: var(--radius-swatch);
+  --radius-sm: calc(var(--radius-field) - 4px);
+  --radius-md: calc(var(--radius-field) - 2px);
+  --radius-lg: var(--radius-field);
+  --radius-xl: calc(var(--radius-field) + 4px);
 }
 
 body {
-  @apply bg-background text-foreground antialiased;
+  @apply bg-page-bg text-foreground antialiased;
+  font-feature-settings: "tnum" 0;
+}
+
+/* Rule from the handoff: every money/percent value uses tabular figures. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }

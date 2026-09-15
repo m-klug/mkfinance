@@ -9,11 +9,11 @@ describe("App routes", () => {
     seedAuthenticatedSession();
     renderWithProviders(<App />, { route: "/" });
 
-    // Sidebar nav (shell chrome) and the page content both show up.
+    // Nav rail (icon-only, shell chrome) and the page content both show up.
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-    expect(screen.getAllByText("Contas").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Cartões").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Categorias").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Contas" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Cartões" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Categorias" }).length).toBeGreaterThan(0);
   });
 
   // FE-2 replaced the transactions placeholder with the real screen.
