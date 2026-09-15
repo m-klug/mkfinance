@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -49,40 +50,61 @@ export function VaultEntriesSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="rounded-modal sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{t("vaults.entriesTitle", { name: vault?.name ?? "" })}</DialogTitle>
-          <DialogDescription>{t("vaults.entriesSubtitle")}</DialogDescription>
+          <DialogTitle className="text-[15px] font-extrabold tracking-tight text-ink-primary">
+            {t("vaults.entriesTitle", { name: vault?.name ?? "" })}
+          </DialogTitle>
+          <DialogDescription className="text-ink-tertiary">
+            {t("vaults.entriesSubtitle")}
+          </DialogDescription>
         </DialogHeader>
 
-        {isPending && <p className="text-muted-foreground">{t("common.loading")}</p>}
+        {isPending && <p className="text-sm text-ink-tertiary">{t("common.loading")}</p>}
         {!isPending && (entries?.length ?? 0) === 0 && (
-          <p className="text-muted-foreground">{t("vaults.entriesEmpty")}</p>
+          <p className="text-sm text-ink-tertiary">{t("vaults.entriesEmpty")}</p>
         )}
         {!isPending && (entries?.length ?? 0) > 0 && (
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>{t("vaults.entryDate")}</TableHead>
-                <TableHead>{t("vaults.entryDescription")}</TableHead>
-                <TableHead>{t("vaults.entrySource")}</TableHead>
-                <TableHead>{t("vaults.entryStatus")}</TableHead>
-                <TableHead className="text-right">{t("vaults.entryAmount")}</TableHead>
+              <TableRow className="border-divider-card hover:bg-transparent">
+                <TableHead className="text-[11px] font-bold text-ink-label">
+                  {t("vaults.entryDate")}
+                </TableHead>
+                <TableHead className="text-[11px] font-bold text-ink-label">
+                  {t("vaults.entryDescription")}
+                </TableHead>
+                <TableHead className="text-[11px] font-bold text-ink-label">
+                  {t("vaults.entrySource")}
+                </TableHead>
+                <TableHead className="text-[11px] font-bold text-ink-label">
+                  {t("vaults.entryStatus")}
+                </TableHead>
+                <TableHead className="text-right text-[11px] font-bold text-ink-label">
+                  {t("vaults.entryAmount")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(entries ?? []).map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="tabular-nums">{formatDate(entry.date)}</TableCell>
-                  <TableCell>{entry.description}</TableCell>
-                  <TableCell className="text-muted-foreground">
+                <TableRow key={entry.id} className="border-divider-row">
+                  <TableCell className="tabular-nums text-ink-tertiary">
+                    {formatDate(entry.date)}
+                  </TableCell>
+                  <TableCell className="font-bold text-ink-primary">{entry.description}</TableCell>
+                  <TableCell className="text-ink-secondary">
                     {t(`vaults.entrySourceLabel.${entry.source}`)}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {t(`transactionStatus.${entry.status}`)}
+                  <TableCell>
+                    <Badge variant={entry.status === "PENDING" ? "alert" : "neutral"}>
+                      {t(`transactionStatus.${entry.status}`)}
+                    </Badge>
                   </TableCell>
                   <TableCell
-                    className={cn("text-right tabular-nums font-medium", entryAmountClass(entry.amountCents))}
+                    className={cn(
+                      "text-right tabular-nums font-extrabold",
+                      entryAmountClass(entry.amountCents),
+                    )}
                   >
                     {formatCents(entry.amountCents)}
                   </TableCell>

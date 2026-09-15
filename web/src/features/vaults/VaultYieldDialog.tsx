@@ -96,10 +96,14 @@ export function VaultYieldDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="rounded-modal">
         <DialogHeader>
-          <DialogTitle>{t("vaults.yieldTitle")}</DialogTitle>
-          <DialogDescription>{t("vaults.yieldSubtitle")}</DialogDescription>
+          <DialogTitle className="text-[15px] font-extrabold tracking-tight text-ink-primary">
+            {t("vaults.yieldTitle")}
+          </DialogTitle>
+          <DialogDescription className="text-ink-tertiary">
+            {t("vaults.yieldSubtitle")}
+          </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <MoneyField
@@ -128,27 +132,32 @@ export function VaultYieldDialog({
           />
 
           {amountCents > 0 && (
-            <div className="flex flex-col gap-2 rounded-md border p-3 text-sm">
-              <p className="font-medium">{t("vaults.yieldPreviewTitle")}</p>
+            <div className="flex flex-col gap-2 rounded-field bg-field p-3 text-sm">
+              <p className="text-[11px] font-bold text-ink-label">
+                {t("vaults.yieldPreviewTitle")}
+              </p>
               {preview.length === 0 ? (
-                <p className="text-muted-foreground">{t("vaults.yieldPreviewEmpty")}</p>
+                <p className="text-ink-tertiary">{t("vaults.yieldPreviewEmpty")}</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {preview.map((share) => (
-                    <li key={share.vaultId} className="flex justify-between tabular-nums">
+                    <li
+                      key={share.vaultId}
+                      className="flex justify-between tabular-nums text-ink-primary"
+                    >
                       <span>{share.name}</span>
-                      <span>{formatCents(share.cents)}</span>
+                      <span className="font-bold">{formatCents(share.cents)}</span>
                     </li>
                   ))}
                   {unallocatedPreviewCents > 0 && (
-                    <li className="flex justify-between tabular-nums text-muted-foreground">
+                    <li className="flex justify-between tabular-nums text-ink-tertiary">
                       <span>{t("vaults.yieldPreviewUnallocated")}</span>
                       <span>{formatCents(unallocatedPreviewCents)}</span>
                     </li>
                   )}
                 </ul>
               )}
-              <p className="text-xs text-muted-foreground">{t("vaults.yieldPreviewHint")}</p>
+              <p className="text-xs text-ink-tertiary">{t("vaults.yieldPreviewHint")}</p>
             </div>
           )}
 

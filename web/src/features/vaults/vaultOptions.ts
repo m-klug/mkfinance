@@ -102,18 +102,18 @@ export function selectValueToVaultId(value: string): string | null {
 export function goalStatusBadgeClass(status: VaultGoalStatus): string {
   switch (status) {
     case VaultGoalStatus.REACHED:
-      return "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100";
+      return "bg-success-bg text-success-ink";
     case VaultGoalStatus.OVERDUE:
-      return "bg-destructive/15 text-destructive";
+      return "bg-alert-bg text-alert-ink";
     case VaultGoalStatus.IN_PROGRESS:
     default:
-      return "bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100";
+      return "bg-neutral text-ink-secondary";
   }
 }
 
 /** Green for money that arrived in the vault, red for money that left (signed amount, §4.1). */
 export function entryAmountClass(amountCents: number): string {
-  return amountCents < 0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-400";
+  return amountCents < 0 ? "text-alert-ink" : "text-success-ink";
 }
 
 export interface VaultYieldPreviewShare {
