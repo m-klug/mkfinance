@@ -7,15 +7,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AuthShell } from "@/features/auth/AuthShell";
 import { getGetCurrentUserQueryKey, useLogin } from "@/lib/api/generated/auth/auth";
 import { translateApiError } from "@/lib/errors";
+
+const FIELD_CLASS =
+  "h-11 rounded-field border-none bg-field px-3.5 text-sm font-semibold shadow-none focus-visible:ring-2 focus-visible:ring-mint/40";
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -23,6 +20,7 @@ export default function LoginPage() {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const loginMutation = useLogin();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -42,51 +40,66 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle asChild>
-            <h1>{t("auth.login")}</h1>
-          </CardTitle>
-          <CardDescription>{t("auth.loginSubtitle")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="login-email">{t("auth.email")}</Label>
-              <Input
-                id="login-email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
+    <AuthShell>
+      <div className="flex w-full flex-col gap-4 rounded-card bg-card p-8">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[22px] font-extrabold tracking-[-0.025em] text-ink-primary">
+            {t("auth.login")}
+          </h1>
+          <p className="text-xs text-ink-tertiary">{t("auth.loginSubtitle")}</p>
+        </div>
+
+        <form className="flex flex-col gap-3.5" onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="login-email" className="text-[11px] font-bold text-ink-label">
+              {t("auth.email")}
+            </Label>
+            <Input
+              id="login-email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className={FIELD_CLASS}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="login-password" className="text-[11px] font-bold text-ink-label">
+                {t("auth.password")}
+              </Label>
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                className="text-[11px] font-bold text-link hover:text-link-hover"
+              >
+                {showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+              </button>
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="login-password">{t("auth.password")}</Label>
-              <Input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </div>
-            <Button type="submit" disabled={loginMutation.isPending}>
-              {loginMutation.isPending ? t("auth.submitting") : t("auth.login")}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            {t("auth.noAccountPrompt")}{" "}
-            <Link to="/register" className="font-medium text-primary hover:underline">
-              {t("auth.register")}
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+            <Input
+              id="login-password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className={FIELD_CLASS}
+            />
+          </div>
+          <Button type="submit" disabled={loginMutation.isPending} className="mt-1 w-full">
+            {loginMutation.isPending ? t("auth.submitting") : t("auth.login")}
+          </Button>
+        </form>
+
+        <p className="text-center text-xs text-ink-tertiary">
+          {t("auth.noAccountPrompt")}{" "}
+          <Link to="/register" className="font-bold text-link hover:text-link-hover">
+            {t("auth.register")}
+          </Link>
+        </p>
+      </div>
+    </AuthShell>
   );
 }

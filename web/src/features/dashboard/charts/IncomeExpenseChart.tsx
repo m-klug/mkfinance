@@ -13,9 +13,12 @@ interface IncomeExpenseChartProps {
   width: number;
 }
 
+// Mint for income, chart-gray-1 for expense — the handoff's income×expense bars
+// stay in the neutral/mint palette rather than a red/green traffic-light pair
+// (design_handoff_mk_finance/README.md §Cores dos 6 pilares / gráficos).
 const COLORS: Record<IncomeExpenseDatum["kind"], string> = {
-  income: "#16a34a",
-  expense: "#dc2626",
+  income: "#2FBF8F",
+  expense: "#3A4046",
 };
 
 // Lazy-loaded (Recharts stays in its own chunk, CONTEXTO §6.8). Explicit width
@@ -24,15 +27,25 @@ export default function IncomeExpenseChart({ data, width }: IncomeExpenseChartPr
   const height = 220;
   return (
     <BarChart width={width} height={height} data={data} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-      <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--divider-row)" />
+      <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--ink-tertiary)" }} axisLine={{ stroke: "var(--divider-card)" }} tickLine={false} />
       <YAxis
-        tick={{ fontSize: 12 }}
+        tick={{ fontSize: 12, fill: "var(--ink-tertiary)" }}
         width={72}
+        axisLine={false}
+        tickLine={false}
         tickFormatter={(value: number) => formatCents(value)}
       />
-      <Tooltip formatter={(value: number) => formatCents(value)} />
-      <Bar dataKey="amountCents" radius={[4, 4, 0, 0]}>
+      <Tooltip
+        formatter={(value: number) => formatCents(value)}
+        contentStyle={{
+          borderRadius: 12,
+          border: "1px solid var(--divider-card)",
+          background: "var(--card)",
+          fontSize: 12,
+        }}
+      />
+      <Bar dataKey="amountCents" radius={[8, 8, 4, 4]}>
         {data.map((datum) => (
           <Cell key={datum.label} fill={COLORS[datum.kind]} />
         ))}

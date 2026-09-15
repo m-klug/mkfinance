@@ -37,7 +37,15 @@ export default function CategoryPieChart({ spends, width }: CategoryPieChartProp
           <Cell key={entry.name} fill={PILLAR_COLORS[entry.pillar]} />
         ))}
       </Pie>
-      <Tooltip formatter={(value: number) => formatCents(value)} />
+      <Tooltip
+        formatter={(value: number) => formatCents(value)}
+        contentStyle={{
+          borderRadius: 12,
+          border: "1px solid var(--divider-card)",
+          background: "var(--card)",
+          fontSize: 12,
+        }}
+      />
     </PieChart>
   );
 }
