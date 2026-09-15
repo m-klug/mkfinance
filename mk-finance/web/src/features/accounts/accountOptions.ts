@@ -54,3 +54,26 @@ export function contributionPillarOptions(t: TFunction): SelectOption[] {
 export function accountOptions(accounts: Account[]): SelectOption[] {
   return accounts.map((account) => ({ value: account.id, label: account.name }));
 }
+
+/** Up to two uppercase initials for the account row's avatar chip (display only). */
+export function accountInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+}
+
+// Rotating palette for the account avatar chip — purely decorative, cycling
+// through the pillar palette so the table doesn't render every row in mint.
+const AVATAR_TONES = [
+  "#2FBF8F",
+  "#86CFB6",
+  "#B9E3D4",
+  "#F0A68F",
+  "#5B6B7A",
+  "#CFD4D1",
+];
+
+export function accountAvatarTone(index: number): string {
+  return AVATAR_TONES[index % AVATAR_TONES.length];
+}

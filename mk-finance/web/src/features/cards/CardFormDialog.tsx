@@ -130,10 +130,14 @@ export function CardFormDialog({ workspaceId, open, onOpenChange, card }: CardFo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="rounded-modal">
         <DialogHeader>
-          <DialogTitle>{card ? t("cards.editTitle") : t("cards.newTitle")}</DialogTitle>
-          <DialogDescription>{t("cards.formSubtitle")}</DialogDescription>
+          <DialogTitle className="text-[15px] font-extrabold tracking-tight text-ink-primary">
+            {card ? t("cards.editTitle") : t("cards.newTitle")}
+          </DialogTitle>
+          <DialogDescription className="text-ink-tertiary">
+            {t("cards.formSubtitle")}
+          </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <TextField

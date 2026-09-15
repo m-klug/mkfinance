@@ -121,10 +121,14 @@ export function VaultFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="rounded-modal">
         <DialogHeader>
-          <DialogTitle>{vault ? t("vaults.editTitle") : t("vaults.newTitle")}</DialogTitle>
-          <DialogDescription>{t("vaults.formSubtitle")}</DialogDescription>
+          <DialogTitle className="text-[15px] font-extrabold tracking-tight text-ink-primary">
+            {vault ? t("vaults.editTitle") : t("vaults.newTitle")}
+          </DialogTitle>
+          <DialogDescription className="text-ink-tertiary">
+            {t("vaults.formSubtitle")}
+          </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <TextField

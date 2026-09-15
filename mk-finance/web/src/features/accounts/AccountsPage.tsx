@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Archive, PiggyBank, Pencil, Plus } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -27,6 +28,8 @@ import {
 import { AccountType, type Account } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { AccountFormDialog } from "@/features/accounts/AccountFormDialog";
 import {
+  accountAvatarTone,
+  accountInitials,
   effectiveBalanceCents,
   isContributionAccount,
   projectedBalanceCents,
@@ -93,14 +96,16 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-8">
+    <div className="flex flex-1 flex-col gap-4 p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{t("nav.accounts")}</h1>
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink-primary">
+          {t("nav.accounts")}
+        </h1>
+        <div className="flex items-center gap-2.5">
+          <label className="flex items-center gap-2 rounded-pill bg-card px-3.5 py-2 text-xs font-semibold text-ink-secondary">
             <input
               type="checkbox"
-              className="size-4"
+              className="size-4 accent-mint"
               checked={includeArchived}
               onChange={(event) => setIncludeArchived(event.target.checked)}
             />
@@ -113,62 +118,95 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardDescription>{t("accounts.totalBalance")}</CardDescription>
-            <CardTitle className="text-2xl">{formatCents(totals.balance)}</CardTitle>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card className="gap-1.5 rounded-card p-4">
+          <CardHeader className="gap-1 p-0">
+            <CardDescription className="text-[11px] font-semibold text-ink-tertiary">
+              {t("accounts.totalBalance")}
+            </CardDescription>
+            <CardTitle className="tabular-nums text-[25px] font-extrabold tracking-tight text-ink-primary">
+              {formatCents(totals.balance)}
+            </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>{t("accounts.totalBalanceWithInvestments")}</CardDescription>
-            <CardTitle className="text-2xl">
+        <Card className="gap-1.5 rounded-card p-4">
+          <CardHeader className="gap-1 p-0">
+            <CardDescription className="text-[11px] font-semibold text-ink-tertiary">
+              {t("accounts.totalBalanceWithInvestments")}
+            </CardDescription>
+            <CardTitle className="tabular-nums text-[25px] font-extrabold tracking-tight text-ink-primary">
               {formatCents(totals.balanceWithInvestments)}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>{t("accounts.projectedBalance")}</CardDescription>
-            <CardTitle className="text-2xl">{formatCents(totals.projected)}</CardTitle>
+        <Card className="gap-1.5 rounded-card border-none bg-hero p-4">
+          <CardHeader className="gap-1 p-0">
+            <CardDescription className="text-[11px] font-semibold text-[#8d9298]">
+              {t("accounts.projectedBalance")}
+            </CardDescription>
+            <CardTitle className="tabular-nums text-[25px] font-extrabold tracking-tight text-hero-foreground">
+              {formatCents(totals.projected)}
+            </CardTitle>
           </CardHeader>
         </Card>
       </div>
 
-      <Card>
-        <CardContent>
-          {isPending && <p className="text-muted-foreground">{t("common.loading")}</p>}
+      <Card className="rounded-card p-2 sm:p-3">
+        <CardContent className="p-0">
+          {isPending && <p className="p-3 text-sm text-ink-tertiary">{t("common.loading")}</p>}
           {!isPending && (accounts?.length ?? 0) === 0 && (
-            <p className="text-muted-foreground">{t("accounts.empty")}</p>
+            <p className="p-3 text-sm text-ink-tertiary">{t("accounts.empty")}</p>
           )}
           {!isPending && (accounts?.length ?? 0) > 0 && (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>{t("accounts.name")}</TableHead>
-                  <TableHead>{t("accounts.type")}</TableHead>
-                  <TableHead className="text-right">{t("accounts.balance")}</TableHead>
-                  <TableHead className="text-right">{t("accounts.projectedBalance")}</TableHead>
-                  <TableHead className="text-right">{t("common.actions")}</TableHead>
+                <TableRow className="border-divider-card hover:bg-transparent">
+                  <TableHead className="text-[11px] font-bold text-ink-label">
+                    {t("accounts.name")}
+                  </TableHead>
+                  <TableHead className="text-[11px] font-bold text-ink-label">
+                    {t("accounts.type")}
+                  </TableHead>
+                  <TableHead className="text-right text-[11px] font-bold text-ink-label">
+                    {t("accounts.balance")}
+                  </TableHead>
+                  <TableHead className="text-right text-[11px] font-bold text-ink-label">
+                    {t("accounts.projectedBalance")}
+                  </TableHead>
+                  <TableHead className="text-right text-[11px] font-bold text-ink-label">
+                    {t("common.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(accounts ?? []).map((account) => (
-                  <TableRow key={account.id}>
+                {(accounts ?? []).map((account, index) => (
+                  <TableRow key={account.id} className="border-divider-row">
                     <TableCell className="font-medium">
-                      {account.name}
-                      {account.archived && (
-                        <span className="ml-2 rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                          {t("accounts.archivedBadge")}
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          className="flex size-[30px] shrink-0 items-center justify-center rounded-[10px] text-[11px] font-extrabold text-mint-ink"
+                          style={{ backgroundColor: accountAvatarTone(index) }}
+                          aria-hidden
+                        >
+                          {accountInitials(account.name)}
                         </span>
-                      )}
+                        <span className="min-w-0 truncate text-[13px] font-bold text-ink-primary">
+                          {account.name}
+                        </span>
+                        {account.archived && (
+                          <Badge variant="neutral" className="shrink-0">
+                            {t("accounts.archivedBadge")}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell>{t(`accountType.${account.type}`)}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="text-ink-secondary">
+                      {t(`accountType.${account.type}`)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-bold text-ink-primary">
                       {formatCents(effectiveBalanceCents(account))}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="text-right tabular-nums text-ink-secondary">
                       {formatCents(projectedBalanceCents(account))}
                     </TableCell>
                     <TableCell className="text-right">
@@ -178,6 +216,7 @@ export default function AccountsPage() {
                             asChild
                             variant="ghost"
                             size="icon-sm"
+                            className="rounded-pill bg-success-bg text-success-ink hover:bg-success-bg/80 hover:text-success-ink"
                             aria-label={t("vaults.accountAction", { name: account.name })}
                           >
                             <Link to={`/accounts/${account.id}/vaults`}>
@@ -188,6 +227,7 @@ export default function AccountsPage() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
+                          className="rounded-pill text-ink-secondary hover:bg-neutral"
                           aria-label={t("accounts.editAction", { name: account.name })}
                           onClick={() => openEdit(account)}
                         >
@@ -197,6 +237,7 @@ export default function AccountsPage() {
                           <Button
                             variant="ghost"
                             size="icon-sm"
+                            className="rounded-pill text-ink-secondary hover:bg-neutral"
                             aria-label={t("accounts.archiveAction", { name: account.name })}
                             onClick={() => setArchiving(account)}
                           >

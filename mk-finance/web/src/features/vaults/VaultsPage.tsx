@@ -14,10 +14,10 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { cn } from "@/lib/utils";
 import { formatCents } from "@/lib/format";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
@@ -30,6 +30,7 @@ import {
 } from "@/lib/api/generated/vaults/vaults";
 import type { Vault } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { effectiveBalanceCents } from "@/features/accounts/accountOptions";
+import { PILLAR_COLORS } from "@/features/dashboard/dashboardFormat";
 import { VaultCompositionCard } from "@/features/vaults/VaultCompositionCard";
 import { VaultFormDialog } from "@/features/vaults/VaultFormDialog";
 import { VaultGoalBar } from "@/features/vaults/VaultGoalBar";
@@ -138,46 +139,60 @@ export default function VaultsPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-8">
+    <div className="flex flex-1 flex-col gap-4 p-4 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button
             asChild
             variant="ghost"
             size="icon-sm"
+            className="rounded-pill text-ink-secondary hover:bg-neutral"
             aria-label={t("vaults.backToAccounts")}
           >
             <Link to="/accounts">
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-semibold">{account?.name ?? t("vaults.title")}</h1>
+          <div className="flex flex-col gap-0.5">
+            <Link
+              to="/accounts"
+              className="text-[11px] font-bold text-link hover:text-link-hover"
+            >
+              {t("nav.accounts")} › {account?.name ?? ""}
+            </Link>
+            <h1 className="text-2xl font-extrabold tracking-tight text-ink-primary">
+              {account?.name ?? t("vaults.title")}
+            </h1>
+          </div>
         </div>
         {account && (
-          <span className="text-sm text-muted-foreground">
-            {t("vaults.balance")}: {formatCents(effectiveBalanceCents(account))}
+          <span className="text-sm text-ink-secondary">
+            {t("vaults.balance")}:{" "}
+            <span className="tabular-nums font-bold text-ink-primary">
+              {formatCents(effectiveBalanceCents(account))}
+            </span>
           </span>
         )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <label className="flex items-center gap-2 rounded-pill bg-card px-3.5 py-2 text-xs font-semibold text-ink-secondary">
           <input
             type="checkbox"
-            className="size-4"
+            className="size-4 accent-mint"
             checked={includeArchived}
             onChange={(event) => setIncludeArchived(event.target.checked)}
           />
           {t("vaults.showArchived")}
         </label>
         <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" onClick={() => setYieldOpen(true)}>
+          <Button type="button" variant="secondary" onClick={() => setYieldOpen(true)}>
             <TrendingUp className="size-4" />
             {t("vaults.yieldAction")}
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             onClick={() => setReallocateOpen(true)}
             disabled={vaults.filter((vault) => !vault.archived).length === 0}
           >
@@ -191,41 +206,46 @@ export default function VaultsPage() {
         </div>
       </div>
 
-      {listPending && <p className="text-muted-foreground">{t("common.loading")}</p>}
+      {listPending && <p className="text-sm text-ink-tertiary">{t("common.loading")}</p>}
 
       {composition && <VaultCompositionCard composition={composition} />}
 
       {!listPending && vaults.length === 0 && (
-        <Card>
+        <Card className="rounded-card">
           <CardContent>
-            <p className="text-muted-foreground">{t("vaults.empty")}</p>
+            <p className="text-sm text-ink-tertiary">{t("vaults.empty")}</p>
           </CardContent>
         </Card>
       )}
 
       {vaults.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {vaults.map((vault) => (
-            <Card key={vault.id}>
-              <CardHeader className="gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <span
-                      className="size-3 rounded-full"
-                      style={{ backgroundColor: vault.color ?? undefined }}
-                      aria-hidden
-                    />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {vaults.map((vault) => {
+            const pillarColor = PILLAR_COLORS[vault.contributionPillar];
+            return (
+              <div
+                key={vault.id}
+                className="flex flex-col gap-3 rounded-card bg-card p-4"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: vault.color ?? pillarColor }}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 truncate text-[14px] font-extrabold tracking-tight text-ink-primary">
                     {vault.name}
-                    {vault.archived && (
-                      <span className="rounded bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
-                        {t("cards.archivedBadge")}
-                      </span>
-                    )}
-                  </CardTitle>
-                  <div className="flex items-center gap-1">
+                  </span>
+                  {vault.archived && (
+                    <Badge variant="neutral" className="shrink-0">
+                      {t("cards.archivedBadge")}
+                    </Badge>
+                  )}
+                  <div className="ml-auto flex shrink-0 items-center gap-0.5">
                     <Button
                       variant="ghost"
                       size="icon-sm"
+                      className="rounded-pill text-ink-secondary hover:bg-neutral"
                       aria-label={t("vaults.entriesAction", { name: vault.name })}
                       onClick={() => setViewingEntriesOf(vault)}
                     >
@@ -234,6 +254,7 @@ export default function VaultsPage() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
+                      className="rounded-pill text-ink-secondary hover:bg-neutral"
                       aria-label={t("vaults.editAction", { name: vault.name })}
                       onClick={() => openEdit(vault)}
                     >
@@ -243,6 +264,7 @@ export default function VaultsPage() {
                       <Button
                         variant="ghost"
                         size="icon-sm"
+                        className="rounded-pill text-ink-secondary hover:bg-neutral"
                         aria-label={t("vaults.archiveAction", { name: vault.name })}
                         onClick={() => setArchiving(vault)}
                       >
@@ -252,6 +274,7 @@ export default function VaultsPage() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
+                      className="rounded-pill text-ink-secondary hover:bg-neutral"
                       aria-label={t("vaults.deleteAction", { name: vault.name })}
                       onClick={() => setDeleting(vault)}
                     >
@@ -259,26 +282,30 @@ export default function VaultsPage() {
                     </Button>
                   </div>
                 </div>
-                <dl className={cn("grid grid-cols-2 gap-x-4 gap-y-1 text-sm")}>
-                  <div>
-                    <dt className="text-muted-foreground">{t("vaults.balance")}</dt>
-                    <dd className="tabular-nums font-medium">
-                      {formatCents(vault.balanceCents)}
-                    </dd>
+
+                <div>
+                  <div className="tabular-nums text-[21px] font-extrabold tracking-tight text-ink-primary">
+                    {formatCents(vault.balanceCents)}
                   </div>
-                  <div>
-                    <dt className="text-muted-foreground">{t("vaults.projectedBalance")}</dt>
-                    <dd className="tabular-nums text-muted-foreground">
-                      {formatCents(vault.projectedBalanceCents)}
-                    </dd>
+                  <div className="text-[11px] text-ink-tertiary">
+                    {t("vaults.projectedBalance")}:{" "}
+                    <span className="tabular-nums">{formatCents(vault.projectedBalanceCents)}</span>
                   </div>
-                </dl>
-                {vault.goal && (
-                  <VaultGoalBar goal={vault.goal} currentCents={vault.balanceCents} />
-                )}
-              </CardHeader>
-            </Card>
-          ))}
+                </div>
+
+                {vault.goal && <VaultGoalBar goal={vault.goal} currentCents={vault.balanceCents} />}
+
+                <div className="flex items-center gap-2 border-t border-divider-card pt-2.5">
+                  <span
+                    className="inline-flex items-center rounded-pill px-2.5 py-1 text-[10px] font-extrabold tracking-[0.05em] uppercase"
+                    style={{ backgroundColor: `${pillarColor}33`, color: pillarColor }}
+                  >
+                    {t(`pillar.${vault.contributionPillar}`)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
