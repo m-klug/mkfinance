@@ -356,9 +356,9 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
         </DialogHeader>
 
         <Tabs value={mode} onValueChange={(value) => setMode(value as QuickMode)}>
-          <TabsList className="w-full">
+          <TabsList className="w-full max-w-full justify-start overflow-x-auto">
             {QUICK_MODES.map((quickMode) => (
-              <TabsTrigger key={quickMode} value={quickMode}>
+              <TabsTrigger key={quickMode} value={quickMode} className="flex-none">
                 {t(`quickEntry.mode.${quickMode}`)}
               </TabsTrigger>
             ))}
