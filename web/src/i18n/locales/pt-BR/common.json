@@ -471,6 +471,7 @@
     "empty": "Nenhuma caixinha criada ainda. Crie a primeira para começar a repartir o saldo desta conta.",
     "balance": "Saldo",
     "projectedBalance": "Saldo projetado",
+    "allocated": "Alocado em caixinhas",
     "unallocated": "Não alocado",
     "unallocatedOption": "Não alocado",
     "unallocatedHint": "Ainda não escolheu caixinha nem pilar.",

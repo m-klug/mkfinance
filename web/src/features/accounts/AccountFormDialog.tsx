@@ -128,10 +128,14 @@ export function AccountFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="rounded-modal">
         <DialogHeader>
-          <DialogTitle>{account ? t("accounts.editTitle") : t("accounts.newTitle")}</DialogTitle>
-          <DialogDescription>{t("accounts.formSubtitle")}</DialogDescription>
+          <DialogTitle className="text-[15px] font-extrabold tracking-tight text-ink-primary">
+            {account ? t("accounts.editTitle") : t("accounts.newTitle")}
+          </DialogTitle>
+          <DialogDescription className="text-ink-tertiary">
+            {t("accounts.formSubtitle")}
+          </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <TextField

@@ -104,10 +104,14 @@ export function VaultReallocateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="rounded-modal">
         <DialogHeader>
-          <DialogTitle>{t("vaults.reallocateTitle")}</DialogTitle>
-          <DialogDescription>{t("vaults.reallocateSubtitle")}</DialogDescription>
+          <DialogTitle className="text-[15px] font-extrabold tracking-tight text-ink-primary">
+            {t("vaults.reallocateTitle")}
+          </DialogTitle>
+          <DialogDescription className="text-ink-tertiary">
+            {t("vaults.reallocateSubtitle")}
+          </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
