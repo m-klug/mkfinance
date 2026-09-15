@@ -339,7 +339,11 @@
     "registerSubtitle": "Comece a organizar suas finanças em poucos minutos.",
     "noAccountPrompt": "Ainda não tem conta?",
     "hasAccountPrompt": "Já tem uma conta?",
-    "submitting": "Enviando…"
+    "submitting": "Enviando…",
+    "valueProp": "Sua renda dividida em 6 pilares — e um alvo pra cada um.",
+    "showPassword": "mostrar",
+    "hidePassword": "ocultar",
+    "passwordMinLength": "Mínimo 8 caracteres."
   },
   "pillar": {
     "FIXED_COSTS": "Custos Fixos",
@@ -373,7 +377,11 @@
       "targetTitle": "Alvo: {{target}}%",
       "overrunBadge": "Estourou",
       "overrunWarning": "{{count}} pilar(es) acima do alvo neste mês.",
-      "noIncomeWarning": "Sem receita registrada neste mês — mostrando os valores gastos, sem percentuais."
+      "noIncomeWarning": "Sem receita registrada neste mês — mostrando os valores gastos, sem percentuais.",
+      "allocatedLabel": "Alocado",
+      "unallocatedLabel": "Não alocado",
+      "legendActual": "gasto real",
+      "legendTarget": "alvo"
     },
     "balance": {
       "title": "Saldo",
@@ -398,7 +406,8 @@
       "filterLabel": "Filtrar por pilar",
       "allPillars": "Todos",
       "unknown": "Sem categoria",
-      "empty": "Nenhuma despesa no período."
+      "empty": "Nenhuma despesa no período.",
+      "totalLabel": "total"
     },
     "statements": {
       "title": "Faturas abertas",
@@ -406,7 +415,10 @@
       "empty": "Nenhuma fatura em aberto.",
       "dueOn": "Vence em {{date}}",
       "dueSoon": "Vence em breve",
-      "remaining": "Em aberto"
+      "remaining": "Em aberto",
+      "totalLabel": "Total em faturas abertas",
+      "cardsCount_one": "{{count}} cartão",
+      "cardsCount_other": "{{count}} cartões"
     }
   },
   "vaults": {

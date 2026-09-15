@@ -48,38 +48,42 @@ export default function DashboardPage() {
   const isError = summaryQuery.isError || allocationQuery.isError;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-8">
+    <div className="flex flex-1 flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{t("nav.dashboard")}</h1>
+        <h1 className="text-[26px] font-extrabold tracking-[-0.025em] text-ink-primary">
+          {t("nav.dashboard")}
+        </h1>
         <MonthNavigator month={month} onMonthChange={setMonth} />
       </div>
 
-      {isPending && <p className="text-muted-foreground">{t("common.loading")}</p>}
+      {isPending && <p className="text-sm text-ink-tertiary">{t("common.loading")}</p>}
 
       {!isPending && isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="rounded-list-item bg-alert-bg p-3 text-sm text-alert-ink">
           {translateApiError(t, summaryQuery.error ?? allocationQuery.error)}
         </p>
       )}
 
       {!isPending && !isError && summary && allocation && (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5">
           <PillarAllocationSection report={allocation} />
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-5 lg:grid-cols-2">
             <BalanceSection summary={summary} />
             <IncomeExpenseSection summary={summary} />
           </div>
 
-          <CategoryBreakdownSection
-            items={summary.expenseByCategory}
-            categories={categoriesQuery.data ?? []}
-          />
+          <div className="grid gap-5 lg:grid-cols-2">
+            <CategoryBreakdownSection
+              items={summary.expenseByCategory}
+              categories={categoriesQuery.data ?? []}
+            />
 
-          <OpenStatementsSection
-            statements={summary.openStatements}
-            cards={cardsQuery.data ?? []}
-          />
+            <OpenStatementsSection
+              statements={summary.openStatements}
+              cards={cardsQuery.data ?? []}
+            />
+          </div>
         </div>
       )}
     </div>

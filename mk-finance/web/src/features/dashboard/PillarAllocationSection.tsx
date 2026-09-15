@@ -1,119 +1,171 @@
 import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { formatCents } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { TargetBar } from "@/components/ui/target-bar";
 import type { PillarAllocationReport } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import {
   hasAnyOverrun,
   isPillarOverTarget,
   sortPillars,
 } from "@/features/dashboard/dashboardData";
-import { formatPercent } from "@/features/dashboard/dashboardFormat";
+import { formatPercent, PILLAR_COLORS } from "@/features/dashboard/dashboardFormat";
 
 interface PillarAllocationSectionProps {
   report: PillarAllocationReport;
 }
 
+/**
+ * The app's signature panel (design_handoff_mk_finance/README.md §Screens 01/04):
+ * dark hero card with a real-vs-target TargetBar per pillar. Kept always-dark
+ * (bg-hero) regardless of the app theme, matching the handoff's normative
+ * light×dark reference.
+ */
 export function PillarAllocationSection({ report }: PillarAllocationSectionProps) {
   const { t } = useTranslation();
   const pillars = sortPillars(report.pillars);
   const overrun = hasAnyOverrun(pillars);
   const overrunCount = pillars.filter(isPillarOverTarget).length;
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("dashboard.allocation.title")}</CardTitle>
-        <CardDescription>{t("dashboard.allocation.subtitle")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {report.noIncome && (
-          <p
-            role="status"
-            className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400"
-          >
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-            {t("dashboard.allocation.noIncomeWarning")}
-          </p>
-        )}
-        {!report.noIncome && overrun && (
-          <p
-            role="status"
-            className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-          >
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-            {t("dashboard.allocation.overrunWarning", { count: overrunCount })}
-          </p>
-        )}
+  const totalSpentCents = pillars.reduce((sum, pillar) => sum + pillar.spentCents, 0);
+  const totalActualPercent = report.noIncome
+    ? null
+    : pillars.reduce((sum, pillar) => sum + (pillar.actualPercent ?? 0), 0);
+  const unallocatedCents = report.noIncome ? null : report.incomeCents - totalSpentCents;
 
-        <ul className="flex flex-col gap-4">
-          {pillars.map((pillar) => {
-            const over = isPillarOverTarget(pillar);
-            const actual = pillar.actualPercent;
-            const fill = actual == null ? 0 : Math.min(actual, 100);
-            const targetMarker = Math.min(pillar.targetPercent, 100);
-            return (
-              <li
-                key={pillar.pillar}
+  return (
+    <div className="flex flex-col gap-5 rounded-card bg-hero p-6 text-hero-foreground">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[17px] font-bold tracking-[-0.015em] sm:text-[19px]">
+            {t("dashboard.allocation.title")}
+          </h2>
+          <p className="text-xs text-[#8D9298]">{t("dashboard.allocation.subtitle")}</p>
+        </div>
+      </div>
+
+      {report.noIncome && (
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-list-item bg-[#22252A] p-3 text-sm text-hero-foreground"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          {t("dashboard.allocation.noIncomeWarning")}
+        </p>
+      )}
+      {!report.noIncome && overrun && (
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-list-item bg-[#3A201A] p-3 text-sm text-[#FFB4A2]"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          {t("dashboard.allocation.overrunWarning", { count: overrunCount })}
+        </p>
+      )}
+
+      <ul className="flex flex-col">
+        {pillars.map((pillar) => {
+          const over = isPillarOverTarget(pillar);
+          const color = PILLAR_COLORS[pillar.pillar];
+          const actual = pillar.actualPercent;
+          return (
+            <li
+              key={pillar.pillar}
+              className={cn(
+                "grid grid-cols-[minmax(0,1fr)_92px] items-center gap-3 border-t border-white/10 py-3 first:border-t-0 sm:grid-cols-[140px_minmax(0,1fr)_92px_100px] sm:gap-4",
+              )}
+            >
+              <div className="col-span-2 flex min-w-0 items-center gap-2 sm:col-span-1">
+                <span
+                  aria-hidden
+                  className="h-[20px] w-[6px] shrink-0 rounded-pill"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="truncate text-[13px] font-semibold text-[#E7EAE8]">
+                  {t(`pillar.${pillar.pillar}`)}
+                </span>
+              </div>
+
+              {!report.noIncome && (
+                <TargetBar
+                  actualPercent={actual ?? 0}
+                  targetPercent={pillar.targetPercent}
+                  color={color}
+                  className="order-3 col-span-2 h-[9px] bg-[#22252A] sm:order-none sm:col-span-1"
+                />
+              )}
+
+              <div
                 className={cn(
-                  "rounded-md p-2",
-                  over && "bg-destructive/5 ring-1 ring-destructive/30",
+                  "text-right tabular-nums",
+                  report.noIncome && "col-span-2 sm:col-span-3",
                 )}
               >
-                <div className="mb-1 flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-medium">{t(`pillar.${pillar.pillar}`)}</span>
-                  <span className="text-sm tabular-nums text-muted-foreground">
-                    {report.noIncome
-                      ? formatCents(pillar.spentCents)
-                      : t("dashboard.allocation.actualVsTarget", {
-                          actual: formatPercent(actual ?? 0),
-                          target: pillar.targetPercent,
-                        })}
-                  </span>
-                </div>
-
-                {!report.noIncome && (
-                  <div
-                    className="relative h-3 w-full overflow-hidden rounded-full bg-muted"
-                    role="meter"
-                    aria-label={t(`pillar.${pillar.pillar}`)}
-                    aria-valuenow={Math.round(actual ?? 0)}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                  >
-                    <div
-                      className={cn(
-                        "absolute inset-y-0 left-0 rounded-full transition-[width]",
-                        over ? "bg-destructive" : "bg-primary",
-                      )}
-                      style={{ width: `${fill}%` }}
-                    />
-                    <div
-                      className="absolute inset-y-0 w-0.5 bg-foreground/70"
-                      style={{ left: `${targetMarker}%` }}
-                      aria-hidden
-                      title={t("dashboard.allocation.targetTitle", {
-                        target: pillar.targetPercent,
-                      })}
-                    />
+                {report.noIncome ? (
+                  <div className="text-[15px] font-extrabold text-hero-foreground">
+                    {formatCents(pillar.spentCents)}
                   </div>
+                ) : (
+                  <>
+                    <div className="text-[15px] font-extrabold text-hero-foreground sm:text-[18px]">
+                      {formatPercent(actual ?? 0)}
+                    </div>
+                    <div className="text-[10px] text-[#8D9298]">
+                      {t("dashboard.allocation.targetTitle", { target: pillar.targetPercent })}
+                    </div>
+                  </>
                 )}
+              </div>
 
-                <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="tabular-nums">{formatCents(pillar.spentCents)}</span>
+              {!report.noIncome && (
+                <div className="hidden text-right tabular-nums sm:block">
+                  <div className="text-[13px] font-semibold text-[#C9CDD1]">
+                    {formatCents(pillar.spentCents)}
+                  </div>
                   {over && (
-                    <span className="rounded bg-destructive/15 px-2 py-0.5 font-medium text-destructive">
+                    <Badge variant="alert" className="mt-1 bg-[#3A201A] text-[#FFB4A2]">
                       {t("dashboard.allocation.overrunBadge")}
-                    </span>
+                    </Badge>
                   )}
                 </div>
-              </li>
-            );
-          })}
-        </ul>
-      </CardContent>
-    </Card>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {!report.noIncome && (
+        <div className="flex flex-wrap items-center gap-6 border-t border-white/10 pt-4">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[11px] text-[#8D9298]">
+              {t("dashboard.allocation.allocatedLabel")}
+            </span>
+            <span className="text-[15px] font-bold tabular-nums text-hero-foreground">
+              {formatPercent(totalActualPercent ?? 0)} · {formatCents(totalSpentCents)}
+            </span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[11px] text-[#8D9298]">
+              {t("dashboard.allocation.unallocatedLabel")}
+            </span>
+            <span className="text-[15px] font-bold tabular-nums text-mint">
+              {formatCents(unallocatedCents ?? 0)}
+            </span>
+          </div>
+          <div className="ml-auto flex items-center gap-4 text-[11px] text-[#8D9298]">
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className="h-2 w-4 rounded-pill bg-mint" />
+              {t("dashboard.allocation.legendActual")}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className="h-3.5 w-0.5 bg-hero-foreground" />
+              {t("dashboard.allocation.legendTarget")}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

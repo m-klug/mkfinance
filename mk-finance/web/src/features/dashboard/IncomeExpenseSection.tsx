@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { formatCents } from "@/lib/format";
 import type { DashboardSummary } from "@/lib/api/generated/mKFinanceAPI.schemas";
@@ -16,11 +15,15 @@ interface IncomeExpenseSectionProps {
   summary: DashboardSummary;
 }
 
-/** A month-over-month delta line; "higherIsWorse" flips the color meaning. */
+/** A month-over-month delta pill; "higherIsWorse" flips the color meaning. */
 function DeltaLine({ delta, higherIsWorse }: { delta: Delta; higherIsWorse: boolean }) {
   const { t } = useTranslation();
   if (delta.percent == null) {
-    return <span className="text-xs text-muted-foreground">{t("dashboard.incomeExpense.noComparison")}</span>;
+    return (
+      <span className="mt-2 inline-block text-[11px] text-ink-tertiary">
+        {t("dashboard.incomeExpense.noComparison")}
+      </span>
+    );
   }
   const rising = delta.cents > 0;
   const flat = delta.cents === 0;
@@ -29,8 +32,8 @@ function DeltaLine({ delta, higherIsWorse }: { delta: Delta; higherIsWorse: bool
   return (
     <span
       className={cn(
-        "flex items-center gap-1 text-xs",
-        flat ? "text-muted-foreground" : bad ? "text-destructive" : "text-emerald-600 dark:text-emerald-400",
+        "mt-2 inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-[10px] font-bold",
+        flat ? "bg-neutral text-ink-secondary" : bad ? "bg-alert-bg text-alert-ink" : "bg-success-bg text-success-ink",
       )}
     >
       <Icon className="size-3" aria-hidden />
@@ -53,48 +56,47 @@ export function IncomeExpenseSection({ summary }: IncomeExpenseSectionProps) {
   ];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("dashboard.incomeExpense.title")}</CardTitle>
-        <CardDescription>{t("dashboard.incomeExpense.subtitle")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border p-3">
-            <p className="text-sm text-muted-foreground">{t("dashboard.incomeExpense.income")}</p>
-            <p className="text-xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-              {formatCents(summary.incomeCents)}
-            </p>
-            <DeltaLine delta={incomeDelta} higherIsWorse={false} />
-          </div>
-          <div className="rounded-md border p-3">
-            <p className="text-sm text-muted-foreground">{t("dashboard.incomeExpense.expense")}</p>
-            <p className="text-xl font-semibold tabular-nums text-destructive">
-              {formatCents(summary.expenseCents)}
-            </p>
-            <DeltaLine delta={expenseDelta} higherIsWorse />
-          </div>
-          <div className="rounded-md border p-3">
-            <p className="text-sm text-muted-foreground">{t("dashboard.incomeExpense.net")}</p>
-            <p
-              className={cn(
-                "text-xl font-semibold tabular-nums",
-                net < 0 && "text-destructive",
-              )}
-            >
-              {formatCents(net)}
-            </p>
-          </div>
-        </div>
+    <div className="flex flex-col gap-4 rounded-card bg-card p-5">
+      <div className="flex flex-col gap-0.5">
+        <h3 className="text-sm font-bold text-ink-primary">{t("dashboard.incomeExpense.title")}</h3>
+        <p className="text-xs text-ink-tertiary">{t("dashboard.incomeExpense.subtitle")}</p>
+      </div>
 
-        <div ref={ref} className="min-h-[220px]">
-          {width > 0 && (
-            <Suspense fallback={null}>
-              <LazyIncomeExpenseChart data={chartData} width={width} />
-            </Suspense>
-          )}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-list-item bg-field p-3.5">
+          <p className="text-xs font-semibold text-ink-tertiary">{t("dashboard.incomeExpense.income")}</p>
+          <p className="mt-1 text-xl font-extrabold tabular-nums text-ink-primary">
+            {formatCents(summary.incomeCents)}
+          </p>
+          <DeltaLine delta={incomeDelta} higherIsWorse={false} />
         </div>
-      </CardContent>
-    </Card>
+        <div className="rounded-list-item bg-field p-3.5">
+          <p className="text-xs font-semibold text-ink-tertiary">{t("dashboard.incomeExpense.expense")}</p>
+          <p className="mt-1 text-xl font-extrabold tabular-nums text-ink-primary">
+            {formatCents(summary.expenseCents)}
+          </p>
+          <DeltaLine delta={expenseDelta} higherIsWorse />
+        </div>
+        <div className="rounded-list-item bg-hero p-3.5 text-hero-foreground">
+          <p className="text-xs text-[#9AA0A6]">{t("dashboard.incomeExpense.net")}</p>
+          <p
+            className={cn(
+              "mt-1 text-xl font-extrabold tabular-nums",
+              net < 0 ? "text-[#FFB4A2]" : "text-hero-foreground",
+            )}
+          >
+            {formatCents(net)}
+          </p>
+        </div>
+      </div>
+
+      <div ref={ref} className="min-h-[220px]">
+        {width > 0 && (
+          <Suspense fallback={null}>
+            <LazyIncomeExpenseChart data={chartData} width={width} />
+          </Suspense>
+        )}
+      </div>
+    </div>
   );
 }
