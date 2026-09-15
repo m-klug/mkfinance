@@ -376,10 +376,10 @@ export function RecurrenceFormDialog({
               </div>
 
               {recurrence && (
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <label className="flex items-center gap-2 text-sm font-medium text-ink-secondary">
                   <input
                     type="checkbox"
-                    className="size-4"
+                    className="size-4 accent-[color:var(--mint)]"
                     checked={form.active}
                     onChange={(event) => setForm({ ...form, active: event.target.checked })}
                   />

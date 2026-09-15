@@ -178,6 +178,9 @@ export function CategoryFormDialog({
             value={form.parentId}
             onChange={(event) => setForm({ ...form, parentId: event.target.value })}
           />
+          <p className="rounded-field bg-field px-3 py-2.5 text-xs text-ink-tertiary">
+            {t("categories.systemNote")}
+          </p>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t("common.cancel")}

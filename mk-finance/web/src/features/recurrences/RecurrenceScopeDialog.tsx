@@ -54,43 +54,43 @@ export function RecurrenceScopeDialog({
           <DialogTitle>{t(`recurrences.scope.${variant}Title`)}</DialogTitle>
           <DialogDescription>{t(`recurrences.scope.${variant}Description`)}</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           <label
             className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm",
-              isThisOne && "border-primary",
+              "flex cursor-pointer items-start gap-3 rounded-list-item border border-divider-card bg-field p-3.5 text-sm transition-colors",
+              isThisOne && "border-transparent bg-success-bg",
             )}
           >
             <input
               type="radio"
               name="recurrence-scope"
-              className="mt-1 size-4"
+              className="mt-1 size-4 accent-[color:var(--mint)]"
               checked={isThisOne}
               onChange={() => setScope(RecurrenceScope.THIS_ONE)}
             />
             <span className="flex flex-col gap-0.5">
-              <span className="font-medium">{t("recurrences.scope.thisOne")}</span>
-              <span className="text-muted-foreground">
+              <span className="font-bold text-ink-primary">{t("recurrences.scope.thisOne")}</span>
+              <span className="text-ink-secondary">
                 {t(`recurrences.scope.thisOne${variant === "delete" ? "DeleteHint" : "EditHint"}`)}
               </span>
             </span>
           </label>
           <label
             className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm",
-              !isThisOne && "border-primary",
+              "flex cursor-pointer items-start gap-3 rounded-list-item border border-divider-card bg-field p-3.5 text-sm transition-colors",
+              !isThisOne && "border-transparent bg-success-bg",
             )}
           >
             <input
               type="radio"
               name="recurrence-scope"
-              className="mt-1 size-4"
+              className="mt-1 size-4 accent-[color:var(--mint)]"
               checked={!isThisOne}
               onChange={() => setScope(RecurrenceScope.THIS_AND_FUTURE)}
             />
             <span className="flex flex-col gap-0.5">
-              <span className="font-medium">{t("recurrences.scope.thisAndFuture")}</span>
-              <span className="text-muted-foreground">
+              <span className="font-bold text-ink-primary">{t("recurrences.scope.thisAndFuture")}</span>
+              <span className="text-ink-secondary">
                 {t(
                   `recurrences.scope.thisAndFuture${variant === "delete" ? "DeleteHint" : "EditHint"}`,
                 )}
