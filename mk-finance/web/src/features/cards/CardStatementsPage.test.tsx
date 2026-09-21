@@ -57,7 +57,10 @@ describe("CardStatementsPage", () => {
   it("renders statement items with the installment number and status", async () => {
     renderStatements();
 
-    const row = (await screen.findByText("Notebook")).closest("tr") as HTMLElement;
+    // Scope to the desktop table — the mobile item list (README §Mobile)
+    // renders the same items in a different DOM shape alongside it.
+    const table = await screen.findByRole("table");
+    const row = (await within(table).findByText("Notebook")).closest("tr") as HTMLElement;
     expect(within(row).getByText("1/3")).toBeInTheDocument();
     expect(within(row).getByText(groceriesCategory.name)).toBeInTheDocument();
     expect(within(row).getByText(/33,33/)).toBeInTheDocument();
@@ -69,8 +72,9 @@ describe("CardStatementsPage", () => {
     const user = userEvent.setup();
     renderStatements();
 
-    await screen.findByText("Notebook");
-    await user.click(screen.getByRole("button", { name: "Próximo mês" }));
+    await screen.findAllByText("Notebook");
+    // Desktop and mobile each render their own "próximo mês" control.
+    await user.click(screen.getAllByRole("button", { name: "Próximo mês" })[0]);
 
     expect(await screen.findByText("Sem fatura neste mês.")).toBeInTheDocument();
   });
@@ -177,7 +181,7 @@ describe("CardStatementsPage", () => {
     renderStatements();
 
     // A paid statement no longer offers to pay, but its payment can be undone.
-    await screen.findByText("Notebook");
+    await screen.findAllByText("Notebook");
     expect(screen.queryByRole("button", { name: "Pagar fatura" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^Estornar pagamento de/ }));
