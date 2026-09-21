@@ -110,7 +110,7 @@ export function BalanceSection({ summary }: BalanceSectionProps) {
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-neutral text-[11px] font-extrabold text-ink-secondary">
                   {initials(account.name)}
                 </span>
-                <span className="flex min-w-0 flex-col">
+                <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[13px] font-bold text-ink-primary">
                     {account.name}
                   </span>

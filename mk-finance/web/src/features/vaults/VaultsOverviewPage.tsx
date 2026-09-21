@@ -138,7 +138,7 @@ function VaultOverviewCard({
         >
           {vault.name.slice(0, 2).toUpperCase()}
         </span>
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[13px] font-extrabold text-ink-primary">{vault.name}</span>
           <span className="truncate text-[11px] text-ink-tertiary">
             {t(`pillar.${vault.contributionPillar}`)}

@@ -154,7 +154,7 @@ export default function CardStatementsPage() {
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           <h1 className="truncate text-xl font-extrabold tracking-[-0.025em] text-ink-primary">
             {t("statement.mobileTitle", { name: card?.name ?? "" })}
           </h1>
@@ -310,7 +310,7 @@ export default function CardStatementsPage() {
                       <span className="flex size-[36px] shrink-0 items-center justify-center rounded-field bg-field text-ink-secondary">
                         <Receipt className="size-4" />
                       </span>
-                      <div className="flex min-w-0 flex-col">
+                      <div className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate text-[13px] font-bold text-ink-primary">
                           {item.description}
                         </span>
