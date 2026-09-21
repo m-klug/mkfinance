@@ -140,14 +140,14 @@ export default function PillarSettingsPage() {
                       onChange={(event) => handlePercentChange(pillar, event.target.value)}
                       aria-hidden
                       tabIndex={-1}
-                      className="h-[9px] flex-1 cursor-pointer appearance-none rounded-pill bg-neutral accent-[color:var(--mint)]"
+                      className="h-[9px] flex-1 cursor-pointer appearance-none rounded-pill bg-neutral bg-clip-content accent-[color:var(--mint)] max-sm:py-[17px]"
                     />
                     <div className="flex items-center gap-1 sm:w-20 sm:justify-end">
                       <TextField
                         id={`pillar-target-${pillar}`}
                         label={t(`pillar.${pillar}`)}
                         fieldClassName="[&>label]:sr-only"
-                        className="w-16 text-right tabular-nums"
+                        className="w-16 text-right tabular-nums max-sm:h-11"
                         type="number"
                         inputMode="numeric"
                         min={0}
@@ -187,7 +187,11 @@ export default function PillarSettingsPage() {
               </div>
 
               <div>
-                <Button type="submit" disabled={!isValidSum || updateMutation.isPending}>
+                <Button
+                  type="submit"
+                  disabled={!isValidSum || updateMutation.isPending}
+                  className="max-sm:h-11 max-sm:w-full"
+                >
                   {updateMutation.isPending ? t("common.saving") : t("common.save")}
                 </Button>
               </div>

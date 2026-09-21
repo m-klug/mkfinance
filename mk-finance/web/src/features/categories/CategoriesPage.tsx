@@ -48,7 +48,7 @@ function CategoryList({ nodes, onEdit, onDelete }: CategoryListProps) {
   return (
     <ul className="flex flex-col divide-y divide-divider-row">
       {nodes.map(({ category, children }) => (
-        <li key={category.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+        <li key={category.id} className="flex flex-col gap-2 py-2.5 first:pt-0 last:pb-0 max-sm:py-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-2 truncate text-sm font-bold text-ink-primary">
               <span className="truncate">{category.name}</span>
@@ -60,7 +60,7 @@ function CategoryList({ nodes, onEdit, onDelete }: CategoryListProps) {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
+                  className="rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary max-sm:size-11"
                   aria-label={t("categories.editAction", { name: category.name })}
                   onClick={() => onEdit(category)}
                 >
@@ -69,7 +69,7 @@ function CategoryList({ nodes, onEdit, onDelete }: CategoryListProps) {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
+                  className="rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary max-sm:size-11"
                   aria-label={t("categories.deleteAction", { name: category.name })}
                   onClick={() => onDelete(category)}
                 >
@@ -98,7 +98,7 @@ function CategoryList({ nodes, onEdit, onDelete }: CategoryListProps) {
                         type="button"
                         aria-label={t("categories.editAction", { name: child.name })}
                         onClick={() => onEdit(child)}
-                        className="rounded-full p-0.5 text-ink-tertiary hover:bg-card hover:text-ink-primary"
+                        className="rounded-full p-0.5 text-ink-tertiary hover:bg-card hover:text-ink-primary max-sm:p-2"
                       >
                         <Pencil className="size-3" />
                       </button>
@@ -106,7 +106,7 @@ function CategoryList({ nodes, onEdit, onDelete }: CategoryListProps) {
                         type="button"
                         aria-label={t("categories.deleteAction", { name: child.name })}
                         onClick={() => onDelete(child)}
-                        className="rounded-full p-0.5 text-ink-tertiary hover:bg-card hover:text-ink-primary"
+                        className="rounded-full p-0.5 text-ink-tertiary hover:bg-card hover:text-ink-primary max-sm:p-2"
                       >
                         <Trash2 className="size-3" />
                       </button>
@@ -199,7 +199,7 @@ export default function CategoriesPage() {
             {t("nav.categories")}
           </h1>
         </div>
-        <Button onClick={openCreate}>
+        <Button onClick={openCreate} className="max-sm:h-11">
           <Plus className="size-4" />
           {t("categories.new")}
         </Button>
