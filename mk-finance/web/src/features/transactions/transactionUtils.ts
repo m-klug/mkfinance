@@ -103,3 +103,80 @@ export function lookupName<T extends { id: string; name: string }>(
   if (!id) return undefined;
   return items.find((item) => item.id === id)?.name;
 }
+
+const MONTH_ABBR_PT = [
+  "JAN",
+  "FEV",
+  "MAR",
+  "ABR",
+  "MAI",
+  "JUN",
+  "JUL",
+  "AGO",
+  "SET",
+  "OUT",
+  "NOV",
+  "DEZ",
+];
+
+function isoDateParts(dateIso: string): [number, number, number] {
+  const [year, month, day] = dateIso.split("-").map(Number);
+  return [year, month, day];
+}
+
+function addDaysIso(dateIso: string, deltaDays: number): string {
+  const [year, month, day] = isoDateParts(dateIso);
+  return toIsoDate(new Date(year, month - 1, day + deltaDays));
+}
+
+/**
+ * "HOJE · 18 SET" / "ONTEM · 17 SET" / "16 SET" — the mobile Extrato's
+ * date-section header (design_handoff_mk_finance mobile screen 02, "Traduções
+ * de padrão desktop → mobile": grouping-by-date-in-a-column → section header).
+ */
+export function dateGroupLabel(
+  dateIso: string,
+  t: TFunction,
+  todayIsoValue: string = todayIso(),
+): string {
+  const [, month, day] = isoDateParts(dateIso);
+  const dayMonth = `${day} ${MONTH_ABBR_PT[month - 1]}`;
+  if (dateIso === todayIsoValue) {
+    return `${t("transactions.dateGroupToday").toUpperCase()} · ${dayMonth}`;
+  }
+  if (dateIso === addDaysIso(todayIsoValue, -1)) {
+    return `${t("transactions.dateGroupYesterday").toUpperCase()} · ${dayMonth}`;
+  }
+  return dayMonth;
+}
+
+export interface TransactionDateGroup {
+  dateIso: string;
+  label: string;
+  transactions: Transaction[];
+}
+
+/**
+ * Buckets transactions by calendar date into ordered sections (newest date
+ * first) for the mobile Extrato list. Order within a bucket follows the
+ * incoming array — this function does not itself sort transactions.
+ */
+export function groupTransactionsByDate(
+  transactions: Transaction[],
+  t: TFunction,
+  todayIsoValue: string = todayIso(),
+): TransactionDateGroup[] {
+  const byDate = new Map<string, Transaction[]>();
+  for (const transaction of transactions) {
+    const bucket = byDate.get(transaction.date);
+    if (bucket) bucket.push(transaction);
+    else byDate.set(transaction.date, [transaction]);
+  }
+  return Array.from(byDate.entries())
+    .map(([dateIso, txs]) => ({
+      dateIso,
+      label: dateGroupLabel(dateIso, t, todayIsoValue),
+      transactions: txs,
+    }))
+    .sort((a, b) => b.dateIso.localeCompare(a.dateIso));
+}
