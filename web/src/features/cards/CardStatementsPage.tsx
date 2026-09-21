@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronLeft, ChevronRight, Undo2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Receipt, Undo2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -141,7 +141,56 @@ export default function CardStatementsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Mobile header: back to the card + card name + item count (README §Mobile). */}
+      <div className="flex items-center gap-2.5 sm:hidden">
+        <Button
+          asChild
+          variant="ghost"
+          size="icon-lg"
+          className="rounded-field bg-card text-ink-secondary"
+          aria-label={t("statement.backToCards")}
+        >
+          <Link to="/cards">
+            <ArrowLeft className="size-4" />
+          </Link>
+        </Button>
+        <div className="flex min-w-0 flex-col">
+          <h1 className="truncate text-xl font-extrabold tracking-[-0.025em] text-ink-primary">
+            {t("statement.mobileTitle", { name: card?.name ?? "" })}
+          </h1>
+          <span className="truncate text-[11px] text-ink-tertiary">
+            {t("statement.mobileItemCount", {
+              month: formatMonth(month),
+              count: detail?.items.length ?? 0,
+            })}
+          </span>
+        </div>
+      </div>
+
+      {/* Mobile month chips. */}
+      <div className="flex items-center gap-1.5 overflow-x-auto sm:hidden">
+        <button
+          type="button"
+          aria-label={t("statement.previousMonth")}
+          className="shrink-0 rounded-pill bg-card px-3.5 py-2 text-[11px] font-bold text-ink-secondary"
+          onClick={() => setMonth((current) => addMonths(current, -1))}
+        >
+          ‹ {formatMonth(addMonths(month, -1))}
+        </button>
+        <span className="shrink-0 rounded-pill bg-hero px-3.5 py-2 text-[11px] font-extrabold capitalize text-hero-foreground">
+          {formatMonth(month)}
+        </span>
+        <button
+          type="button"
+          aria-label={t("statement.nextMonth")}
+          className="shrink-0 rounded-pill bg-card px-3.5 py-2 text-[11px] font-bold text-ink-secondary"
+          onClick={() => setMonth((current) => addMonths(current, 1))}
+        >
+          {formatMonth(addMonths(month, 1))} ›
+        </button>
+      </div>
+
+      <div className="hidden flex-wrap items-center justify-between gap-3 sm:flex">
         <div className="flex items-center gap-2">
           <Button
             asChild
@@ -230,7 +279,7 @@ export default function CardStatementsPage() {
                   </span>
                 </span>
               </div>
-              <div className="flex items-end gap-5 sm:ml-auto">
+              <div className="flex flex-wrap items-end gap-4 sm:ml-auto sm:gap-5">
                 <span className="flex flex-col">
                   <span className="text-[11px] text-[#8d9298]">{t("statement.paidLabel")}</span>
                   <span className="tabular-nums text-[16px] font-bold text-hero-foreground">
@@ -249,7 +298,46 @@ export default function CardStatementsPage() {
               </div>
             </div>
 
-            <Card className="rounded-card p-2 sm:p-3">
+            {/* Mobile item list: 2-line rows (icon + description/meta) + amount (README §Mobile). */}
+            {(detail?.items.length ?? 0) > 0 && (
+              <div className="rounded-card bg-card p-1.5 sm:hidden">
+                <ul aria-label={t("statement.itemDescription")}>
+                  {(detail?.items ?? []).map((item) => (
+                    <li
+                      key={item.installmentId}
+                      className="flex items-center gap-2.5 border-b border-divider-row px-2.5 py-2.5 last:border-0"
+                    >
+                      <span className="flex size-[36px] shrink-0 items-center justify-center rounded-field bg-field text-ink-secondary">
+                        <Receipt className="size-4" />
+                      </span>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-[13px] font-bold text-ink-primary">
+                          {item.description}
+                        </span>
+                        <span className="truncate text-[11px] text-ink-tertiary">
+                          {formatDate(item.purchaseDate)}
+                          {item.installmentCount > 1 &&
+                            ` · ${t("statement.installmentOf", {
+                              number: item.installmentNumber,
+                              count: item.installmentCount,
+                            })}`}
+                          {lookupName(categories, item.categoryId) &&
+                            ` · ${lookupName(categories, item.categoryId)}`}
+                        </span>
+                      </div>
+                      <span className="ml-auto shrink-0 tabular-nums text-[13px] font-extrabold text-ink-primary">
+                        {formatCents(item.amountCents)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(detail?.items.length ?? 0) === 0 && (
+              <p className="text-sm text-ink-tertiary sm:hidden">{t("statement.noItems")}</p>
+            )}
+
+            <Card className="hidden rounded-card p-2 sm:block sm:p-3">
               <CardContent className="p-0">
                 {(detail?.items.length ?? 0) === 0 ? (
                   <p className="p-3 text-sm text-ink-tertiary">{t("statement.noItems")}</p>

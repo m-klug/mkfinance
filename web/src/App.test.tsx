@@ -29,8 +29,9 @@ describe("App routes", () => {
     seedAuthenticatedSession();
     renderWithProviders(<App />, { route: "/cards" });
 
-    expect(await screen.findByRole("heading", { name: "Cartões" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Novo cartão" })).toBeInTheDocument();
+    // Desktop and mobile each render their own header (README §Mobile).
+    expect((await screen.findAllByRole("heading", { name: "Cartões" })).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Novo cartão" }).length).toBeGreaterThan(0);
     expect(
       screen.queryByText("Em construção — esta tela chega nas próximas etapas."),
     ).not.toBeInTheDocument();

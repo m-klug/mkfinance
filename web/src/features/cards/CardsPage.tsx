@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Archive, Pencil, Plus, Receipt } from "lucide-react";
+import { Archive, ArrowLeft, EllipsisVertical, Pencil, Plus, Receipt } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { useFormatCents } from "@/hooks/useFormatCents";
@@ -75,9 +81,46 @@ export default function CardsPage() {
     );
   }
 
+  const activeCards = (cards ?? []).filter((card) => !card.archived);
+  const totalLimitCents = activeCards.reduce((total, card) => total + card.limitCents, 0);
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Mobile header: back to Mais + title/count + quick add (README §Mobile — Navegação). */}
+      <div className="flex items-center gap-2.5 sm:hidden">
+        <Button
+          asChild
+          variant="ghost"
+          size="icon-lg"
+          className="rounded-field bg-card text-ink-secondary"
+          aria-label={t("nav.back")}
+        >
+          <Link to="/more">
+            <ArrowLeft className="size-4" />
+          </Link>
+        </Button>
+        <div className="flex flex-col">
+          <h1 className="text-xl font-extrabold tracking-[-0.025em] text-ink-primary">
+            {t("nav.cards")}
+          </h1>
+          <span className="text-[11px] text-ink-tertiary">
+            {t("cards.mobileCount", {
+              count: activeCards.length,
+              limit: formatCents(totalLimitCents),
+            })}
+          </span>
+        </div>
+        <Button
+          size="icon-lg"
+          className="ml-auto rounded-field"
+          aria-label={t("cards.new")}
+          onClick={openCreate}
+        >
+          <Plus className="size-5" strokeWidth={2.5} />
+        </Button>
+      </div>
+
+      <div className="hidden flex-wrap items-center justify-between gap-3 sm:flex">
         <h1 className="text-2xl font-extrabold tracking-tight text-ink-primary">
           {t("nav.cards")}
         </h1>
@@ -98,7 +141,97 @@ export default function CardsPage() {
         </div>
       </div>
 
-      <Card className="rounded-card p-2 sm:p-3">
+      <label className="flex items-center gap-2 self-start rounded-pill bg-card px-3.5 py-2.5 text-xs font-semibold text-ink-secondary sm:hidden">
+        <input
+          type="checkbox"
+          className="size-4 accent-mint"
+          checked={includeArchived}
+          onChange={(event) => setIncludeArchived(event.target.checked)}
+        />
+        {t("cards.showArchived")}
+      </label>
+
+      {isPending && <p className="text-sm text-ink-tertiary sm:hidden">{t("common.loading")}</p>}
+      {!isPending && (cards?.length ?? 0) === 0 && (
+        <p className="text-sm text-ink-tertiary sm:hidden">{t("cards.empty")}</p>
+      )}
+
+      {/* Mobile list: 2-line rows (chip + name/brand) + limit + usage bar + compact action menu. */}
+      {!isPending && (cards?.length ?? 0) > 0 && (
+        <ul aria-label={t("nav.cards")} className="flex flex-col gap-2.5 sm:hidden">
+          {(cards ?? []).map((card) => {
+            const usage = usagePercent(card);
+            return (
+              <li key={card.id} className="flex flex-col gap-2.5 rounded-card bg-card p-3.5">
+                <div className="flex items-center gap-2.5">
+                  <span className="h-[24px] w-[36px] shrink-0 rounded-[6px] bg-mint" aria-hidden />
+                  <div className="flex min-w-0 flex-col">
+                    <span className="flex items-center gap-1.5 truncate text-[13px] font-bold text-ink-primary">
+                      {card.name}
+                      {card.archived && <Badge variant="neutral">{t("cards.archivedBadge")}</Badge>}
+                    </span>
+                    {card.brand && (
+                      <span className="truncate text-[11px] text-ink-tertiary">{card.brand}</span>
+                    )}
+                  </div>
+                  <span className="ml-auto shrink-0 tabular-nums text-[14px] font-extrabold text-ink-primary">
+                    {formatCents(card.limitCents)}
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-lg"
+                        className="shrink-0 rounded-pill text-ink-secondary"
+                        aria-label={t("common.actions")}
+                      >
+                        <EllipsisVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link to={`/cards/${card.id}/statements`}>
+                          <Receipt className="size-4" />
+                          {t("cards.statementsAction", { name: card.name })}
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => openEdit(card)}>
+                        <Pencil className="size-4" />
+                        {t("cards.editAction", { name: card.name })}
+                      </DropdownMenuItem>
+                      {!card.archived && (
+                        <DropdownMenuItem onSelect={() => setArchiving(card)}>
+                          <Archive className="size-4" />
+                          {t("cards.archiveAction", { name: card.name })}
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="relative block h-[8px] w-full overflow-hidden rounded-pill bg-neutral">
+                    <span
+                      className={cn(
+                        "absolute inset-y-0 left-0 block rounded-pill",
+                        usage <= 70 ? "bg-mint" : "bg-pillar-pleasures",
+                      )}
+                      style={{ width: `${usage}%` }}
+                    />
+                  </span>
+                  <div className="flex justify-between text-[11px] tabular-nums text-ink-tertiary">
+                    <span>{formatCents(availableLimitCents(card))} {t("cards.availableLimit").toLowerCase()}</span>
+                    <span>
+                      {t("cards.closingDueValue", { closingDay: card.closingDay, dueDay: card.dueDay })}
+                    </span>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <Card className="hidden rounded-card p-2 sm:block sm:p-3">
         <CardContent className="p-0">
           {isPending && <p className="p-3 text-sm text-ink-tertiary">{t("common.loading")}</p>}
           {!isPending && (cards?.length ?? 0) === 0 && (

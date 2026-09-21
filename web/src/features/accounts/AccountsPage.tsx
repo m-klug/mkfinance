@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Archive, PiggyBank, Pencil, Plus } from "lucide-react";
+import { Archive, ArrowLeft, EllipsisVertical, PiggyBank, Pencil, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
@@ -96,9 +102,43 @@ export default function AccountsPage() {
     );
   }
 
+  const activeCount = (accounts ?? []).filter((account) => !account.archived).length;
+  const archivedCount = (accounts ?? []).filter((account) => account.archived).length;
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Mobile header: back to Mais + title/count + quick add (README §Mobile — Navegação). */}
+      <div className="flex items-center gap-2.5 sm:hidden">
+        <Button
+          asChild
+          variant="ghost"
+          size="icon-lg"
+          className="rounded-field bg-card text-ink-secondary"
+          aria-label={t("nav.back")}
+        >
+          <Link to="/more">
+            <ArrowLeft className="size-4" />
+          </Link>
+        </Button>
+        <div className="flex flex-col">
+          <h1 className="text-xl font-extrabold tracking-[-0.025em] text-ink-primary">
+            {t("nav.accounts")}
+          </h1>
+          <span className="text-[11px] text-ink-tertiary">
+            {t("accounts.mobileCount", { active: activeCount, archived: archivedCount })}
+          </span>
+        </div>
+        <Button
+          size="icon-lg"
+          className="ml-auto rounded-field"
+          aria-label={t("accounts.new")}
+          onClick={openCreate}
+        >
+          <Plus className="size-5" strokeWidth={2.5} />
+        </Button>
+      </div>
+
+      <div className="hidden flex-wrap items-center justify-between gap-3 sm:flex">
         <h1 className="text-2xl font-extrabold tracking-tight text-ink-primary">
           {t("nav.accounts")}
         </h1>
@@ -119,7 +159,44 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* Mobile hero panel: same 3 totals, stacked (README §Traduções desktop → mobile). */}
+      <div className="flex flex-col gap-3 rounded-card bg-hero p-4.5 text-hero-foreground sm:hidden">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[11px] text-[#8d9298]">{t("accounts.totalBalance")}</span>
+          <span className="tabular-nums text-[28px] font-extrabold tracking-[-0.035em] text-hero-foreground">
+            {formatCents(totals.balance)}
+          </span>
+        </div>
+        <div className="h-px bg-[#26292d]" />
+        <div className="flex gap-2.5">
+          <div className="flex flex-1 flex-col gap-0.5">
+            <span className="text-[10px] text-[#8d9298]">
+              {t("accounts.totalBalanceWithInvestments")}
+            </span>
+            <span className="tabular-nums text-[15px] font-extrabold text-hero-foreground">
+              {formatCents(totals.balanceWithInvestments)}
+            </span>
+          </div>
+          <div className="flex flex-1 flex-col gap-0.5">
+            <span className="text-[10px] text-[#8d9298]">{t("accounts.projectedBalance")}</span>
+            <span className="tabular-nums text-[15px] font-extrabold text-mint">
+              {formatCents(totals.projected)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 self-start rounded-pill bg-card px-3.5 py-2.5 text-xs font-semibold text-ink-secondary sm:hidden">
+        <input
+          type="checkbox"
+          className="size-4 accent-mint"
+          checked={includeArchived}
+          onChange={(event) => setIncludeArchived(event.target.checked)}
+        />
+        {t("accounts.showArchived")}
+      </label>
+
+      <div className="hidden gap-3 sm:grid sm:grid-cols-3">
         <Card className="gap-1.5 rounded-card p-4">
           <CardHeader className="gap-1 p-0">
             <CardDescription className="text-[11px] font-semibold text-ink-tertiary">
@@ -152,7 +229,79 @@ export default function AccountsPage() {
         </Card>
       </div>
 
-      <Card className="rounded-card p-2 sm:p-3">
+      {isPending && <p className="text-sm text-ink-tertiary sm:hidden">{t("common.loading")}</p>}
+      {!isPending && (accounts?.length ?? 0) === 0 && (
+        <p className="text-sm text-ink-tertiary sm:hidden">{t("accounts.empty")}</p>
+      )}
+
+      {/* Mobile list: 2-line rows (avatar + name/type) + balance + compact action menu. */}
+      {!isPending && (accounts?.length ?? 0) > 0 && (
+        <ul
+          aria-label={t("nav.accounts")}
+          className="flex flex-col gap-2 sm:hidden"
+        >
+          {(accounts ?? []).map((account, index) => (
+            <li
+              key={account.id}
+              className="flex items-center gap-2.5 rounded-card bg-card p-3.5"
+            >
+              <span
+                className="flex size-[38px] shrink-0 items-center justify-center rounded-[13px] text-[13px] font-extrabold text-mint-ink"
+                style={{ backgroundColor: accountAvatarTone(index) }}
+                aria-hidden
+              >
+                {accountInitials(account.name)}
+              </span>
+              <div className="flex min-w-0 flex-col">
+                <span className="flex items-center gap-1.5 truncate text-[13px] font-bold text-ink-primary">
+                  {account.name}
+                  {account.archived && <Badge variant="neutral">{t("accounts.archivedBadge")}</Badge>}
+                </span>
+                <span className="truncate text-[11px] text-ink-tertiary">
+                  {t(`accountType.${account.type}`)}
+                </span>
+              </div>
+              <span className="ml-auto shrink-0 tabular-nums text-[14px] font-extrabold text-ink-primary">
+                {formatCents(effectiveBalanceCents(account))}
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    className="shrink-0 rounded-pill text-ink-secondary"
+                    aria-label={t("common.actions")}
+                  >
+                    <EllipsisVertical className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {isContributionAccount(account) && (
+                    <DropdownMenuItem asChild>
+                      <Link to={`/accounts/${account.id}/vaults`}>
+                        <PiggyBank className="size-4" />
+                        {t("vaults.accountAction", { name: account.name })}
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onSelect={() => openEdit(account)}>
+                    <Pencil className="size-4" />
+                    {t("accounts.editAction", { name: account.name })}
+                  </DropdownMenuItem>
+                  {!account.archived && (
+                    <DropdownMenuItem onSelect={() => setArchiving(account)}>
+                      <Archive className="size-4" />
+                      {t("accounts.archiveAction", { name: account.name })}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Card className="hidden rounded-card p-2 sm:block sm:p-3">
         <CardContent className="p-0">
           {isPending && <p className="p-3 text-sm text-ink-tertiary">{t("common.loading")}</p>}
           {!isPending && (accounts?.length ?? 0) === 0 && (
