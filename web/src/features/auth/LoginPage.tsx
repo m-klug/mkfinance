@@ -95,7 +95,11 @@ export default function LoginPage() {
               className={FIELD_CLASS}
             />
           </div>
-          <Button type="submit" disabled={loginMutation.isPending} className="mt-1 w-full">
+          <Button
+            type="submit"
+            disabled={loginMutation.isPending}
+            className="mt-1 w-full max-sm:h-11"
+          >
             {loginMutation.isPending ? t("auth.submitting") : t("auth.login")}
           </Button>
         </form>

@@ -102,7 +102,11 @@ export default function RegisterPage() {
             />
             <span className="text-[11px] text-ink-label">{t("auth.passwordMinLength")}</span>
           </div>
-          <Button type="submit" disabled={registerMutation.isPending} className="mt-1 w-full">
+          <Button
+            type="submit"
+            disabled={registerMutation.isPending}
+            className="mt-1 w-full max-sm:h-11"
+          >
             {registerMutation.isPending ? t("auth.submitting") : t("auth.register")}
           </Button>
         </form>
