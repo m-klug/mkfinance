@@ -164,7 +164,15 @@
     "kpiNet": "Resultado do período",
     "clearFilters": "Limpar filtros",
     "vaultBadgePrefix": "caixinha · ",
-    "showingCount": "Mostrando {{shown}} de {{total}} lançamentos"
+    "showingCount": "Mostrando {{shown}} de {{total}} lançamentos",
+    "dateGroupToday": "Hoje",
+    "dateGroupYesterday": "Ontem",
+    "filtersButton": "Filtros",
+    "filtersSheetTitle": "Filtros",
+    "applyFilters": "Aplicar filtros",
+    "removeFilterChip": "Remover filtro {{label}}",
+    "settleShort": "Efetivar",
+    "allFilter": "Tudo"
   },
   "quickEntry": {
     "open": "Novo lançamento",
@@ -421,6 +429,12 @@
       "totalWithInvestments": "Com investimentos",
       "investmentBadge": "Investimento",
       "empty": "Nenhuma conta cadastrada ainda."
+    },
+    "hero": {
+      "balanceLabel": "Saldo em contas",
+      "income": "Entradas",
+      "expense": "Saídas",
+      "projected": "Projetado"
     },
     "incomeExpense": {
       "title": "Receitas e despesas",

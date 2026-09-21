@@ -2,8 +2,12 @@ import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { useFormatCents } from "@/hooks/useFormatCents";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { AccountType, type DashboardSummary } from "@/lib/api/generated/mKFinanceAPI.schemas";
-import { effectiveBalanceCents } from "@/features/accounts/accountOptions";
+import {
+  effectiveBalanceCents,
+  projectedBalanceCents,
+} from "@/features/accounts/accountOptions";
 
 interface BalanceSectionProps {
   summary: DashboardSummary;
@@ -14,10 +18,65 @@ function initials(name: string): string {
   return name.trim().slice(0, 2).toUpperCase();
 }
 
+/**
+ * Mobile-only dark hero panel (design_handoff_mk_finance/mobile screen 01):
+ * replaces the desktop's separate balance/income-expense cards with a single
+ * stacked summary — saldo em contas, then entradas/saídas/projetado. Gated
+ * by useIsMobile() (not CSS) so the desktop cards' matching totals never
+ * co-exist in the DOM — table/list-style structural swaps in this reskin use
+ * the hook rather than max-sm:/sm: so tests that assert a total appears once
+ * keep working without change.
+ */
+function BalanceHeroMobile({ summary }: BalanceSectionProps) {
+  const { t } = useTranslation();
+  const formatCents = useFormatCents();
+  // Same population as totalBalanceCents (excludes INVESTMENT, excludes archived).
+  const projectedTotal = summary.accounts
+    .filter((account) => !account.archived && account.type !== AccountType.INVESTMENT)
+    .reduce((sum, account) => sum + projectedBalanceCents(account), 0);
+
+  return (
+    <div className="flex flex-col gap-3.5 rounded-card bg-hero p-[18px] text-hero-foreground">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] text-[#8D9298]">{t("dashboard.hero.balanceLabel")}</span>
+        <span className="text-[30px] font-extrabold tracking-[-0.035em] tabular-nums text-hero-foreground">
+          {formatCents(summary.totalBalanceCents)}
+        </span>
+      </div>
+      <div className="h-px bg-white/10" />
+      <div className="flex gap-2.5">
+        <div className="flex flex-1 flex-col gap-0.5">
+          <span className="text-[10px] text-[#8D9298]">{t("dashboard.hero.income")}</span>
+          <span className="text-[15px] font-extrabold tabular-nums text-hero-foreground">
+            {formatCents(summary.incomeCents)}
+          </span>
+        </div>
+        <div className="flex flex-1 flex-col gap-0.5">
+          <span className="text-[10px] text-[#8D9298]">{t("dashboard.hero.expense")}</span>
+          <span className="text-[15px] font-extrabold tabular-nums text-hero-foreground">
+            {formatCents(summary.expenseCents)}
+          </span>
+        </div>
+        <div className="flex flex-1 flex-col gap-0.5">
+          <span className="text-[10px] text-[#8D9298]">{t("dashboard.hero.projected")}</span>
+          <span className="text-[15px] font-extrabold tabular-nums text-mint">
+            {formatCents(projectedTotal)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function BalanceSection({ summary }: BalanceSectionProps) {
   const { t } = useTranslation();
   const formatCents = useFormatCents();
+  const isMobile = useIsMobile();
   const accounts = summary.accounts.filter((account) => !account.archived);
+
+  if (isMobile) {
+    return <BalanceHeroMobile summary={summary} />;
+  }
 
   return (
     <div className="flex flex-col gap-3">

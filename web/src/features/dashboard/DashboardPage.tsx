@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import {
   useGetDashboardSummary,
   useGetPillarAllocation,
@@ -20,6 +21,7 @@ import { OpenStatementsSection } from "@/features/dashboard/OpenStatementsSectio
 export default function DashboardPage() {
   const { t } = useTranslation();
   const workspaceId = useCurrentWorkspaceId();
+  const isMobile = useIsMobile();
   const [month, setMonth] = useState(() => currentMonth());
   const enabled = Boolean(workspaceId);
 
@@ -66,24 +68,35 @@ export default function DashboardPage() {
 
       {!isPending && !isError && summary && allocation && (
         <div className="flex flex-col gap-5">
+          {/* Mobile (design_handoff_mk_finance mobile screen 01): the balance
+              hero comes before the allocation panel, and the chart/category/
+              statements sections are left off this screen entirely — those
+              live in their own destinations under "Mais" on mobile. Desktop
+              keeps the original order and full section set unchanged. */}
+          {isMobile && <BalanceSection summary={summary} />}
+
           <PillarAllocationSection report={allocation} />
 
-          <div className="grid gap-5 lg:grid-cols-2">
-            <BalanceSection summary={summary} />
-            <IncomeExpenseSection summary={summary} />
-          </div>
+          {!isMobile && (
+            <>
+              <div className="grid gap-5 lg:grid-cols-2">
+                <BalanceSection summary={summary} />
+                <IncomeExpenseSection summary={summary} />
+              </div>
 
-          <div className="grid gap-5 lg:grid-cols-2">
-            <CategoryBreakdownSection
-              items={summary.expenseByCategory}
-              categories={categoriesQuery.data ?? []}
-            />
+              <div className="grid gap-5 lg:grid-cols-2">
+                <CategoryBreakdownSection
+                  items={summary.expenseByCategory}
+                  categories={categoriesQuery.data ?? []}
+                />
 
-            <OpenStatementsSection
-              statements={summary.openStatements}
-              cards={cardsQuery.data ?? []}
-            />
-          </div>
+                <OpenStatementsSection
+                  statements={summary.openStatements}
+                  cards={cardsQuery.data ?? []}
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

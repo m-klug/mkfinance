@@ -37,13 +37,13 @@ export function PillarAllocationSection({ report }: PillarAllocationSectionProps
   const unallocatedCents = report.noIncome ? null : report.incomeCents - totalSpentCents;
 
   return (
-    <div className="flex flex-col gap-5 rounded-card bg-hero p-6 text-hero-foreground">
+    <div className="flex flex-col gap-5 rounded-card bg-hero p-6 text-hero-foreground max-sm:gap-3 max-sm:rounded-[20px] max-sm:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="text-[17px] font-bold tracking-[-0.015em] sm:text-[19px]">
+          <h2 className="text-[17px] font-bold tracking-[-0.015em] max-sm:text-sm sm:text-[19px]">
             {t("dashboard.allocation.title")}
           </h2>
-          <p className="text-xs text-[#8D9298]">{t("dashboard.allocation.subtitle")}</p>
+          <p className="text-xs text-[#8D9298] max-sm:hidden">{t("dashboard.allocation.subtitle")}</p>
         </div>
       </div>
 
