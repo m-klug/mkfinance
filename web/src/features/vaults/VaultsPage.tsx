@@ -7,6 +7,7 @@ import {
   Archive,
   ArrowLeft,
   ArrowLeftRight,
+  EllipsisVertical,
   Pencil,
   Plus,
   Receipt,
@@ -17,6 +18,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
@@ -141,7 +148,40 @@ export default function VaultsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Mobile header: back to the account + name + quick add (README §Mobile). */}
+      <div className="flex items-center gap-2.5 sm:hidden">
+        <Button
+          asChild
+          variant="ghost"
+          size="icon-lg"
+          className="rounded-field bg-card text-ink-secondary"
+          aria-label={t("vaults.backToAccounts")}
+        >
+          <Link to="/accounts">
+            <ArrowLeft className="size-4" />
+          </Link>
+        </Button>
+        <div className="flex min-w-0 flex-col">
+          <h1 className="truncate text-xl font-extrabold tracking-[-0.025em] text-ink-primary">
+            {account?.name ?? t("vaults.title")}
+          </h1>
+          {account && (
+            <span className="truncate text-[11px] text-ink-tertiary">
+              {t("vaults.balance")}: {formatCents(effectiveBalanceCents(account))}
+            </span>
+          )}
+        </div>
+        <Button
+          size="icon-lg"
+          className="ml-auto shrink-0 rounded-field"
+          aria-label={t("vaults.new")}
+          onClick={openCreate}
+        >
+          <Plus className="size-5" strokeWidth={2.5} />
+        </Button>
+      </div>
+
+      <div className="hidden flex-wrap items-center justify-between gap-3 sm:flex">
         <div className="flex items-center gap-2">
           <Button
             asChild
@@ -176,7 +216,39 @@ export default function VaultsPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Mobile action row: chips instead of full pill buttons — "Nova caixinha" moved to the header. */}
+      <div className="flex items-center gap-2 overflow-x-auto sm:hidden">
+        <label className="flex shrink-0 items-center gap-2 rounded-pill bg-card px-3.5 py-2.5 text-xs font-semibold text-ink-secondary">
+          <input
+            type="checkbox"
+            className="size-4 accent-mint"
+            checked={includeArchived}
+            onChange={(event) => setIncludeArchived(event.target.checked)}
+          />
+          {t("vaults.showArchived")}
+        </label>
+        <Button
+          type="button"
+          variant="secondary"
+          className="shrink-0"
+          onClick={() => setYieldOpen(true)}
+        >
+          <TrendingUp className="size-4" />
+          {t("vaults.yieldAction")}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          className="shrink-0"
+          onClick={() => setReallocateOpen(true)}
+          disabled={vaults.filter((vault) => !vault.archived).length === 0}
+        >
+          <ArrowLeftRight className="size-4" />
+          {t("vaults.reallocate")}
+        </Button>
+      </div>
+
+      <div className="hidden flex-wrap items-center justify-between gap-3 sm:flex">
         <label className="flex items-center gap-2 rounded-pill bg-card px-3.5 py-2 text-xs font-semibold text-ink-secondary">
           <input
             type="checkbox"
@@ -242,7 +314,7 @@ export default function VaultsPage() {
                       {t("cards.archivedBadge")}
                     </Badge>
                   )}
-                  <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                  <div className="ml-auto hidden shrink-0 items-center gap-0.5 sm:flex">
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -282,6 +354,39 @@ export default function VaultsPage() {
                       <Trash2 className="size-4" />
                     </Button>
                   </div>
+                  {/* Mobile: the 4-icon cluster collapses into a compact action menu. */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-lg"
+                        className="ml-auto shrink-0 rounded-pill text-ink-secondary sm:hidden"
+                        aria-label={t("common.actions")}
+                      >
+                        <EllipsisVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setViewingEntriesOf(vault)}>
+                        <Receipt className="size-4" />
+                        {t("vaults.entriesAction", { name: vault.name })}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => openEdit(vault)}>
+                        <Pencil className="size-4" />
+                        {t("vaults.editAction", { name: vault.name })}
+                      </DropdownMenuItem>
+                      {!vault.archived && (
+                        <DropdownMenuItem onSelect={() => setArchiving(vault)}>
+                          <Archive className="size-4" />
+                          {t("vaults.archiveAction", { name: vault.name })}
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onSelect={() => setDeleting(vault)}>
+                        <Trash2 className="size-4" />
+                        {t("vaults.deleteAction", { name: vault.name })}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
                 <div>

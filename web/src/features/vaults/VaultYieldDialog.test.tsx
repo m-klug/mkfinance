@@ -46,7 +46,7 @@ describe("VaultYieldDialog", () => {
     const user = userEvent.setup();
     renderVaultsPage();
 
-    await user.click(await screen.findByRole("button", { name: "Lançar rendimento" }));
+    await user.click((await screen.findAllByRole("button", { name: "Lançar rendimento" }))[0]);
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: "Lançar rendimento" })).toBeInTheDocument();
 
@@ -68,7 +68,7 @@ describe("VaultYieldDialog", () => {
     const user = userEvent.setup();
     renderVaultsPage();
 
-    await user.click(await screen.findByRole("button", { name: "Lançar rendimento" }));
+    await user.click((await screen.findAllByRole("button", { name: "Lançar rendimento" }))[0]);
     const dialog = await screen.findByRole("dialog");
 
     await user.type(within(dialog).getByLabelText("Valor do rendimento"), "10001");
@@ -92,7 +92,7 @@ describe("VaultYieldDialog", () => {
     const user = userEvent.setup();
     renderVaultsPage();
 
-    await user.click(await screen.findByRole("button", { name: "Lançar rendimento" }));
+    await user.click((await screen.findAllByRole("button", { name: "Lançar rendimento" }))[0]);
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Lançar rendimento" }));
 
@@ -119,7 +119,7 @@ describe("VaultYieldDialog", () => {
     const user = userEvent.setup();
     renderVaultsPage();
 
-    await user.click(await screen.findByRole("button", { name: "Lançar rendimento" }));
+    await user.click((await screen.findAllByRole("button", { name: "Lançar rendimento" }))[0]);
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("Valor do rendimento"), "5000");
 

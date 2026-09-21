@@ -29,7 +29,10 @@ describe("CardsPage", () => {
   it("lists cards with their available limit (limit − unpaid statements)", async () => {
     renderPage();
 
-    const row = (await screen.findByText(creditCard.name)).closest("tr") as HTMLElement;
+    // Scope to the desktop table — the mobile list (README §Mobile) renders
+    // the same data in a different DOM shape alongside it.
+    const table = await screen.findByRole("table");
+    const row = (await within(table).findByText(creditCard.name)).closest("tr") as HTMLElement;
     // Full limit and available limit both render on the row.
     expect(within(row).getByText(/5\.000,00/)).toBeInTheDocument();
     expect(within(row).getByText(/3\.500,00/)).toBeInTheDocument();
@@ -41,13 +44,14 @@ describe("CardsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await screen.findByText(creditCard.name);
+    await screen.findAllByText(creditCard.name);
     expect(screen.queryByText(archivedCard.name)).not.toBeInTheDocument();
 
-    await user.click(screen.getByLabelText("Mostrar arquivados"));
+    // Desktop and mobile each render their own toggle, bound to the same state.
+    await user.click(screen.getAllByLabelText("Mostrar arquivados")[0]);
 
-    expect(await screen.findByText(archivedCard.name)).toBeInTheDocument();
-    expect(screen.getByText("Arquivado")).toBeInTheDocument();
+    expect((await screen.findAllByText(archivedCard.name)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Arquivado").length).toBeGreaterThan(0);
   });
 
   it("creates a card, sending the limit in cents and the closing/due days", async () => {
@@ -61,7 +65,7 @@ describe("CardsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Novo cartão" }));
+    await user.click((await screen.findAllByRole("button", { name: "Novo cartão" }))[0]);
     await user.type(screen.getByLabelText("Nome"), "Inter");
     await user.type(screen.getByLabelText("Limite"), "300000");
     await user.selectOptions(screen.getByLabelText("Dia de fechamento"), "15");
@@ -88,7 +92,7 @@ describe("CardsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Novo cartão" }));
+    await user.click((await screen.findAllByRole("button", { name: "Novo cartão" }))[0]);
     await user.click(screen.getByRole("button", { name: "Salvar" }));
 
     expect(await screen.findByText("Campo obrigatório.")).toBeInTheDocument();

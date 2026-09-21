@@ -28,12 +28,15 @@ describe("AccountsPage", () => {
   it("lists accounts with their balances and the workspace totals", async () => {
     renderPage();
 
-    expect(await screen.findByText(checkingAccount.name)).toBeInTheDocument();
-    expect(screen.getByText(investmentAccount.name)).toBeInTheDocument();
+    // The mobile list duplicates every row/total alongside the desktop table
+    // (README §Mobile — both markups render, CSS picks one per breakpoint),
+    // so row content is asserted with getAllByText from here on.
+    expect((await screen.findAllByText(checkingAccount.name)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(investmentAccount.name).length).toBeGreaterThan(0);
     // R5 balance of the checking account (row cell + "total without investments").
     expect(screen.getAllByText(/2\.500,00/).length).toBeGreaterThan(0);
     // Total without investments is the checking balance alone; with them, both.
-    expect(screen.getByText(/7\.500,00/)).toBeInTheDocument();
+    expect(screen.getAllByText(/7\.500,00/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/2\.300,00/).length).toBeGreaterThan(0);
   });
 
@@ -42,13 +45,15 @@ describe("AccountsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await screen.findByText(checkingAccount.name);
+    await screen.findAllByText(checkingAccount.name);
     expect(screen.queryByText(archivedAccount.name)).not.toBeInTheDocument();
 
-    await user.click(screen.getByLabelText("Mostrar arquivadas"));
+    // Desktop and mobile each render their own "Mostrar arquivadas" toggle —
+    // both are bound to the same state, so flipping either one is enough.
+    await user.click(screen.getAllByLabelText("Mostrar arquivadas")[0]);
 
-    expect(await screen.findByText(archivedAccount.name)).toBeInTheDocument();
-    expect(screen.getByText("Arquivada")).toBeInTheDocument();
+    expect((await screen.findAllByText(archivedAccount.name)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Arquivada").length).toBeGreaterThan(0);
   });
 
   it("rejects an account without a name instead of calling the API", async () => {
@@ -62,7 +67,7 @@ describe("AccountsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Nova conta" }));
+    await user.click((await screen.findAllByRole("button", { name: "Nova conta" }))[0]);
     await user.click(screen.getByRole("button", { name: "Salvar" }));
 
     expect(await screen.findByText("Campo obrigatório.")).toBeInTheDocument();
@@ -80,7 +85,7 @@ describe("AccountsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Nova conta" }));
+    await user.click((await screen.findAllByRole("button", { name: "Nova conta" }))[0]);
     await user.type(screen.getByLabelText("Nome"), "Carteira");
     await user.selectOptions(screen.getByLabelText("Tipo"), "CASH");
     // Digits are read as cents: "12345" is R$ 123,45.
@@ -107,7 +112,7 @@ describe("AccountsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Nova conta" }));
+    await user.click((await screen.findAllByRole("button", { name: "Nova conta" }))[0]);
     expect(screen.queryByLabelText("Pilar de aporte padrão")).not.toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText("Tipo"), "INVESTMENT");

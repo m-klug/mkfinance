@@ -35,7 +35,7 @@ describe("VaultsPage", () => {
   it("shows the account header and the composition of every vault plus the unallocated slice", async () => {
     renderVaultsPage();
 
-    expect(await screen.findByRole("heading", { name: investmentAccount.name })).toBeInTheDocument();
+    expect((await screen.findAllByRole("heading", { name: investmentAccount.name })).length).toBeGreaterThan(0);
     // Each vault's name shows up twice: once in the bar legend, once on its own card.
     expect(screen.getAllByText(reserveVault.name).length).toBeGreaterThan(0);
     expect(screen.getAllByText(tripVault.name).length).toBeGreaterThan(0);
@@ -84,7 +84,7 @@ describe("VaultsPage", () => {
     const user = userEvent.setup();
     renderVaultsPage();
 
-    await user.click(await screen.findByRole("button", { name: "Nova caixinha" }));
+    await user.click((await screen.findAllByRole("button", { name: "Nova caixinha" }))[0]);
     await user.type(screen.getByLabelText("Nome"), "Casa Nova");
     await user.selectOptions(screen.getByLabelText("Pilar"), "GOALS");
     await user.click(screen.getByRole("button", { name: "Salvar" }));
@@ -102,7 +102,7 @@ describe("VaultsPage", () => {
     const user = userEvent.setup();
     renderVaultsPage();
 
-    await user.click(await screen.findByRole("button", { name: "Nova caixinha" }));
+    await user.click((await screen.findAllByRole("button", { name: "Nova caixinha" }))[0]);
     expect(screen.queryByLabelText("Prazo")).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Valor-alvo"), "1000000");
@@ -186,7 +186,7 @@ describe("VaultsPage", () => {
     const user = userEvent.setup();
     renderVaultsPage();
 
-    await user.click(await screen.findByRole("button", { name: "Remanejar" }));
+    await user.click((await screen.findAllByRole("button", { name: "Remanejar" }))[0]);
     const dialog = await screen.findByRole("dialog");
     // "De" stays on the literal "Não alocado" (value=""); only "Para" is set.
     await user.selectOptions(within(dialog).getByLabelText("Para"), reserveVault.id);
@@ -212,7 +212,7 @@ describe("VaultsPage", () => {
     const user = userEvent.setup();
     renderVaultsPage();
 
-    await user.click(await screen.findByRole("button", { name: "Remanejar" }));
+    await user.click((await screen.findAllByRole("button", { name: "Remanejar" }))[0]);
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("Valor"), "100");
     await user.click(within(dialog).getByRole("button", { name: "Remanejar" }));
@@ -249,7 +249,7 @@ describe("AccountsPage → Caixinhas entry point", () => {
     seedAuthenticatedSession();
     renderWithProviders(<App />, { route: "/accounts" });
 
-    expect(await screen.findByText(investmentAccount.name)).toBeInTheDocument();
+    expect((await screen.findAllByText(investmentAccount.name)).length).toBeGreaterThan(0);
     expect(
       screen.getByRole("link", { name: `Caixinhas de ${investmentAccount.name}` }),
     ).toBeInTheDocument();
@@ -268,7 +268,7 @@ describe("AccountsPage → Caixinhas entry point", () => {
       await screen.findByRole("link", { name: `Caixinhas de ${investmentAccount.name}` }),
     );
 
-    expect(await screen.findByRole("heading", { name: investmentAccount.name })).toBeInTheDocument();
+    expect((await screen.findAllByRole("heading", { name: investmentAccount.name })).length).toBeGreaterThan(0);
     expect(screen.getAllByText(reserveVault.name).length).toBeGreaterThan(0);
   });
 });
