@@ -11,7 +11,9 @@ import {
   Equal,
   Pencil,
   Plus,
+  SlidersHorizontal,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -26,11 +28,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { SelectField, TextField } from "@/components/form/fields";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { useFormatCents } from "@/hooks/useFormatCents";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import {
@@ -58,6 +68,7 @@ import { TagsInput } from "@/features/transactions/TagsInput";
 import {
   categoryOptions,
   firstDayOfCurrentMonthIso,
+  groupTransactionsByDate,
   lastDayOfCurrentMonthIso,
   lookupName,
   signedAmountCents,
@@ -107,6 +118,7 @@ export default function TransactionsPage() {
   const formatCents = useFormatCents();
   const queryClient = useQueryClient();
   const workspaceId = useCurrentWorkspaceId();
+  const isMobile = useIsMobile();
 
   // Defaults to the whole running month, not "up to today": a competency includes what is already
   // scheduled inside it — a recurrence occurrence, a bill entered with "agendar como pendente" —
@@ -116,6 +128,7 @@ export default function TransactionsPage() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | undefined>();
   const [deleting, setDeleting] = useState<Transaction | undefined>();
+  const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
 
   const enabled = Boolean(workspaceId);
   const { data: accountsData } = useListAccounts(workspaceId ?? "", undefined, {
@@ -249,6 +262,69 @@ export default function TransactionsPage() {
   }, [transactions]);
   const netCents = incomeCents - expenseCents;
 
+  // Mobile chips row (design_handoff_mk_finance mobile screen 02, "Traduções de
+  // padrão desktop → mobile": filtros em barra → chips roláveis + sheet
+  // "Filtros"): one removable chip per filter that differs from the default,
+  // desktop's filter card stays untouched and is only hidden on mobile.
+  const defaultFiltersValue = defaultFilters();
+  const activeFilterChips: { key: string; label: string; onRemove: () => void }[] = [];
+  if (filters.from !== defaultFiltersValue.from || filters.to !== defaultFiltersValue.to) {
+    activeFilterChips.push({
+      key: "period",
+      label: `${formatDate(filters.from)} – ${formatDate(filters.to)}`,
+      onRemove: () =>
+        setFilters((current) => ({
+          ...current,
+          from: defaultFiltersValue.from,
+          to: defaultFiltersValue.to,
+        })),
+    });
+  }
+  if (filters.accountId) {
+    activeFilterChips.push({
+      key: "account",
+      label: lookupName(accounts, filters.accountId) ?? filters.accountId,
+      onRemove: () => updateFilter("accountId", ""),
+    });
+  }
+  if (filters.categoryId) {
+    activeFilterChips.push({
+      key: "category",
+      label: lookupName(categories, filters.categoryId) ?? filters.categoryId,
+      onRemove: () => updateFilter("categoryId", ""),
+    });
+  }
+  if (filters.type) {
+    activeFilterChips.push({
+      key: "type",
+      label: t(`transactionType.${filters.type}`),
+      onRemove: () => updateFilter("type", ""),
+    });
+  }
+  if (filters.status) {
+    activeFilterChips.push({
+      key: "status",
+      label: t(`transactionStatus.${filters.status}`),
+      onRemove: () => updateFilter("status", ""),
+    });
+  }
+  if (filters.search.trim()) {
+    activeFilterChips.push({
+      key: "search",
+      label: `“${filters.search.trim()}”`,
+      onRemove: () => updateFilter("search", ""),
+    });
+  }
+  if (filters.tags.length > 0) {
+    activeFilterChips.push({
+      key: "tags",
+      label: filters.tags.join(", "),
+      onRemove: () => updateFilter("tags", []),
+    });
+  }
+
+  const dateGroups = groupTransactionsByDate(transactions, t);
+
   return (
     <div className="flex flex-1 flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -266,43 +342,108 @@ export default function TransactionsPage() {
         </Button>
       </div>
 
-      <div className="grid gap-3.5 sm:grid-cols-3">
-        <Card className="flex-row items-center gap-3.5 rounded-card p-4">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-success-bg text-success-ink">
-            <ArrowDownRight className="size-4" />
-          </span>
-          <span className="flex flex-col gap-0.5">
-            <span className="text-xs text-ink-secondary">{t("transactions.kpiIncome")}</span>
-            <span className="tabular-nums text-xl font-extrabold tracking-tight text-ink-primary">
+      {isMobile ? (
+        // Mobile KPI strip (design_handoff_mk_finance mobile screen 02): one
+        // white card, three columns with thin dividers — not the dark
+        // stacked hero used on the Dashboard, matching the mock exactly.
+        <div className="flex items-stretch gap-3 rounded-card bg-card p-3.5">
+          <div className="flex flex-1 flex-col gap-0.5">
+            <span className="text-[10px] text-ink-secondary">{t("transactions.kpiIncome")}</span>
+            <span className="text-base font-extrabold tabular-nums text-success-ink">
               {formatCents(incomeCents)}
             </span>
-          </span>
-        </Card>
-        <Card className="flex-row items-center gap-3.5 rounded-card p-4">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-neutral text-ink-secondary">
-            <ArrowUpRight className="size-4" />
-          </span>
-          <span className="flex flex-col gap-0.5">
-            <span className="text-xs text-ink-secondary">{t("transactions.kpiExpense")}</span>
-            <span className="tabular-nums text-xl font-extrabold tracking-tight text-ink-primary">
+          </div>
+          <div className="w-px bg-divider-row" />
+          <div className="flex flex-1 flex-col gap-0.5">
+            <span className="text-[10px] text-ink-secondary">{t("transactions.kpiExpense")}</span>
+            <span className="text-base font-extrabold tabular-nums text-ink-primary">
               {formatCents(expenseCents)}
             </span>
-          </span>
-        </Card>
-        <Card className="flex-row items-center gap-3.5 rounded-card bg-hero p-4 text-hero-foreground">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-mint text-mint-ink">
-            <Equal className="size-4" />
-          </span>
-          <span className="flex flex-col gap-0.5">
-            <span className="text-xs text-hero-foreground/60">{t("transactions.kpiNet")}</span>
-            <span className="tabular-nums text-xl font-extrabold tracking-tight text-hero-foreground">
+          </div>
+          <div className="w-px bg-divider-row" />
+          <div className="flex flex-1 flex-col gap-0.5">
+            <span className="text-[10px] text-ink-secondary">{t("transactions.kpiNet")}</span>
+            <span className="text-base font-extrabold tabular-nums text-ink-primary">
               {netCents >= 0 ? "+ " : ""}
               {formatCents(netCents)}
             </span>
-          </span>
-        </Card>
-      </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-3.5 sm:grid-cols-3">
+          <Card className="flex-row items-center gap-3.5 rounded-card p-4">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-success-bg text-success-ink">
+              <ArrowDownRight className="size-4" />
+            </span>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-xs text-ink-secondary">{t("transactions.kpiIncome")}</span>
+              <span className="tabular-nums text-xl font-extrabold tracking-tight text-ink-primary">
+                {formatCents(incomeCents)}
+              </span>
+            </span>
+          </Card>
+          <Card className="flex-row items-center gap-3.5 rounded-card p-4">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-neutral text-ink-secondary">
+              <ArrowUpRight className="size-4" />
+            </span>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-xs text-ink-secondary">{t("transactions.kpiExpense")}</span>
+              <span className="tabular-nums text-xl font-extrabold tracking-tight text-ink-primary">
+                {formatCents(expenseCents)}
+              </span>
+            </span>
+          </Card>
+          <Card className="flex-row items-center gap-3.5 rounded-card bg-hero p-4 text-hero-foreground">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-mint text-mint-ink">
+              <Equal className="size-4" />
+            </span>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-xs text-hero-foreground/60">{t("transactions.kpiNet")}</span>
+              <span className="tabular-nums text-xl font-extrabold tracking-tight text-hero-foreground">
+                {netCents >= 0 ? "+ " : ""}
+                {formatCents(netCents)}
+              </span>
+            </span>
+          </Card>
+        </div>
+      )}
 
+      {isMobile ? (
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center gap-2 overflow-x-auto">
+            {activeFilterChips.length === 0 ? (
+              <span className="text-xs text-ink-tertiary">{t("transactions.allFilter")}</span>
+            ) : (
+              activeFilterChips.map((chip) => (
+                <span
+                  key={chip.key}
+                  className="flex shrink-0 items-center gap-1.5 rounded-pill bg-card px-3 py-2 text-xs font-bold text-ink-secondary"
+                >
+                  <span className="max-w-[140px] truncate">{chip.label}</span>
+                  <button
+                    type="button"
+                    aria-label={t("transactions.removeFilterChip", { label: chip.label })}
+                    onClick={chip.onRemove}
+                    className="flex size-4 shrink-0 items-center justify-center rounded-full text-ink-tertiary hover:text-ink-primary"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              ))
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="shrink-0 rounded-full"
+            aria-label={t("transactions.filtersButton")}
+            onClick={() => setFiltersSheetOpen(true)}
+          >
+            <SlidersHorizontal className="size-4" />
+          </Button>
+        </div>
+      ) : (
       <Card className="rounded-card">
         <CardContent className="flex flex-col gap-3.5">
           {/* Date range, account and category share the top row — the four
@@ -398,6 +539,7 @@ export default function TransactionsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <Card className="rounded-card">
         <CardContent>
@@ -405,7 +547,91 @@ export default function TransactionsPage() {
           {!isPending && transactions.length === 0 && (
             <p className="text-ink-secondary">{t("transactions.empty")}</p>
           )}
-          {!isPending && transactions.length > 0 && (
+          {!isPending && transactions.length > 0 && isMobile && (
+            <div className="flex flex-col gap-4">
+              {dateGroups.map((group) => (
+                <div key={group.dateIso} className="flex flex-col gap-2">
+                  <span className="pl-1 text-[11px] font-extrabold tracking-wide text-ink-label">
+                    {group.label}
+                  </span>
+                  <div className="flex flex-col rounded-card bg-field px-4">
+                    {group.transactions.map((transaction, index) => {
+                      const category = categoryById.get(transaction.categoryId ?? "");
+                      const pending = transaction.status === TransactionStatus.PENDING;
+                      const signed = signedAmountCents(transaction);
+                      return (
+                        <div key={transaction.id}>
+                          {index > 0 && <div className="h-px bg-divider-row" />}
+                          <div className="flex items-center gap-2 py-2.5">
+                            <button
+                              type="button"
+                              className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                              onClick={() => setEditing(transaction)}
+                              aria-label={t("transactions.editAction", {
+                                description: transaction.description,
+                              })}
+                            >
+                              <span className="flex min-w-0 flex-1 flex-col">
+                                <span className="truncate text-[13px] font-bold text-ink-primary">
+                                  {transaction.description}
+                                </span>
+                                <span className="flex min-w-0 items-center gap-1 truncate text-[11px] text-ink-tertiary">
+                                  <span
+                                    className="size-1.5 shrink-0 rounded-swatch"
+                                    style={{ backgroundColor: categoryTone(category) }}
+                                    aria-hidden
+                                  />
+                                  <span className="truncate">
+                                    {lookupName(accounts, transaction.accountId) ?? "—"} ·{" "}
+                                    {transaction.type === TransactionType.TRANSFER
+                                      ? t("transactionType.TRANSFER")
+                                      : (category?.name ?? "—")}
+                                  </span>
+                                </span>
+                              </span>
+                              <span
+                                className={cn(
+                                  "shrink-0 text-[13px] font-extrabold tabular-nums",
+                                  signed > 0 ? "text-success-ink" : "text-ink-primary",
+                                )}
+                              >
+                                {formatCents(signed)}
+                              </span>
+                            </button>
+                            {pending && (
+                              <Button
+                                size="sm"
+                                className="h-8 shrink-0 rounded-full px-3 text-[11px]"
+                                disabled={settleMutation.isPending}
+                                aria-label={t("transactions.settleAction", {
+                                  description: transaction.description,
+                                })}
+                                onClick={() => handleSettle(transaction)}
+                              >
+                                {t("transactions.settleShort")}
+                              </Button>
+                            )}
+                            <Button
+                              variant="secondary"
+                              size="icon-sm"
+                              className="shrink-0 rounded-full"
+                              aria-label={t("transactions.deleteAction", {
+                                description: transaction.description,
+                              })}
+                              onClick={() => setDeleting(transaction)}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!isPending && transactions.length > 0 && !isMobile && (
             <Table>
               <TableHeader>
                 <TableRow className="border-divider-card hover:bg-transparent">
@@ -583,6 +809,105 @@ export default function TransactionsPage() {
       </Card>
 
       <QuickTransactionDialog open={quickOpen} onOpenChange={setQuickOpen} />
+
+      {/* Mobile filters bottom sheet (design_handoff_mk_finance mobile screen
+          02): the same fields as the desktop filter card, reused as-is, just
+          laid out in a single column inside the sheet. */}
+      <Dialog open={filtersSheetOpen} onOpenChange={setFiltersSheetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("transactions.filtersSheetTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3.5">
+            <TextField
+              id="filter-from-mobile"
+              label={t("transactions.filterFrom")}
+              type="date"
+              fieldClassName={FORM_FIELD_CLASSNAME}
+              value={filters.from}
+              onChange={(event) => updateFilter("from", event.target.value)}
+            />
+            <TextField
+              id="filter-to-mobile"
+              label={t("transactions.filterTo")}
+              type="date"
+              fieldClassName={FORM_FIELD_CLASSNAME}
+              value={filters.to}
+              onChange={(event) => updateFilter("to", event.target.value)}
+            />
+            <SelectField
+              id="filter-account-mobile"
+              label={t("transactions.account")}
+              placeholder={t("transactions.allAccounts")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
+              options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+              value={filters.accountId}
+              onChange={(event) => updateFilter("accountId", event.target.value)}
+            />
+            <SelectField
+              id="filter-category-mobile"
+              label={t("transactions.category")}
+              placeholder={t("transactions.allCategories")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
+              options={categoryOptions(categories)}
+              value={filters.categoryId}
+              onChange={(event) => updateFilter("categoryId", event.target.value)}
+            />
+            <SelectField
+              id="filter-type-mobile"
+              label={t("transactions.type")}
+              placeholder={t("transactions.allTypes")}
+              fieldClassName={FORM_FIELD_CLASSNAME}
+              options={transactionTypeOptions(t)}
+              value={filters.type}
+              onChange={(event) => updateFilter("type", event.target.value)}
+            />
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-bold tracking-wide text-ink-label uppercase">
+                {t("transactions.status")}
+              </span>
+              <SegmentedControl
+                className="w-full"
+                options={[
+                  { value: "", label: t("transactions.allStatuses") },
+                  { value: TransactionStatus.SETTLED, label: t("transactionStatus.SETTLED") },
+                  { value: TransactionStatus.PENDING, label: t("transactionStatus.PENDING") },
+                ]}
+                value={filters.status}
+                onChange={(value) => updateFilter("status", value)}
+              />
+            </div>
+            <TagsInput
+              id="filter-tags-mobile"
+              label={t("transactions.tags")}
+              workspaceId={workspaceId}
+              value={filters.tags}
+              onChange={(tags) => updateFilter("tags", tags)}
+            />
+            <TextField
+              id="filter-search-mobile"
+              label={t("transactions.search")}
+              type="search"
+              autoComplete="off"
+              fieldClassName={FORM_FIELD_CLASSNAME}
+              value={filters.search}
+              onChange={(event) => updateFilter("search", event.target.value)}
+            />
+            <button
+              type="button"
+              className="self-start text-xs font-bold text-link hover:text-link-hover"
+              onClick={handleClearFilters}
+            >
+              {t("transactions.clearFilters")}
+            </button>
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={() => setFiltersSheetOpen(false)}>
+              {t("transactions.applyFilters")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {workspaceId && editing && (
         <TransactionFormDialog
