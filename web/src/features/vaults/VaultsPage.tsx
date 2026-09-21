@@ -161,7 +161,7 @@ export default function VaultsPage() {
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           <h1 className="truncate text-xl font-extrabold tracking-[-0.025em] text-ink-primary">
             {account?.name ?? t("vaults.title")}
           </h1>

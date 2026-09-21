@@ -252,7 +252,7 @@ export default function AccountsPage() {
               >
                 {accountInitials(account.name)}
               </span>
-              <div className="flex min-w-0 flex-col">
+              <div className="flex min-w-0 flex-1 flex-col">
                 <span className="flex items-center gap-1.5 truncate text-[13px] font-bold text-ink-primary">
                   {account.name}
                   {account.archived && <Badge variant="neutral">{t("accounts.archivedBadge")}</Badge>}

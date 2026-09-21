@@ -165,7 +165,7 @@ export default function CardsPage() {
               <li key={card.id} className="flex flex-col gap-2.5 rounded-card bg-card p-3.5">
                 <div className="flex items-center gap-2.5">
                   <span className="h-[24px] w-[36px] shrink-0 rounded-[6px] bg-mint" aria-hidden />
-                  <div className="flex min-w-0 flex-col">
+                  <div className="flex min-w-0 flex-1 flex-col">
                     <span className="flex items-center gap-1.5 truncate text-[13px] font-bold text-ink-primary">
                       {card.name}
                       {card.archived && <Badge variant="neutral">{t("cards.archivedBadge")}</Badge>}
@@ -269,7 +269,7 @@ export default function CardsPage() {
                             className="h-[24px] w-[36px] shrink-0 rounded-[6px] bg-mint"
                             aria-hidden
                           />
-                          <span className="flex min-w-0 flex-col">
+                          <span className="flex min-w-0 flex-1 flex-col">
                             <span className="min-w-0 truncate text-[13px] font-bold text-ink-primary">
                               {card.name}
                             </span>
