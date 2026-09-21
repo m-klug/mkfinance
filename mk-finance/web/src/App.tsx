@@ -7,6 +7,8 @@ import LoginPage from "@/features/auth/LoginPage";
 import RegisterPage from "@/features/auth/RegisterPage";
 import AccountsPage from "@/features/accounts/AccountsPage";
 import VaultsPage from "@/features/vaults/VaultsPage";
+import VaultsOverviewPage from "@/features/vaults/VaultsOverviewPage";
+import MorePage from "@/features/more/MorePage";
 import CardsPage from "@/features/cards/CardsPage";
 import CardStatementsPage from "@/features/cards/CardStatementsPage";
 import CategoriesPage from "@/features/categories/CategoriesPage";
@@ -32,6 +34,8 @@ export default function App() {
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
             <Route path="/accounts/:accountId/vaults" element={<VaultsPage />} />
+            <Route path="/vaults" element={<VaultsOverviewPage />} />
+            <Route path="/more" element={<MorePage />} />
             <Route path="/cards" element={<CardsPage />} />
             <Route path="/cards/:cardId/statements" element={<CardStatementsPage />} />
             <Route path="/categories" element={<CategoriesPage />} />

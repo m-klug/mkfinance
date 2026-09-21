@@ -41,6 +41,7 @@ function DialogOverlay({
       data-slot="dialog-overlay"
       className={cn(
         "fixed inset-0 z-50 bg-[var(--scrim)] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "max-sm:bg-[rgba(22,24,26,0.45)] max-sm:dark:bg-[rgba(0,0,0,0.62)]",
         className
       )}
       {...props}
@@ -48,6 +49,11 @@ function DialogOverlay({
   )
 }
 
+// Below sm, every dialog becomes a bottom sheet (design_handoff_mk_finance
+// README §Mobile "Traduções de padrão desktop → mobile" — Modal central →
+// bottom sheet, radius 28 top-only, 40×4 drag handle, scrim rgba(22,24,26,.45)).
+// The zoom-in/out animation is neutralized (scale 100) below sm so only the
+// slide-from-bottom plays; sm and up keep the original centered dialog.
 function DialogContent({
   className,
   children,
@@ -63,11 +69,18 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-modal border-divider-card bg-card p-6 shadow-[var(--shadow-modal)] duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          // grid-cols-[minmax(0,1fr)]: without an explicit track, a plain `grid`
+          // sizes its implicit column to its content's intrinsic width (CSS
+          // Grid "blowout") — a long label or a 5-way segmented control inside
+          // could stretch the sheet past the viewport. minmax(0,1fr) caps the
+          // track at the container's own width so children wrap/truncate instead.
+          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto overflow-x-hidden rounded-modal border-divider-card bg-card p-6 shadow-[var(--shadow-modal)] duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          "max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[85vh] max-sm:w-full max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-modal max-sm:rounded-b-none max-sm:pt-2 max-sm:pb-[max(1.5rem,env(safe-area-inset-bottom))] max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:zoom-in-100 max-sm:data-[state=open]:slide-in-from-bottom",
           className
         )}
         {...props}
       >
+        <div className="mx-auto h-1 w-10 shrink-0 rounded-pill bg-divider-card sm:hidden" aria-hidden />
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -107,6 +120,7 @@ function DialogFooter({
       data-slot="dialog-footer"
       className={cn(
         "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        "max-sm:sticky max-sm:-bottom-6 max-sm:-mx-6 max-sm:mt-2 max-sm:border-t max-sm:border-divider-card max-sm:bg-card max-sm:px-6 max-sm:pt-3 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]",
         className
       )}
       {...props}

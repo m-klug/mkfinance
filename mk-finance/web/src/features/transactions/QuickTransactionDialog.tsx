@@ -90,9 +90,10 @@ interface FormErrors {
 // Big 40/800 amount field with the dark "impacto no pilar" panel
 // (design_handoff_mk_finance/README.md screen 03) — only the classes differ
 // from the plain field look, the input/label DOM stays what MoneyField renders.
+// Mobile (§Mobile "Lançamento rápido"): the field drops to 32/800.
 const HERO_AMOUNT_FIELD_CLASSNAME =
   "[&_label]:text-[11px] [&_label]:font-bold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-hero-foreground/55 " +
-  "[&_input]:h-auto [&_input]:border-none [&_input]:bg-transparent [&_input]:p-0 [&_input]:text-[40px] [&_input]:font-extrabold " +
+  "[&_input]:h-auto [&_input]:border-none [&_input]:bg-transparent [&_input]:p-0 [&_input]:text-[32px] sm:[&_input]:text-[40px] [&_input]:font-extrabold " +
   "[&_input]:leading-none [&_input]:tracking-tight [&_input]:text-hero-foreground [&_input]:shadow-none [&_input]:focus-visible:ring-0";
 
 export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionDialogProps) {

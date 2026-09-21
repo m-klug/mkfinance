@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { type ComponentType } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
@@ -6,14 +6,14 @@ import {
   ArrowLeftRight,
   CalendarDays,
   CreditCard,
+  Ellipsis,
   LayoutDashboard,
   LogOut,
-  Menu,
+  PiggyBank,
   Repeat,
   Settings,
   Tags,
   Wallet,
-  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
   { to: "/settings/pillars", labelKey: "nav.settings", icon: Settings },
 ];
+
+// Everything that lives inside the mobile "Mais" hub (design_handoff_mk_finance/README.md
+// §Mobile) — the tab bar's "Mais" item stays highlighted while the user is
+// anywhere under one of these, not just on /more itself.
+const MORE_HUB_PREFIXES = ["/more", "/cards", "/accounts", "/categories", "/recurrences", "/calendar", "/settings"];
 
 /**
  * Icon-only rail, 9 destinations + theme/logout footer
@@ -79,14 +84,8 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const logoutMutation = useLogout();
-
-  // Close the mobile drawer whenever the route changes (e.g. after tapping
-  // a nav link), so it never stays open across navigations.
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
+  const isMoreActive = MORE_HUB_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
 
   function handleLogout() {
     logoutMutation.mutate(undefined, {
@@ -102,8 +101,8 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex min-h-screen bg-page-bg p-3.5">
-      <div className="flex min-h-[calc(100vh-1.75rem)] w-full overflow-hidden rounded-shell bg-shell-bg shadow-[var(--shadow-shell)] md:flex-row">
+    <div className="flex min-h-screen bg-page-bg p-3.5 max-sm:p-0">
+      <div className="flex min-h-[calc(100vh-1.75rem)] w-full overflow-hidden rounded-shell bg-shell-bg shadow-[var(--shadow-shell)] max-sm:min-h-screen max-sm:rounded-none max-sm:shadow-none md:flex-row">
         {/* Desktop rail */}
         <aside className="hidden w-[72px] shrink-0 flex-col items-center border-r border-divider-card bg-card py-4 md:flex">
           <div className="mb-4 flex size-9 items-center justify-center rounded-[10px] bg-mint text-sm font-extrabold text-mint-ink">
@@ -116,59 +115,86 @@ export function AppShell() {
           </div>
         </aside>
 
-        {/* Mobile drawer — scrim covers the whole shell per the handoff's modal rule */}
-        {mobileOpen && (
-          <div className="fixed inset-3.5 z-40 overflow-hidden rounded-shell md:hidden">
-            <button
-              type="button"
-              aria-label={t("nav.closeMenu")}
-              className="absolute inset-0 bg-[var(--scrim)]"
-              onClick={() => setMobileOpen(false)}
-            />
-            <aside className="relative flex h-full w-64 flex-col bg-card">
-              <div className="flex h-14 items-center justify-between px-4 text-lg font-extrabold">
-                {t("app.name")}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t("nav.closeMenu")}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <X className="size-4" />
-                </Button>
-              </div>
-              <NavRail onNavigate={() => setMobileOpen(false)} className="flex-1 items-stretch px-3" />
-            </aside>
-          </div>
-        )}
-
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-16 items-center justify-between gap-2 border-b border-divider-card px-4 md:px-6">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              aria-label={t("nav.openMenu")}
-              onClick={() => setMobileOpen(true)}
-            >
-              <Menu className="size-4" />
-            </Button>
-            <span className="text-sm font-bold md:hidden">{t("app.name")}</span>
+          {/* Desktop topbar — the mobile equivalents (quick entry FAB, values/theme
+              toggles, sign out) live in the bottom tab bar and the Mais hub instead. */}
+          <header className="hidden h-16 items-center justify-between gap-2 border-b border-divider-card px-4 md:flex md:px-6">
+            <span className="text-sm font-bold">{t("app.name")}</span>
             <div className="ml-auto flex items-center gap-2">
               <QuickTransactionButton />
-              <span className="hidden md:contents">
-                <ValuesVisibilityToggle />
-                <ThemeToggle />
-                <Button variant="secondary" size="sm" onClick={handleLogout}>
-                  <LogOut className="size-4" />
-                  {t("auth.logout")}
-                </Button>
-              </span>
+              <ValuesVisibilityToggle />
+              <ThemeToggle />
+              <Button variant="secondary" size="sm" onClick={handleLogout}>
+                <LogOut className="size-4" />
+                {t("auth.logout")}
+              </Button>
             </div>
           </header>
-          <main className="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
+          <main className="flex flex-1 flex-col overflow-y-auto p-4 pb-[calc(64px+env(safe-area-inset-bottom)+16px)] md:p-6">
             <Outlet />
           </main>
+
+          {/* Mobile tab bar — Início · Extrato · FAB · Caixas · Mais
+              (design_handoff_mk_finance/README.md §Mobile "Navegação"). */}
+          <nav
+            className="fixed inset-x-0 bottom-0 z-30 grid h-[calc(64px+env(safe-area-inset-bottom))] grid-cols-5 items-center bg-card px-4 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(22,24,26,0.06)] md:hidden"
+            aria-label={t("app.name")}
+          >
+            <NavLink
+              to="/"
+              end
+              aria-label={t("nav.home")}
+              className={({ isActive }) =>
+                cn(
+                  "flex flex-col items-center gap-0.5 justify-self-center",
+                  isActive ? "font-extrabold text-success-ink" : "text-ink-tertiary",
+                )
+              }
+            >
+              <LayoutDashboard className="size-[18px]" />
+              <span className="text-[10px] font-bold">{t("nav.home")}</span>
+            </NavLink>
+            <NavLink
+              to="/transactions"
+              aria-label={t("nav.statement")}
+              className={({ isActive }) =>
+                cn(
+                  "flex flex-col items-center gap-0.5 justify-self-center",
+                  isActive ? "font-extrabold text-success-ink" : "text-ink-tertiary",
+                )
+              }
+            >
+              <ArrowLeftRight className="size-[18px]" />
+              <span className="text-[10px] font-bold">{t("nav.statement")}</span>
+            </NavLink>
+            <div className="justify-self-center">
+              <QuickTransactionButton variant="fab" />
+            </div>
+            <NavLink
+              to="/vaults"
+              aria-label={t("nav.vaults")}
+              className={({ isActive }) =>
+                cn(
+                  "flex flex-col items-center gap-0.5 justify-self-center",
+                  isActive ? "font-extrabold text-success-ink" : "text-ink-tertiary",
+                )
+              }
+            >
+              <PiggyBank className="size-[18px]" />
+              <span className="text-[10px] font-bold">{t("nav.vaults")}</span>
+            </NavLink>
+            <NavLink
+              to="/more"
+              aria-label={t("nav.more")}
+              className={cn(
+                "flex flex-col items-center gap-0.5 justify-self-center",
+                isMoreActive ? "font-extrabold text-success-ink" : "text-ink-tertiary",
+              )}
+            >
+              <Ellipsis className="size-[18px]" />
+              <span className="text-[10px] font-bold">{t("nav.more")}</span>
+            </NavLink>
+          </nav>
         </div>
       </div>
     </div>

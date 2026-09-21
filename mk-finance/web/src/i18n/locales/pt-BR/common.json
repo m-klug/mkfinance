@@ -327,6 +327,10 @@
       "recurrence": "Veio de recorrência"
     }
   },
+  "more": {
+    "statements": "Faturas",
+    "exportCsv": "Exportar CSV"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "transactions": "Lançamentos",
@@ -337,7 +341,12 @@
     "calendar": "Calendário",
     "settings": "Pilares",
     "openMenu": "Abrir menu",
-    "closeMenu": "Fechar menu"
+    "closeMenu": "Fechar menu",
+    "home": "Início",
+    "statement": "Extrato",
+    "vaults": "Caixas",
+    "more": "Mais",
+    "back": "Voltar"
   },
   "theme": {
     "light": "Claro",
@@ -482,6 +491,10 @@
     "unallocatedHint": "Ainda não escolheu caixinha nem pilar.",
     "overdrawn": "{{amount}} a descoberto",
     "compositionTitle": "Composição da conta",
+    "activeGoals": "{{count}} objetivo(s) ativo(s)",
+    "saved": "Guardado",
+    "savedOf": "de {{amount}}",
+    "overviewEmpty": "Nenhuma caixinha criada ainda. Abra uma conta elegível e crie a primeira.",
     "goal": {
       "target": "Meta de {{amount}}",
       "progress": "{{percent}}% da meta",

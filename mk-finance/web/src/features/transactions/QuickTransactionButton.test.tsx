@@ -22,7 +22,10 @@ describe("quick entry from the app shell", () => {
       seedAuthenticatedSession();
       renderWithProviders(<App />, { route });
 
-      await user.click(await screen.findByRole("button", { name: "Novo lançamento" }));
+      // Two triggers exist for responsive layouts (desktop topbar pill, mobile
+      // tab bar FAB) — the topbar one lives in the <header> banner landmark.
+      const header = await screen.findByRole("banner");
+      await user.click(within(header).getByRole("button", { name: "Novo lançamento" }));
 
       const dialog = await screen.findByRole("dialog");
       expect(within(dialog).getByRole("tab", { name: "Aporte" })).toBeInTheDocument();
