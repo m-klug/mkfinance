@@ -4,6 +4,7 @@ import DashboardPage from "@/features/dashboard/DashboardPage";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { seedAuthenticatedSession } from "@/test/authFixtures";
 import { server } from "@/test/server";
+import { useValuesVisibilityStore } from "@/hooks/useValuesVisibility";
 import {
   dashboardHandlers,
   noIncomeAllocation,
@@ -67,5 +68,20 @@ describe("DashboardPage", () => {
 
     // Absolute spent value for a pillar is still shown (Custos Fixos: R$ 2.500,00).
     expect(screen.getAllByText(/2\.500,00/).length).toBeGreaterThan(0);
+  });
+
+  it("masks every amount behind •••• when the values-hidden toggle is on", async () => {
+    server.use(...dashboardHandlers({ allocation: normalAllocation }));
+    useValuesVisibilityStore.setState({ hidden: true });
+    try {
+      renderPage();
+
+      expect(await screen.findByText("Alocação por pilar")).toBeInTheDocument();
+      expect(screen.queryByText(/3\.210,00/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/10\.000,00/)).not.toBeInTheDocument();
+      expect(screen.getAllByText("••••").length).toBeGreaterThan(0);
+    } finally {
+      useValuesVisibilityStore.setState({ hidden: false });
+    }
   });
 });

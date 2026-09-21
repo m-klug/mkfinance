@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import { useListAccounts } from "@/lib/api/generated/accounts/accounts";
@@ -38,6 +38,7 @@ interface ScopeTarget {
 
 export default function RecurrencesPage() {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const queryClient = useQueryClient();
   const workspaceId = useCurrentWorkspaceId();
   const [showClosed, setShowClosed] = useState(false);

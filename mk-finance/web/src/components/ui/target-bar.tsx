@@ -23,7 +23,7 @@ export function TargetBar({ actualPercent, targetPercent, color, axisMax = 50, c
 
   return (
     <div
-      className={cn("relative h-[9px] w-full overflow-hidden rounded-pill bg-neutral dark:bg-[#2B2F34]", className)}
+      className={cn("relative h-[9px] w-full overflow-hidden rounded-pill bg-neutral", className)}
       role="img"
       aria-label={`${actualPercent.toFixed(1)}% de ${targetPercent}% alvo`}
     >

@@ -17,7 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { formatCents, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { useListVaultEntries } from "@/lib/api/generated/vaults/vaults";
 import type { Vault } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { entryAmountClass } from "@/features/vaults/vaultOptions";
@@ -42,6 +43,7 @@ export function VaultEntriesSheet({
   onOpenChange,
 }: VaultEntriesSheetProps) {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const enabled = open && Boolean(workspaceId) && Boolean(vault?.id);
 
   const { data: entries, isPending } = useListVaultEntries(workspaceId, vault?.id ?? "", undefined, {

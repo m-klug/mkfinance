@@ -26,6 +26,12 @@
   --divider-card: #edefed;
   --divider-row: #f3f4f3;
 
+  --surface-neutral-alt: #e6e9e6;
+  --border-outline: #d5d9d6;
+  --border-strong: #cfd4d1;
+  --ink-support: #5b6066;
+  --calendar-out-of-month: #c4c9c5;
+
   --mint: #2fbf8f;
   --mint-ink: #08130f;
 
@@ -82,27 +88,46 @@
 }
 
 .dark {
-  --page-bg: #101214;
+  --page-bg: #0b0d0e;
   --shell-bg: #101214;
   --card: #1d2024;
-  --field: #24282c;
-  --neutral: #2b2f34;
-  --hero: #16181a;
+  --field: #262b30;
+  --neutral: #24282d;
+  /* Hero panels are dark in both themes, but in dark mode they must sit
+     BELOW card/shell (not equal to light's --hero) to stay legible. */
+  --hero: #07090a;
   --hero-foreground: #f4f6f4;
 
-  --ink-primary: #f4f6f4;
-  --ink-secondary: #c9cdd1;
+  --ink-primary: #f2f4f3;
+  --ink-secondary: #c2c7cc;
   --ink-tertiary: #9aa0a6;
   --ink-label: #9aa0a6;
-  --placeholder: #6b7076;
+  --ink-support: #b6bcc1;
+  --placeholder: #8d9298;
 
-  --divider-card: #2b2f34;
-  --divider-row: #2b2f34;
+  --divider-card: #24282d;
+  --divider-row: #262b30;
 
-  --success-bg: #14312a;
-  --success-ink: #6fe0b4;
+  --surface-neutral-alt: #2a2f34;
+  --border-outline: #34393e;
+  --border-strong: #9aa2a8;
+  --calendar-out-of-month: #565c61;
+
+  --mint: #2fbf8f;
+  --mint-ink: #08130f;
+
+  --success-bg: #153c30;
+  --success-ink: #7fe3c0;
   --alert-bg: #3a201a;
-  --alert-ink: #ffb4a2;
+  --alert-ink: #ffa48f;
+  --link: #5ed6ae;
+  --link-hover: #9defcd;
+
+  /* Legibility exceptions (handoff §Regras de tematização #4) — other
+     pillars and chart grays keep the same hex in both themes. */
+  --pillar-financial-freedom: #8ea6bb;
+  --pillar-knowledge: #9aa2a8;
+  --chart-gray-1: #8b949c;
 
   --shadow-shell: 0 20px 60px rgba(8, 10, 12, 0.4);
 
@@ -141,6 +166,12 @@
 
   --color-divider-card: var(--divider-card);
   --color-divider-row: var(--divider-row);
+
+  --color-surface-neutral-alt: var(--surface-neutral-alt);
+  --color-border-outline: var(--border-outline);
+  --color-border-strong: var(--border-strong);
+  --color-ink-support: var(--ink-support);
+  --color-calendar-out-of-month: var(--calendar-out-of-month);
 
   --color-mint: var(--mint);
   --color-mint-ink: var(--mint-ink);

@@ -6,7 +6,8 @@ import { Repeat } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { formatCents, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import { useGetCalendar } from "@/lib/api/generated/calendar/calendar";
@@ -95,14 +96,14 @@ export default function CalendarPage() {
                       className={cn(
                         "flex min-h-14 flex-col items-center gap-1 rounded-list-item p-1 text-xs sm:min-h-20 sm:p-2",
                         cell.inMonth ? dayTintClass(dayEntries) : "bg-transparent",
-                        !cell.inMonth && "text-ink-tertiary/40",
+                        !cell.inMonth && "text-calendar-out-of-month",
                         cell.isToday && "ring-2 ring-inset ring-[color:var(--mint)]",
                       )}
                     >
                       <span
                         className={cn(
                           "font-bold text-ink-primary",
-                          !cell.inMonth && "text-ink-tertiary/40",
+                          !cell.inMonth && "text-calendar-out-of-month",
                           cell.isToday && "text-[color:var(--link)]",
                         )}
                       >
@@ -174,6 +175,7 @@ export default function CalendarPage() {
 
 function CalendarEntryRow({ entry }: { entry: CalendarEntry }) {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const outflow = isOutflow(entry);
   const markerClass =
     entry.kind === CalendarEntryKind.STATEMENT_DUE ? "bg-alert-ink" : "bg-success-ink";

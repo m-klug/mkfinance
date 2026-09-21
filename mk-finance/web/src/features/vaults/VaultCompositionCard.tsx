@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import type { VaultComposition } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { isUnallocatedOverdrawn, vaultBarSegments } from "@/features/vaults/vaultOptions";
 
@@ -21,6 +21,7 @@ interface VaultCompositionCardProps {
  */
 export function VaultCompositionCard({ composition }: VaultCompositionCardProps) {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const segments = vaultBarSegments(composition, t("vaults.unallocated"));
   const overdrawn = isUnallocatedOverdrawn(composition);
 

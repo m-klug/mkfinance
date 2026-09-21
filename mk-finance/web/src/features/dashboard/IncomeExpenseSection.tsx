@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import type { DashboardSummary } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { computeDelta, type Delta } from "@/features/dashboard/dashboardData";
 import { formatSignedPercent } from "@/features/dashboard/dashboardFormat";
@@ -44,6 +44,7 @@ function DeltaLine({ delta, higherIsWorse }: { delta: Delta; higherIsWorse: bool
 
 export function IncomeExpenseSection({ summary }: IncomeExpenseSectionProps) {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const { ref, width } = useContainerWidth<HTMLDivElement>();
   const net = summary.incomeCents - summary.expenseCents;
 

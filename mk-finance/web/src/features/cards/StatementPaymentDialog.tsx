@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MoneyField, SelectField, TextField } from "@/components/form/fields";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
 import { usePayStatement } from "@/lib/api/generated/statements/statements";
 import type { Account, StatementPaymentRequest } from "@/lib/api/generated/mKFinanceAPI.schemas";
@@ -40,6 +40,7 @@ export function StatementPaymentDialog({
   onPaid,
 }: StatementPaymentDialogProps) {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const [accountId, setAccountId] = useState("");
   const [amountCents, setAmountCents] = useState(0);
   const [date, setDate] = useState(todayIsoDate);

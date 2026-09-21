@@ -18,6 +18,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { ValuesVisibilityToggle } from "@/components/privacy/ValuesVisibilityToggle";
 import { cn } from "@/lib/utils";
 import { getGetCurrentUserQueryKey, useLogout } from "@/lib/api/generated/auth/auth";
 // Quick entry has to be one tap away from every screen (PLANEJAMENTO §6.3),
@@ -110,6 +111,7 @@ export function AppShell() {
           </div>
           <NavRail className="flex-1" />
           <div className="flex flex-col items-center gap-2 pt-2">
+            <ValuesVisibilityToggle />
             <ThemeToggle />
           </div>
         </aside>
@@ -155,6 +157,7 @@ export function AppShell() {
             <div className="ml-auto flex items-center gap-2">
               <QuickTransactionButton />
               <span className="hidden md:contents">
+                <ValuesVisibilityToggle />
                 <ThemeToggle />
                 <Button variant="secondary" size="sm" onClick={handleLogout}>
                   <LogOut className="size-4" />

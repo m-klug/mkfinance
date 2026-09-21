@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import { getListAccountsQueryKey, useListAccounts } from "@/lib/api/generated/accounts/accounts";
@@ -40,6 +40,7 @@ import { VaultYieldDialog } from "@/features/vaults/VaultYieldDialog";
 
 export default function VaultsPage() {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const queryClient = useQueryClient();
   const workspaceId = useCurrentWorkspaceId();
   const { accountId = "" } = useParams();

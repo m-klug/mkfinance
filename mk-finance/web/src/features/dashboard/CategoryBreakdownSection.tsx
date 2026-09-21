@@ -2,7 +2,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import {
   Pillar,
   type Category,
@@ -26,6 +26,7 @@ type PillarFilter = Pillar | "ALL";
 
 export function CategoryBreakdownSection({ items, categories }: CategoryBreakdownSectionProps) {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const { ref, width } = useContainerWidth<HTMLDivElement>();
   const [filter, setFilter] = useState<PillarFilter>("ALL");
 

@@ -26,7 +26,7 @@ HOST=mkfinance.internal
 # Names/addresses the leaf cert is valid for. The Proxmox LXC IP is included so
 # the site works whether you reach it by hostname or by IP; localhost/127.0.0.1
 # cover local testing on the PC.
-SAN="DNS:${HOST},IP:192.168.1.247,DNS:localhost,IP:127.0.0.1"
+SAN="DNS:${HOST},IP:192.168.1.244,DNS:localhost,IP:127.0.0.1"
 
 # 1) Root CA — created once, then reused. Regenerating it would invalidate the
 #    trust already installed on every device, so we never overwrite it.
@@ -67,4 +67,4 @@ echo "  macOS:  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keych
 echo "  Debian: sudo cp $CA_CRT /usr/local/share/ca-certificates/ && sudo update-ca-certificates"
 echo "  (Firefox uses its own store — import $CA_CRT under Settings > Certificates too.)"
 echo
-echo "Then: (cd .. && docker compose up -d) and open https://${HOST} (or https://192.168.1.247)"
+echo "Then: (cd .. && docker compose up -d) and open https://${HOST} (or https://192.168.1.244)"

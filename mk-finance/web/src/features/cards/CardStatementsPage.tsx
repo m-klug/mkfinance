@@ -17,7 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { formatCents, formatDate, formatMonth } from "@/lib/format";
+import { formatDate, formatMonth } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import {
@@ -57,6 +58,7 @@ const STATUS_VARIANT: Record<StatementStatus, BadgeVariant> = {
 
 export default function CardStatementsPage() {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const queryClient = useQueryClient();
   const workspaceId = useCurrentWorkspaceId();
   const { cardId = "" } = useParams();

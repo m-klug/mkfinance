@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { AccountType, type DashboardSummary } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { effectiveBalanceCents } from "@/features/accounts/accountOptions";
 
@@ -16,6 +16,7 @@ function initials(name: string): string {
 
 export function BalanceSection({ summary }: BalanceSectionProps) {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const accounts = summary.accounts.filter((account) => !account.archived);
 
   return (

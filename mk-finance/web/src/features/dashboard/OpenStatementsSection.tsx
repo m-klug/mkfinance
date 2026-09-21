@@ -2,7 +2,8 @@ import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { formatCents, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import type { Card as CreditCard, Statement } from "@/lib/api/generated/mKFinanceAPI.schemas";
 
 interface OpenStatementsSectionProps {
@@ -22,6 +23,7 @@ function daysUntil(isoDate: string, today: Date = new Date()): number {
 
 export function OpenStatementsSection({ statements, cards }: OpenStatementsSectionProps) {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const cardName = new Map(cards.map((card) => [card.id, card.name]));
   const ordered = [...statements].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const totalRemaining = ordered.reduce(

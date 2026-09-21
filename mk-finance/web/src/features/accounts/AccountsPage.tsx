@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import {
@@ -41,6 +41,7 @@ function sumBy(accounts: Account[], value: (account: Account) => number): number
 
 export default function AccountsPage() {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const queryClient = useQueryClient();
   const workspaceId = useCurrentWorkspaceId();
   const [includeArchived, setIncludeArchived] = useState(false);

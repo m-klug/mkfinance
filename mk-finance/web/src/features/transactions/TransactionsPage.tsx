@@ -29,7 +29,8 @@ import {
 import { SelectField, TextField } from "@/components/form/fields";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
-import { formatCents, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import {
@@ -103,6 +104,7 @@ function categoryTone(category: Category | undefined): string {
 
 export default function TransactionsPage() {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const queryClient = useQueryClient();
   const workspaceId = useCurrentWorkspaceId();
 
