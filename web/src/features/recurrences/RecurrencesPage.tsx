@@ -163,7 +163,7 @@ export default function RecurrencesPage() {
             />
             {t("recurrences.showClosed")}
           </label>
-          <Button onClick={openCreate}>
+          <Button onClick={openCreate} className="max-sm:h-11">
             <Plus className="size-4" />
             {t("recurrences.new")}
           </Button>
@@ -177,7 +177,7 @@ export default function RecurrencesPage() {
             <p className="text-ink-tertiary">{t("recurrences.empty")}</p>
           )}
           {!isPending && (recurrences?.length ?? 0) > 0 && (
-            <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto sm:block" data-testid="recurrences-desktop-table">
               <Table>
                 <TableHeader>
                   <TableRow className="border-divider-row hover:bg-transparent">
@@ -260,6 +260,63 @@ export default function RecurrencesPage() {
                 </TableBody>
               </Table>
             </div>
+          )}
+
+          {!isPending && (recurrences?.length ?? 0) > 0 && (
+            <ul
+              className="flex flex-col divide-y divide-divider-row sm:hidden"
+              data-testid="recurrences-mobile-list"
+            >
+              {(recurrences ?? []).map((recurrence) => (
+                <li key={recurrence.id} className="flex items-center gap-2.5 py-3 first:pt-0 last:pb-0">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-list-item bg-field text-ink-secondary">
+                    <Repeat className="size-3.5" aria-hidden />
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="flex items-center gap-1.5 truncate text-sm font-bold text-ink-primary">
+                      <span className="truncate">{recurrence.description}</span>
+                      {!recurrence.active && (
+                        <Badge variant="neutral">{t("recurrences.statusClosed")}</Badge>
+                      )}
+                    </span>
+                    <span className="truncate text-xs text-ink-secondary">
+                      {scheduleLabel(recurrence, t)}
+                      {" · "}
+                      {lookupName(categoryList, recurrence.categoryId) ?? "—"}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-right text-sm font-bold tabular-nums text-ink-primary">
+                    {formatCents(recurrence.amountCents)}
+                  </span>
+                  {recurrence.active && (
+                    <div className="flex shrink-0 flex-col gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-11 rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
+                        aria-label={t("recurrences.editAction", {
+                          description: recurrence.description,
+                        })}
+                        onClick={() => openEdit(recurrence)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-11 rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
+                        aria-label={t("recurrences.deleteAction", {
+                          description: recurrence.description,
+                        })}
+                        onClick={() => openDelete(recurrence)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </CardContent>
       </Card>

@@ -20,6 +20,13 @@ function renderPage() {
   return renderWithProviders(<RecurrencesPage />, { route: "/recurrences" });
 }
 
+// The page renders a desktop table (sm:block) and a mobile list (sm:hidden)
+// for the same data — CSS toggles which is visible, but both exist in jsdom.
+// Scope row-content queries to the desktop table to avoid duplicate matches.
+async function desktopTable() {
+  return within(await screen.findByTestId("recurrences-desktop-table"));
+}
+
 describe("RecurrencesPage", () => {
   beforeEach(() => {
     server.use(...financeReadHandlers(), ...recurrenceReadHandlers());
@@ -28,22 +35,25 @@ describe("RecurrencesPage", () => {
   it("lists only active series by default", async () => {
     renderPage();
 
-    expect(await screen.findByText(rentRecurrence.description)).toBeInTheDocument();
-    expect(screen.getByText(futureSalaryRecurrence.description)).toBeInTheDocument();
-    expect(screen.queryByText(closedGymRecurrence.description)).not.toBeInTheDocument();
+    const table = await desktopTable();
+    expect(await table.findByText(rentRecurrence.description)).toBeInTheDocument();
+    expect(table.getByText(futureSalaryRecurrence.description)).toBeInTheDocument();
+    expect(table.queryByText(closedGymRecurrence.description)).not.toBeInTheDocument();
   });
 
   it("reveals closed series, without edit/delete actions, when asked", async () => {
     const user = userEvent.setup();
     renderPage();
 
-    await screen.findByText(rentRecurrence.description);
+    await (await desktopTable()).findByText(rentRecurrence.description);
     await user.click(screen.getByLabelText("Mostrar encerradas"));
 
-    expect(await screen.findByText(closedGymRecurrence.description)).toBeInTheDocument();
-    expect(screen.getByText("Encerrada")).toBeInTheDocument();
+    // The table remounts while the re-filtered query is loading, so re-grab it.
+    const table = await desktopTable();
+    expect(await table.findByText(closedGymRecurrence.description)).toBeInTheDocument();
+    expect(table.getByText("Encerrada")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: `Editar ${closedGymRecurrence.description}` }),
+      table.queryByRole("button", { name: `Editar ${closedGymRecurrence.description}` }),
     ).not.toBeInTheDocument();
   });
 
@@ -128,8 +138,9 @@ describe("RecurrencesPage", () => {
     const user = userEvent.setup();
     renderPage();
 
+    const table = await desktopTable();
     await user.click(
-      await screen.findByRole("button", { name: `Editar ${futureSalaryRecurrence.description}` }),
+      await table.findByRole("button", { name: `Editar ${futureSalaryRecurrence.description}` }),
     );
 
     // No scope prompt — the series' startDate is in the future.
@@ -154,8 +165,9 @@ describe("RecurrencesPage", () => {
     const user = userEvent.setup();
     renderPage();
 
+    const table = await desktopTable();
     await user.click(
-      await screen.findByRole("button", { name: `Editar ${rentRecurrence.description}` }),
+      await table.findByRole("button", { name: `Editar ${rentRecurrence.description}` }),
     );
 
     const scopeDialog = await screen.findByRole("dialog");
@@ -187,8 +199,9 @@ describe("RecurrencesPage", () => {
     const user = userEvent.setup();
     renderPage();
 
+    const table = await desktopTable();
     await user.click(
-      await screen.findByRole("button", { name: `Excluir ${futureSalaryRecurrence.description}` }),
+      await table.findByRole("button", { name: `Excluir ${futureSalaryRecurrence.description}` }),
     );
 
     const dialog = await screen.findByRole("dialog");
@@ -209,8 +222,9 @@ describe("RecurrencesPage", () => {
     const user = userEvent.setup();
     renderPage();
 
+    const table = await desktopTable();
     await user.click(
-      await screen.findByRole("button", { name: `Excluir ${rentRecurrence.description}` }),
+      await table.findByRole("button", { name: `Excluir ${rentRecurrence.description}` }),
     );
 
     const scopeDialog = await screen.findByRole("dialog");
