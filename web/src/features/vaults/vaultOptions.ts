@@ -172,13 +172,14 @@ export function yieldPreviewShares(vaults: Vault[], amountCents: number): VaultY
 export function goalMonthlyLabel(
   t: TFunction,
   goal: Pick<VaultGoal, "status" | "monthlyNeededCents">,
+  formatAmount: (cents: number) => string = formatCents,
 ): string {
   if (goal.status === VaultGoalStatus.REACHED) return t("vaults.goal.reached");
   if (goal.monthlyNeededCents == null) return t("vaults.goal.noDeadline");
   if (goal.status === VaultGoalStatus.OVERDUE) {
-    return t("vaults.goal.monthlyNeededOverdue", { amount: formatCents(goal.monthlyNeededCents) });
+    return t("vaults.goal.monthlyNeededOverdue", { amount: formatAmount(goal.monthlyNeededCents) });
   }
-  return t("vaults.goal.monthlyNeeded", { amount: formatCents(goal.monthlyNeededCents) });
+  return t("vaults.goal.monthlyNeeded", { amount: formatAmount(goal.monthlyNeededCents) });
 }
 
 /**

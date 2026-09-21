@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import {
@@ -32,6 +32,7 @@ import { availableLimitCents, usagePercent } from "@/features/cards/cardOptions"
 
 export default function CardsPage() {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const queryClient = useQueryClient();
   const workspaceId = useCurrentWorkspaceId();
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -162,7 +163,7 @@ export default function CardsPage() {
                             <span
                               className={cn(
                                 "absolute inset-y-0 left-0 block rounded-pill",
-                                usage <= 70 ? "bg-mint" : "bg-[#F0A68F]",
+                                usage <= 70 ? "bg-mint" : "bg-pillar-pleasures",
                               )}
                               style={{ width: `${usage}%` }}
                             />

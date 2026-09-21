@@ -10,6 +10,11 @@ export function formatCents(cents: number): string {
   return brl.format(cents / 100);
 }
 
+// Masked placeholder shown instead of a real amount when the values-hidden
+// toggle is on (useValuesVisibility). Fixed-width dots, not the real digit
+// count, so the mask itself never leaks a value's magnitude.
+export const HIDDEN_VALUE_MASK = "••••";
+
 export function formatDate(isoDate: string): string {
   const [year, month, day] = isoDate.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString("pt-BR");

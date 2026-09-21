@@ -417,7 +417,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
         />
 
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-          <div className="flex flex-col items-start gap-4 rounded-card bg-hero p-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-card bg-hero p-5">
             <MoneyField
               id="quick-amount"
               label={t("transactions.amount")}
@@ -427,11 +427,8 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
               fieldClassName={HERO_AMOUNT_FIELD_CLASSNAME}
             />
             {pillarPreview && (
-              <div className="flex flex-col items-start gap-1.5 sm:items-end">
-                <span className="text-[11px] text-hero-foreground/55">
-                  {t("quickEntry.pillarImpact")}
-                </span>
-                <span className="flex items-center gap-2 rounded-pill bg-hero-foreground/10 px-3 py-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-list-item bg-hero-foreground/10 px-3.5 py-2.5">
+                <span className="flex items-center gap-2 whitespace-nowrap">
                   <span
                     className="size-[7px] shrink-0 rounded-full"
                     style={{ backgroundColor: PILLAR_COLORS[pillarPreview.pillar] }}
@@ -440,18 +437,21 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                   <span className="text-xs font-bold text-hero-foreground">
                     {t(`pillar.${pillarPreview.pillar}`)}
                   </span>
-                  <span
-                    className={cn(
-                      "text-[11px] font-bold tabular-nums",
-                      pillarPreview.over ? "text-alert-ink" : "text-hero-foreground/70",
-                    )}
-                  >
-                    {t("quickEntry.pillarImpactChange", {
-                      before: formatPercent(pillarPreview.beforePercent),
-                      after: formatPercent(pillarPreview.afterPercent),
-                      target: pillarPreview.targetPercent,
-                    })}
+                  <span className="text-[10px] uppercase tracking-wide text-hero-foreground/55">
+                    {t("quickEntry.pillarImpact")}
                   </span>
+                </span>
+                <span
+                  className={cn(
+                    "shrink-0 text-[11px] font-bold whitespace-nowrap tabular-nums",
+                    pillarPreview.over ? "text-alert-ink" : "text-hero-foreground/70",
+                  )}
+                >
+                  {t("quickEntry.pillarImpactChange", {
+                    before: formatPercent(pillarPreview.beforePercent),
+                    after: formatPercent(pillarPreview.afterPercent),
+                    target: pillarPreview.targetPercent,
+                  })}
                 </span>
               </div>
             )}
@@ -468,7 +468,31 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
             onChange={(event) => setDescription(event.target.value)}
           />
 
-          {!isTransferLike && (
+          {!isTransferLike && !isCardMode && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                id="quick-category"
+                label={t("transactions.category")}
+                placeholder={t("transactions.categoryPlaceholder")}
+                fieldClassName={FORM_FIELD_CLASSNAME}
+                options={categoryOptions(categories)}
+                value={categoryId}
+                error={errors.category}
+                onChange={(event) => setCategoryId(event.target.value)}
+              />
+              <SelectField
+                id="quick-account"
+                label={t("transactions.account")}
+                fieldClassName={FORM_FIELD_CLASSNAME}
+                options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+                value={accountId}
+                error={errors.accounts}
+                onChange={(event) => setAccountId(event.target.value)}
+              />
+            </div>
+          )}
+
+          {isCardMode && (
             <SelectField
               id="quick-category"
               label={t("transactions.category")}
@@ -481,35 +505,33 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
             />
           )}
 
-          {!isCardMode && (
+          {isTransferLike && (
             <div className="grid gap-4 sm:grid-cols-2">
               <SelectField
                 id="quick-account"
-                label={isTransferLike ? t("transactions.fromAccount") : t("transactions.account")}
+                label={t("transactions.fromAccount")}
                 fieldClassName={FORM_FIELD_CLASSNAME}
                 options={accounts.map((account) => ({ value: account.id, label: account.name }))}
                 value={accountId}
                 error={errors.accounts}
                 onChange={(event) => setAccountId(event.target.value)}
               />
-              {isTransferLike && (
-                <SelectField
-                  id="quick-to-account"
-                  label={t("transactions.toAccount")}
-                  placeholder={t("transactions.toAccountPlaceholder")}
-                  fieldClassName={FORM_FIELD_CLASSNAME}
-                  options={destinationAccounts.map((account) => ({
-                    value: account.id,
-                    label: account.name,
-                  }))}
-                  value={toAccountId}
-                  onChange={(event) => {
-                    setToAccountId(event.target.value);
-                    // A new destination re-applies that account's default pillar.
-                    setPillarOverride(null);
-                  }}
-                />
-              )}
+              <SelectField
+                id="quick-to-account"
+                label={t("transactions.toAccount")}
+                placeholder={t("transactions.toAccountPlaceholder")}
+                fieldClassName={FORM_FIELD_CLASSNAME}
+                options={destinationAccounts.map((account) => ({
+                  value: account.id,
+                  label: account.name,
+                }))}
+                value={toAccountId}
+                onChange={(event) => {
+                  setToAccountId(event.target.value);
+                  // A new destination re-applies that account's default pillar.
+                  setPillarOverride(null);
+                }}
+              />
             </div>
           )}
 

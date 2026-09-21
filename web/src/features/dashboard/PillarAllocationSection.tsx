@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { Badge } from "@/components/ui/badge";
 import { TargetBar } from "@/components/ui/target-bar";
 import type { PillarAllocationReport } from "@/lib/api/generated/mKFinanceAPI.schemas";
@@ -25,6 +25,7 @@ interface PillarAllocationSectionProps {
  */
 export function PillarAllocationSection({ report }: PillarAllocationSectionProps) {
   const { t } = useTranslation();
+  const formatCents = useFormatCents();
   const pillars = sortPillars(report.pillars);
   const overrun = hasAnyOverrun(pillars);
   const overrunCount = pillars.filter(isPillarOverTarget).length;

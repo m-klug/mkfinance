@@ -41,7 +41,14 @@ export default function LoginPage() {
 
   return (
     <AuthShell>
-      <div className="flex w-full flex-col gap-4 rounded-card bg-card p-8">
+      <div className="flex w-full flex-col gap-4 rounded-modal bg-card p-8 shadow-[var(--shadow-modal)]">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-8 items-center justify-center rounded-[11px] bg-mint text-sm font-extrabold text-mint-ink">
+            M
+          </span>
+          <span className="text-sm font-extrabold tracking-[-0.01em] text-ink-primary">{t("app.name")}</span>
+        </div>
+
         <div className="flex flex-col gap-1">
           <h1 className="text-[22px] font-extrabold tracking-[-0.025em] text-ink-primary">
             {t("auth.login")}

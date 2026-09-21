@@ -1,6 +1,6 @@
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
 
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { PILLAR_COLORS } from "@/features/dashboard/dashboardFormat";
 import type { CategorySpend } from "@/features/dashboard/dashboardData";
 
@@ -13,6 +13,7 @@ interface CategoryPieChartProps {
 // explicit width from the measured container instead of ResponsiveContainer, so
 // it never needs ResizeObserver at render time.
 export default function CategoryPieChart({ spends, width }: CategoryPieChartProps) {
+  const formatCents = useFormatCents();
   const height = 220;
   const radius = Math.min(width, height) / 2 - 8;
   const data = spends.map((spend) => ({
@@ -44,7 +45,10 @@ export default function CategoryPieChart({ spends, width }: CategoryPieChartProp
           border: "1px solid var(--divider-card)",
           background: "var(--card)",
           fontSize: 12,
+          color: "var(--ink-primary)",
         }}
+        labelStyle={{ color: "var(--ink-primary)" }}
+        itemStyle={{ color: "var(--ink-primary)" }}
       />
     </PieChart>
   );

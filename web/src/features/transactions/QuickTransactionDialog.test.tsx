@@ -136,7 +136,7 @@ describe("QuickTransactionDialog", () => {
     await user.type(await screen.findByLabelText("Valor"), "8000");
     await user.type(screen.getByLabelText("Descrição"), "Conta de luz");
     await user.selectOptions(screen.getByLabelText("Categoria"), groceriesCategory.id);
-    await user.click(screen.getByLabelText("Agendar como pendente"));
+    await user.click(screen.getByLabelText("Agendar"));
     await user.click(screen.getByRole("button", { name: "Salvar" }));
 
     await waitFor(() => expect(calls).toHaveLength(1));

@@ -65,13 +65,15 @@ export function accountInitials(name: string): string {
 
 // Rotating palette for the account avatar chip — purely decorative, cycling
 // through the pillar palette so the table doesn't render every row in mint.
+// CSS custom properties (not hex) so tones follow the active theme, same as
+// PILLAR_COLORS in dashboardFormat.ts.
 const AVATAR_TONES = [
-  "#2FBF8F",
-  "#86CFB6",
-  "#B9E3D4",
-  "#F0A68F",
-  "#5B6B7A",
-  "#CFD4D1",
+  "var(--pillar-fixed-costs)",
+  "var(--pillar-comfort)",
+  "var(--pillar-goals)",
+  "var(--pillar-pleasures)",
+  "var(--pillar-financial-freedom)",
+  "var(--pillar-knowledge)",
 ];
 
 export function accountAvatarTone(index: number): string {

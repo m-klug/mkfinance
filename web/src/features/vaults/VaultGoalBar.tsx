@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
-import { formatCents } from "@/lib/format";
+import { useFormatCents } from "@/hooks/useFormatCents";
 import { VaultGoalStatus, type VaultGoal } from "@/lib/api/generated/mKFinanceAPI.schemas";
 import { clampPercent, goalMonthlyLabel, goalStatusBadgeClass } from "@/features/vaults/vaultOptions";
 
@@ -19,13 +19,14 @@ const FILL_CLASS: Record<VaultGoalStatus, string> = {
 
 export function VaultGoalBar({ goal, currentCents }: VaultGoalBarProps) {
   const { t } = useTranslation();
+  const formatMoney = useFormatCents();
   const width = clampPercent(goal.progressPercent);
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-2">
         <span className="text-[11px] font-bold text-ink-label">
-          {t("vaults.goal.target", { amount: formatCents(goal.targetAmountCents) })}
+          {t("vaults.goal.target", { amount: formatMoney(goal.targetAmountCents) })}
         </span>
         <span className="ml-auto text-[11px] font-extrabold tabular-nums text-ink-primary">
           {t("vaults.goal.progress", { percent: Math.round(goal.progressPercent) })}
@@ -46,9 +47,9 @@ export function VaultGoalBar({ goal, currentCents }: VaultGoalBarProps) {
         >
           {t(`vaults.goalStatus.${goal.status}`)}
         </span>
-        <span className="tabular-nums">{goalMonthlyLabel(t, goal)}</span>
+        <span className="tabular-nums">{goalMonthlyLabel(t, goal, formatMoney)}</span>
       </div>
-      <span className="tabular-nums text-[10px] text-ink-label">{formatCents(currentCents)}</span>
+      <span className="tabular-nums text-[10px] text-ink-label">{formatMoney(currentCents)}</span>
     </div>
   );
 }
