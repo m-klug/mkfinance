@@ -8,6 +8,7 @@ import { Archive, ArrowLeft, EllipsisVertical, Pencil, Plus, Receipt } from "luc
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ListRow } from "@/components/ui/list-row";
 import {
   Table,
   TableBody,
@@ -163,51 +164,52 @@ export default function CardsPage() {
             const usage = usagePercent(card);
             return (
               <li key={card.id} className="flex flex-col gap-2.5 rounded-card bg-card p-3.5">
-                <div className="flex items-center gap-2.5">
-                  <span className="h-[24px] w-[36px] shrink-0 rounded-[6px] bg-mint" aria-hidden />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="flex items-center gap-1.5 truncate text-[13px] font-bold text-ink-primary">
-                      {card.name}
-                      {card.archived && <Badge variant="neutral">{t("cards.archivedBadge")}</Badge>}
-                    </span>
-                    {card.brand && (
-                      <span className="truncate text-[11px] text-ink-tertiary">{card.brand}</span>
-                    )}
-                  </div>
-                  <span className="ml-auto shrink-0 tabular-nums text-[14px] font-extrabold text-ink-primary">
-                    {formatCents(card.limitCents)}
-                  </span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-lg"
-                        className="shrink-0 rounded-pill text-ink-secondary"
-                        aria-label={t("common.actions")}
-                      >
-                        <EllipsisVertical className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link to={`/cards/${card.id}/statements`}>
-                          <Receipt className="size-4" />
-                          {t("cards.statementsAction", { name: card.name })}
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => openEdit(card)}>
-                        <Pencil className="size-4" />
-                        {t("cards.editAction", { name: card.name })}
-                      </DropdownMenuItem>
-                      {!card.archived && (
-                        <DropdownMenuItem onSelect={() => setArchiving(card)}>
-                          <Archive className="size-4" />
-                          {t("cards.archiveAction", { name: card.name })}
+                <ListRow
+                  className="py-0"
+                  leading={<span className="h-[24px] w-[36px] rounded-[6px] bg-mint" aria-hidden />}
+                  title={card.name}
+                  subtitle={
+                    (card.brand || card.archived) && (
+                      <span className="flex items-center gap-1.5">
+                        {card.brand}
+                        {card.archived && <Badge variant="neutral">{t("cards.archivedBadge")}</Badge>}
+                      </span>
+                    )
+                  }
+                  value={formatCents(card.limitCents)}
+                  trailing={
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-lg"
+                          className="rounded-pill text-ink-secondary"
+                          aria-label={t("common.actions")}
+                        >
+                          <EllipsisVertical className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link to={`/cards/${card.id}/statements`}>
+                            <Receipt className="size-4" />
+                            {t("cards.statementsAction", { name: card.name })}
+                          </Link>
                         </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                        <DropdownMenuItem onSelect={() => openEdit(card)}>
+                          <Pencil className="size-4" />
+                          {t("cards.editAction", { name: card.name })}
+                        </DropdownMenuItem>
+                        {!card.archived && (
+                          <DropdownMenuItem onSelect={() => setArchiving(card)}>
+                            <Archive className="size-4" />
+                            {t("cards.archiveAction", { name: card.name })}
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  }
+                />
                 <div className="flex flex-col gap-1">
                   <span className="relative block h-[8px] w-full overflow-hidden rounded-pill bg-neutral">
                     <span

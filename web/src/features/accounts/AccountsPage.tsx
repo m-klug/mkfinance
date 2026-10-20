@@ -8,6 +8,7 @@ import { Archive, ArrowLeft, EllipsisVertical, PiggyBank, Pencil, Plus } from "l
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListRow } from "@/components/ui/list-row";
 import {
   Table,
   TableBody,
@@ -241,61 +242,60 @@ export default function AccountsPage() {
           className="flex flex-col gap-2 sm:hidden"
         >
           {(accounts ?? []).map((account, index) => (
-            <li
-              key={account.id}
-              className="flex items-center gap-2.5 rounded-card bg-card p-3.5"
-            >
-              <span
-                className="flex size-[38px] shrink-0 items-center justify-center rounded-[13px] text-[13px] font-extrabold text-mint-ink"
-                style={{ backgroundColor: accountAvatarTone(index) }}
-                aria-hidden
-              >
-                {accountInitials(account.name)}
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="flex items-center gap-1.5 truncate text-[13px] font-bold text-ink-primary">
-                  {account.name}
-                  {account.archived && <Badge variant="neutral">{t("accounts.archivedBadge")}</Badge>}
-                </span>
-                <span className="truncate text-[11px] text-ink-tertiary">
-                  {t(`accountType.${account.type}`)}
-                </span>
-              </div>
-              <span className="ml-auto shrink-0 tabular-nums text-[14px] font-extrabold text-ink-primary">
-                {formatCents(effectiveBalanceCents(account))}
-              </span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-lg"
-                    className="shrink-0 rounded-pill text-ink-secondary"
-                    aria-label={t("common.actions")}
+            <li key={account.id} className="rounded-card bg-card px-3.5">
+              <ListRow
+                leading={
+                  <span
+                    className="flex size-[38px] items-center justify-center rounded-[13px] text-[13px] font-extrabold text-mint-ink"
+                    style={{ backgroundColor: accountAvatarTone(index) }}
+                    aria-hidden
                   >
-                    <EllipsisVertical className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {isContributionAccount(account) && (
-                    <DropdownMenuItem asChild>
-                      <Link to={`/accounts/${account.id}/vaults`}>
-                        <PiggyBank className="size-4" />
-                        {t("vaults.accountAction", { name: account.name })}
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onSelect={() => openEdit(account)}>
-                    <Pencil className="size-4" />
-                    {t("accounts.editAction", { name: account.name })}
-                  </DropdownMenuItem>
-                  {!account.archived && (
-                    <DropdownMenuItem onSelect={() => setArchiving(account)}>
-                      <Archive className="size-4" />
-                      {t("accounts.archiveAction", { name: account.name })}
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    {accountInitials(account.name)}
+                  </span>
+                }
+                title={account.name}
+                subtitle={
+                  <span className="flex items-center gap-1.5">
+                    {t(`accountType.${account.type}`)}
+                    {account.archived && <Badge variant="neutral">{t("accounts.archivedBadge")}</Badge>}
+                  </span>
+                }
+                value={formatCents(effectiveBalanceCents(account))}
+                trailing={
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-lg"
+                        className="rounded-pill text-ink-secondary"
+                        aria-label={t("common.actions")}
+                      >
+                        <EllipsisVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isContributionAccount(account) && (
+                        <DropdownMenuItem asChild>
+                          <Link to={`/accounts/${account.id}/vaults`}>
+                            <PiggyBank className="size-4" />
+                            {t("vaults.accountAction", { name: account.name })}
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onSelect={() => openEdit(account)}>
+                        <Pencil className="size-4" />
+                        {t("accounts.editAction", { name: account.name })}
+                      </DropdownMenuItem>
+                      {!account.archived && (
+                        <DropdownMenuItem onSelect={() => setArchiving(account)}>
+                          <Archive className="size-4" />
+                          {t("accounts.archiveAction", { name: account.name })}
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                }
+              />
             </li>
           ))}
         </ul>

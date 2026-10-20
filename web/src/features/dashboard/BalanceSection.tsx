@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { ListRow } from "@/components/ui/list-row";
 import { useFormatCents } from "@/hooks/useFormatCents";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { AccountType, type DashboardSummary } from "@/lib/api/generated/mKFinanceAPI.schemas";
@@ -103,29 +104,26 @@ export function BalanceSection({ summary }: BalanceSectionProps) {
         ) : (
           <ul className="flex flex-col gap-2">
             {accounts.map((account) => (
-              <li
-                key={account.id}
-                className="flex items-center gap-3 rounded-list-item bg-field px-3.5 py-2.5"
-              >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-neutral text-[11px] font-extrabold text-ink-secondary">
-                  {initials(account.name)}
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[13px] font-bold text-ink-primary">
-                    {account.name}
-                  </span>
-                  <span className="text-[10px] text-ink-label">
-                    {t(`accountType.${account.type}`)}
-                  </span>
-                </span>
-                <span className="ml-auto flex flex-col items-end gap-1">
-                  <span className="text-[13px] font-bold tabular-nums text-ink-primary">
-                    {formatCents(effectiveBalanceCents(account))}
-                  </span>
-                  {account.type === AccountType.INVESTMENT && (
-                    <Badge variant="success">{t("dashboard.balance.investmentBadge")}</Badge>
-                  )}
-                </span>
+              <li key={account.id} className="rounded-list-item bg-field px-3.5">
+                <ListRow
+                  leading={
+                    <span className="flex size-8 items-center justify-center rounded-[10px] bg-neutral text-[11px] font-extrabold text-ink-secondary">
+                      {initials(account.name)}
+                    </span>
+                  }
+                  title={account.name}
+                  subtitle={t(`accountType.${account.type}`)}
+                  value={
+                    <span className="flex flex-col items-end gap-1">
+                      <span className="text-[13px] font-bold tabular-nums text-ink-primary">
+                        {formatCents(effectiveBalanceCents(account))}
+                      </span>
+                      {account.type === AccountType.INVESTMENT && (
+                        <Badge variant="success">{t("dashboard.balance.investmentBadge")}</Badge>
+                      )}
+                    </span>
+                  }
+                />
               </li>
             ))}
           </ul>

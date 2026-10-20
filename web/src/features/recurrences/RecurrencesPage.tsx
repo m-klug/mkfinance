@@ -7,6 +7,7 @@ import { Pencil, Plus, Repeat, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ListRow } from "@/components/ui/list-row";
 import {
   Table,
   TableBody,
@@ -18,6 +19,7 @@ import {
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useFormatCents } from "@/hooks/useFormatCents";
 import { translateApiError } from "@/lib/errors";
+import { cn } from "@/lib/utils";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import { useListAccounts } from "@/lib/api/generated/accounts/accounts";
 import { useListCategories } from "@/lib/api/generated/categories/categories";
@@ -267,53 +269,61 @@ export default function RecurrencesPage() {
               className="flex flex-col divide-y divide-divider-row sm:hidden"
               data-testid="recurrences-mobile-list"
             >
-              {(recurrences ?? []).map((recurrence) => (
-                <li key={recurrence.id} className="flex items-center gap-2.5 py-3 first:pt-0 last:pb-0">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-list-item bg-field text-ink-secondary">
-                    <Repeat className="size-3.5" aria-hidden />
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="flex items-center gap-1.5 truncate text-sm font-bold text-ink-primary">
-                      <span className="truncate">{recurrence.description}</span>
-                      {!recurrence.active && (
-                        <Badge variant="neutral">{t("recurrences.statusClosed")}</Badge>
-                      )}
-                    </span>
-                    <span className="truncate text-xs text-ink-secondary">
-                      {scheduleLabel(recurrence, t)}
-                      {" · "}
-                      {lookupName(categoryList, recurrence.categoryId) ?? "—"}
-                    </span>
-                  </div>
-                  <span className="shrink-0 text-right text-sm font-bold tabular-nums text-ink-primary">
-                    {formatCents(recurrence.amountCents)}
-                  </span>
-                  {recurrence.active && (
-                    <div className="flex shrink-0 flex-col gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-11 rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
-                        aria-label={t("recurrences.editAction", {
-                          description: recurrence.description,
-                        })}
-                        onClick={() => openEdit(recurrence)}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-11 rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
-                        aria-label={t("recurrences.deleteAction", {
-                          description: recurrence.description,
-                        })}
-                        onClick={() => openDelete(recurrence)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  )}
+              {(recurrences ?? []).map((recurrence, index) => (
+                <li key={recurrence.id}>
+                  <ListRow
+                    className={cn(
+                      index === 0 && "pt-0",
+                      index === (recurrences?.length ?? 0) - 1 && "pb-0",
+                    )}
+                    leading={
+                      <span className="flex size-9 items-center justify-center rounded-list-item bg-field text-ink-secondary">
+                        <Repeat className="size-3.5" aria-hidden />
+                      </span>
+                    }
+                    title={recurrence.description}
+                    subtitle={
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span>
+                          {scheduleLabel(recurrence, t)}
+                          {" · "}
+                          {lookupName(categoryList, recurrence.categoryId) ?? "—"}
+                        </span>
+                        {!recurrence.active && (
+                          <Badge variant="neutral">{t("recurrences.statusClosed")}</Badge>
+                        )}
+                      </span>
+                    }
+                    value={formatCents(recurrence.amountCents)}
+                    trailing={
+                      recurrence.active && (
+                        <div className="flex flex-col gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="size-11 rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
+                            aria-label={t("recurrences.editAction", {
+                              description: recurrence.description,
+                            })}
+                            onClick={() => openEdit(recurrence)}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="size-11 rounded-full text-ink-tertiary hover:bg-neutral hover:text-ink-primary"
+                            aria-label={t("recurrences.deleteAction", {
+                              description: recurrence.description,
+                            })}
+                            onClick={() => openDelete(recurrence)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      )
+                    }
+                  />
                 </li>
               ))}
             </ul>

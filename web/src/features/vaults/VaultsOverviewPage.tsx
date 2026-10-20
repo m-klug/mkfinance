@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useQueries } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
+import { ListRow } from "@/components/ui/list-row";
 import { useFormatCents } from "@/hooks/useFormatCents";
 import { useCurrentWorkspaceId } from "@/hooks/useCurrentWorkspace";
 import { useListAccounts } from "@/lib/api/generated/accounts/accounts";
@@ -131,25 +132,20 @@ function VaultOverviewCard({
       to={`/accounts/${vault.accountId}/vaults`}
       className="flex flex-col gap-2 rounded-card bg-card p-4"
     >
-      <div className="flex items-center gap-2.5">
-        <span
-          className="flex size-[38px] shrink-0 items-center justify-center rounded-[13px] text-[13px] font-extrabold"
-          style={{ backgroundColor: `color-mix(in srgb, ${color} 22%, transparent)`, color }}
-        >
-          {vault.name.slice(0, 2).toUpperCase()}
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13px] font-extrabold text-ink-primary">{vault.name}</span>
-          <span className="truncate text-[11px] text-ink-tertiary">
-            {t(`pillar.${vault.contributionPillar}`)}
+      <ListRow
+        className="py-0"
+        leading={
+          <span
+            className="flex size-[38px] items-center justify-center rounded-[13px] text-[13px] font-extrabold"
+            style={{ backgroundColor: `color-mix(in srgb, ${color} 22%, transparent)`, color }}
+          >
+            {vault.name.slice(0, 2).toUpperCase()}
           </span>
-        </div>
-        {vault.goal && (
-          <span className="ml-auto shrink-0 tabular-nums text-[13px] font-extrabold text-ink-primary">
-            {Math.round(percent)}%
-          </span>
-        )}
-      </div>
+        }
+        title={vault.name}
+        subtitle={t(`pillar.${vault.contributionPillar}`)}
+        value={vault.goal ? `${Math.round(percent)}%` : undefined}
+      />
       {vault.goal && (
         <>
           <div className="relative h-[9px] w-full overflow-hidden rounded-pill bg-neutral">

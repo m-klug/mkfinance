@@ -224,6 +224,18 @@
 body {
   @apply bg-page-bg text-foreground antialiased;
   font-feature-settings: "tnum" 0;
+  touch-action: manipulation;
+}
+
+/* iOS Safari zooms the page when a focused field has font-size < 16px and
+   never zooms back out, so fields stay at 16px on phones whatever their
+   per-component text-* class says. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* Rule from the handoff: every money/percent value uses tabular figures. */

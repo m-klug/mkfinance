@@ -5,6 +5,7 @@ import { Repeat } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ListRow } from "@/components/ui/list-row";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 import { useFormatCents } from "@/hooks/useFormatCents";
@@ -181,12 +182,12 @@ function CalendarEntryRow({ entry }: { entry: CalendarEntry }) {
     entry.kind === CalendarEntryKind.STATEMENT_DUE ? "bg-alert-ink" : "bg-success-ink";
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span className={cn("size-2 shrink-0 rounded-full", markerClass)} aria-hidden />
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate font-bold text-ink-primary">{entry.description}</span>
+    <li>
+      <ListRow
+        leading={<span className={cn("size-2 rounded-full", markerClass)} aria-hidden />}
+        title={entry.description}
+        subtitle={
+          <span className="flex flex-wrap items-center gap-2">
             <Badge variant="neutral">{t(`calendarEntryKind.${entry.kind}`)}</Badge>
             {entry.kind === CalendarEntryKind.PENDING_TRANSACTION && entry.recurrenceId && (
               <Link
@@ -197,17 +198,14 @@ function CalendarEntryRow({ entry }: { entry: CalendarEntry }) {
                 {t("calendar.recurrenceBadge")}
               </Link>
             )}
-          </div>
-        </div>
-      </div>
-      <span
-        className={cn(
-          "tabular-nums font-bold",
-          outflow ? "text-alert-ink" : "text-success-ink",
-        )}
-      >
-        {formatCents(signedAmountCents(entry))}
-      </span>
+          </span>
+        }
+        value={
+          <span className={outflow ? "text-alert-ink" : "text-success-ink"}>
+            {formatCents(signedAmountCents(entry))}
+          </span>
+        }
+      />
     </li>
   );
 }
