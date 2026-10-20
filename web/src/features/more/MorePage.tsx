@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
+  Calculator,
+  Landmark,
   ChevronRight,
   CreditCard,
   Download,
@@ -39,6 +41,8 @@ const HUB_LINKS: HubLink[] = [
   { to: "/categories", labelKey: "nav.categories", icon: Tags },
   { to: "/recurrences", labelKey: "nav.recurrences", icon: Repeat },
   { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
+  { to: "/investments", labelKey: "nav.investments", icon: Landmark },
+  { to: "/simulator", labelKey: "nav.simulator", icon: Calculator },
   { to: "/settings/pillars", labelKey: "nav.settings", icon: Settings },
 ];
 

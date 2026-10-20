@@ -162,6 +162,26 @@ public final class ErrorCode {
     /** The transaction has reimbursement links, so deleting it or changing what they depend on is refused. */
     public static final String TRANSACTION_HAS_REIMBURSEMENTS = "TRANSACTION_HAS_REIMBURSEMENTS";
 
+    // fixed-income simulator
+    public static final String SIMULATION_INDEXER_NOT_AVAILABLE = "SIMULATION_INDEXER_NOT_AVAILABLE";
+    public static final String SIMULATION_NOTHING_APPLIED = "SIMULATION_NOTHING_APPLIED";
+    public static final String MARKET_RATE_UNAVAILABLE = "MARKET_RATE_UNAVAILABLE";
+
+    // fixed-income positions
+    public static final String POSITION_NOT_FOUND = "POSITION_NOT_FOUND";
+    public static final String POSITION_ORIGIN_INVALID = "POSITION_ORIGIN_INVALID";
+    public static final String POSITION_CONTRIBUTION_INVALID = "POSITION_CONTRIBUTION_INVALID";
+    public static final String POSITION_ALREADY_EXISTS = "POSITION_ALREADY_EXISTS";
+    public static final String POSITION_ACCOUNT_INVALID = "POSITION_ACCOUNT_INVALID";
+    public static final String POSITION_VAULT_INVALID = "POSITION_VAULT_INVALID";
+    public static final String POSITION_INDEXER_NOT_AVAILABLE = "POSITION_INDEXER_NOT_AVAILABLE";
+    public static final String POSITION_DATES_INVALID = "POSITION_DATES_INVALID";
+    public static final String POSITION_SETTLED = "POSITION_SETTLED";
+    public static final String POSITION_NOT_SETTLED = "POSITION_NOT_SETTLED";
+    public static final String POSITION_RECEIVED_BELOW_PRINCIPAL = "POSITION_RECEIVED_BELOW_PRINCIPAL";
+    public static final String POSITION_RETURN_TRANSFER_INVALID = "POSITION_RETURN_TRANSFER_INVALID";
+    public static final String TRANSACTION_HAS_POSITION = "TRANSACTION_HAS_POSITION";
+
     // generic
     public static final String VALIDATION_ERROR = "VALIDATION_ERROR";
     public static final String DATA_INTEGRITY_VIOLATION = "DATA_INTEGRITY_VIOLATION";

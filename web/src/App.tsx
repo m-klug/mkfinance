@@ -17,6 +17,8 @@ import DashboardPage from "@/features/dashboard/DashboardPage";
 import PillarSettingsPage from "@/features/settings/PillarSettingsPage";
 import RecurrencesPage from "@/features/recurrences/RecurrencesPage";
 import CalendarPage from "@/features/calendar/CalendarPage";
+import SimulatorPage from "@/features/simulator/SimulatorPage";
+import InvestmentsPage from "@/features/investments/InvestmentsPage";
 
 // No <BrowserRouter> here on purpose — it lives in main.tsx so tests can
 // swap in a <MemoryRouter> (see src/test/renderWithProviders.tsx) and drive
@@ -41,6 +43,8 @@ export default function App() {
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/recurrences" element={<RecurrencesPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/investments" element={<InvestmentsPage />} />
+            <Route path="/simulator" element={<SimulatorPage />} />
             <Route path="/settings/pillars" element={<PillarSettingsPage />} />
           </Route>
         </Route>

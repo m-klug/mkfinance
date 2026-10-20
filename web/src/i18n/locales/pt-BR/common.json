@@ -391,7 +391,9 @@
     "statement": "Extrato",
     "vaults": "Caixas",
     "more": "Mais",
-    "back": "Voltar"
+    "back": "Voltar",
+    "simulator": "Simulador",
+    "investments": "Investimentos"
   },
   "theme": {
     "light": "Claro",
@@ -647,7 +649,23 @@
     "REIMBURSEMENT_OVER_EXPENSE": "Esta despesa só espera mais {{pendingAmount}} de reembolso.",
     "REIMBURSEMENT_NOT_FOUND": "Este vínculo não foi encontrado.",
     "REIMBURSABLE_INVALID": "O valor a reembolsar precisa estar entre R$ 0,01 e o valor da despesa.",
-    "TRANSACTION_HAS_REIMBURSEMENTS": "Este lançamento tem {{linkedAmount}} vinculado a reembolsos — desfaça os vínculos antes de excluir ou reduzir abaixo disso."
+    "TRANSACTION_HAS_REIMBURSEMENTS": "Este lançamento tem {{linkedAmount}} vinculado a reembolsos — desfaça os vínculos antes de excluir ou reduzir abaixo disso.",
+    "SIMULATION_INDEXER_NOT_AVAILABLE": "Este investimento não é vendido com esse indexador.",
+    "SIMULATION_NOTHING_APPLIED": "Informe um valor inicial, ou um aporte mensal com prazo de pelo menos 2 meses.",
+    "MARKET_RATE_UNAVAILABLE": "Não consegui buscar a taxa de mercado agora. Informe o valor no campo de premissa e simule de novo.",
+    "POSITION_NOT_FOUND": "Esta posição não foi encontrada.",
+    "POSITION_ORIGIN_INVALID": "Escolha um aporte, ou informe conta, valor e data de um título anterior ao app.",
+    "POSITION_CONTRIBUTION_INVALID": "Este aporte não pode originar uma posição. Use uma transferência liquidada para uma conta de investimento.",
+    "POSITION_ALREADY_EXISTS": "Este aporte já tem uma posição.",
+    "POSITION_ACCOUNT_INVALID": "Escolha uma conta de investimento ou poupança ativa.",
+    "POSITION_VAULT_INVALID": "Esta caixinha não serve para essa conta (ou está arquivada).",
+    "POSITION_INDEXER_NOT_AVAILABLE": "Este título não é vendido com esse tipo de rentabilidade, ou ainda não é suportado.",
+    "POSITION_DATES_INVALID": "Confira as datas: o vencimento vem depois da compra, e a compra e o pagamento não podem estar no futuro.",
+    "POSITION_SETTLED": "Esta posição já foi paga. Desfaça a baixa para alterá-la.",
+    "POSITION_NOT_SETTLED": "Esta posição ainda não foi paga.",
+    "POSITION_RECEIVED_BELOW_PRINCIPAL": "O valor recebido não pode ser menor que o aplicado ({{principalAmount}}).",
+    "POSITION_RETURN_TRANSFER_INVALID": "Essa transferência não serve: use uma saída da conta de investimento do título que ainda não esteja vinculada a outra posição.",
+    "TRANSACTION_HAS_POSITION": "Este lançamento está ligado a uma posição de investimento. Exclua a posição, ou desfaça a baixa, antes de alterá-lo."
   },
   "bankImport": {
     "action": "Importar extrato (OFX)",
@@ -710,5 +728,218 @@
     "overPending": "Mais do que falta receber desta despesa.",
     "overIncome": "Passa do que ainda resta deste recebimento ({{remaining}}).",
     "confirm": "Vincular {{total}}"
+  },
+  "simulator": {
+    "title": "Simulador de renda fixa",
+    "subtitle": "Quanto rende, líquido, um investimento até o vencimento.",
+    "instrument": {
+      "CDB": "CDB",
+      "LC": "LC",
+      "LCI": "LCI",
+      "LCA": "LCA",
+      "TESOURO_SELIC": "Tesouro Selic",
+      "TESOURO_PREFIXADO": "Tesouro Prefixado",
+      "TESOURO_IPCA": "Tesouro IPCA+"
+    },
+    "indexer": {
+      "PREFIXED": "Prefixado",
+      "CDI_PERCENT": "Pós-fixado (% do CDI)",
+      "SELIC_PERCENT": "Pós-fixado (% da Selic)",
+      "IPCA_PLUS": "IPCA + taxa fixa"
+    },
+    "rateLabel": {
+      "PREFIXED": "Taxa (% ao ano)",
+      "CDI_PERCENT": "Percentual do CDI (%)",
+      "SELIC_PERCENT": "Percentual da Selic (%)",
+      "IPCA_PLUS": "Taxa fixa acima do IPCA (% ao ano)"
+    },
+    "form": {
+      "type": "Investimento",
+      "indexer": "Rentabilidade",
+      "months": "Prazo (meses)",
+      "initial": "Valor inicial",
+      "monthly": "Aporte mensal",
+      "monthlyHint": "Opcional. Entra todo mês, a partir do mês 1.",
+      "submit": "Simular",
+      "simulating": "Simulando…"
+    },
+    "premise": {
+      "cdi": "CDI considerado (% ao ano)",
+      "selic": "Selic considerada (% ao ano)",
+      "ipca": "IPCA projetado (% ao ano)",
+      "marketHint": "Vazio usa {{value}}% (mercado, {{date}}). A taxa fica constante no prazo todo.",
+      "noMarket": "Sem taxa de mercado disponível agora. Informe o valor."
+    },
+    "errors": {
+      "rateRequired": "Informe a taxa.",
+      "rateInvalid": "Taxa inválida. Use números, como 12,5.",
+      "monthsInvalid": "Informe um prazo inteiro de 1 a 600 meses.",
+      "amountRequired": "Informe um valor inicial, ou um aporte mensal com prazo de pelo menos 2 meses.",
+      "premiseInvalid": "Valor inválido. Use números, como 13,65."
+    },
+    "result": {
+      "net": "Valor líquido",
+      "netYield": "Rendimento líquido de {{amount}} ({{percent}})",
+      "equivalent": "Equivale a {{value}} ao ano, líquido",
+      "invested": "Total investido",
+      "grossYield": "Rendimento bruto",
+      "gross": "Valor bruto",
+      "iof": "IOF",
+      "incomeTax": "Imposto de renda",
+      "custody": "Custódia B3",
+      "exempt": "Isento",
+      "assumedCdi": "CDI de {{value}} a.a.",
+      "assumedSelic": "Selic de {{value}} a.a.",
+      "assumedIpca": "IPCA de {{value}} a.a.",
+      "disclaimer": "Estimativa: considera as taxas constantes até o vencimento e resgate total no fim do prazo."
+    },
+    "chart": {
+      "title": "Evolução",
+      "subtitle": "De {{start}} a {{end}}. Cada ponto é o valor se resgatar naquele mês.",
+      "invested": "Investido",
+      "gross": "Bruto",
+      "net": "Líquido",
+      "month": "Mês {{month}}"
+    },
+    "mode": {
+      "single": "Uma simulação",
+      "compare": "Comparar dois"
+    },
+    "compare": {
+      "label": "Simulação {{letter}}",
+      "submit": "Comparar",
+      "winner": "A simulação {{letter}} rende mais",
+      "winnerDetail": "{{better}} ao ano, líquido, contra {{other}}. No vencimento, {{amount}} a mais.",
+      "tie": "Empate",
+      "tieDetail": "As duas rendem o mesmo ao ano, líquido.",
+      "basis": "Quem rende mais é decidido pela taxa líquida equivalente ao ano, que compara bem mesmo com prazos ou valores diferentes."
+    }
+  },
+  "investments": {
+    "title": "Investimentos",
+    "subtitle": "Seus títulos de renda fixa: quanto já renderam e quando pagam.",
+    "new": "Nova posição",
+    "newTitle": "Nova posição",
+    "editTitle": "Editar posição",
+    "formSubtitle": "Não move dinheiro: só detalha o que já está na conta de investimento.",
+    "created": "Posição cadastrada.",
+    "saved": "Posição atualizada.",
+    "deleted": "Posição excluída.",
+    "unsettled": "Baixa desfeita.",
+    "tabs": {
+      "active": "Ativas",
+      "settled": "Pagas"
+    },
+    "emptyActive": "Nenhuma posição ativa.",
+    "emptySettled": "Nenhuma posição paga ainda.",
+    "emptyHint": "Cadastre um título a partir de um aporte, ou um que você comprou antes de usar o app.",
+    "deleteTitle": "Excluir posição?",
+    "deleteDescription": "Remove só o cadastro do título. A transferência da compra e os saldos não mudam.",
+    "unsettleTitle": "Desfazer a baixa?",
+    "unsettleDescription": "Apaga o lançamento de rendimento criado na baixa e a posição volta a ficar ativa. Depois você pode baixar de novo com o valor certo.",
+    "origin": {
+      "contribution": "A partir de um aporte",
+      "manual": "Título anterior ao app"
+    },
+    "form": {
+      "contribution": "Aporte (compra)",
+      "contributionHint": "Valor, data, conta e caixinha vêm da transferência escolhida.",
+      "contributionPlaceholder": "Escolha o aporte",
+      "noContributions": "Não há aportes sem posição. Para um título anterior ao app, use a outra opção.",
+      "manualNotice": "Para títulos comprados antes do app: nada é movido nem lançado. Antes de cadastrar, some o valor aplicado ao saldo inicial da conta de investimento, para o saldo do app bater com o do banco.",
+      "account": "Conta de investimento",
+      "accountPlaceholder": "Escolha a conta",
+      "principal": "Valor aplicado",
+      "purchaseDate": "Data da compra",
+      "linkedFacts": "Valor aplicado {{amount}} em {{date}}, vindos da transferência de compra.",
+      "name": "Nome (opcional)",
+      "namePlaceholder": "Ex.: CDB Inter jan/27",
+      "maturity": "Vencimento",
+      "vault": "Caixinha do rendimento",
+      "vaultHint": "Para onde vai o rendimento quando o título pagar.",
+      "noVault": "Sem caixinha (não alocado)"
+    },
+    "errors": {
+      "rateRequired": "Informe a taxa.",
+      "rateInvalid": "Taxa inválida. Use números, como 110 ou 12,5.",
+      "contributionRequired": "Escolha o aporte.",
+      "accountRequired": "Escolha a conta.",
+      "principalRequired": "Informe o valor aplicado.",
+      "purchaseDateRequired": "Informe a data da compra.",
+      "purchaseDateFuture": "A compra não pode estar no futuro.",
+      "maturityRequired": "Informe o vencimento.",
+      "maturityBeforePurchase": "O vencimento tem que ser depois da compra."
+    },
+    "settle": {
+      "title": "Baixar título",
+      "subtitle": "Informe quando o dinheiro caiu e quanto, já líquido de imposto. O app lança só o rendimento.",
+      "date": "Data do pagamento",
+      "received": "Valor líquido recebido",
+      "estimateHint": "Estimativa do app para o vencimento: {{amount}}.",
+      "noEstimateHint": "Sem estimativa para este título.",
+      "principal": "Valor aplicado",
+      "yield": "Rendimento a lançar",
+      "yieldGoesTo": "O rendimento vai para a caixinha {{vault}}.",
+      "yieldGoesUnallocated": "O rendimento fica na parte não alocada da conta.",
+      "returnTransfer": "Transferência de volta (opcional)",
+      "returnTransferHint": "A saída da conta de investimento que levou esse dinheiro para a corrente. Pode ser vinculada depois.",
+      "noLink": "Não vincular agora",
+      "noVaultWarning": "Este título não tem caixinha. Para registrar a transferência de volta, remaneje antes o valor da parte não alocada para uma caixinha: a saída exige caixinha com saldo.",
+      "confirm": "Baixar",
+      "done": "Título baixado.",
+      "belowPrincipal": "O valor recebido não pode ser menor que o aplicado ({{principal}})."
+    },
+    "card": {
+      "percentOfCdi": "{{value}} do CDI",
+      "percentOfSelic": "{{value}} da Selic",
+      "perYear": "{{value}} a.a.",
+      "awaiting": "Aguardando pagamento",
+      "settled": "Paga",
+      "beforeApp": "Anterior ao app",
+      "applied": "Aplicado",
+      "received": "Recebido",
+      "yield": "Rendimento",
+      "estimated": "Estimado",
+      "valueToday": "Valor hoje",
+      "accrued": "Rendimento acumulado",
+      "atMaturity": "No vencimento",
+      "noEstimate": "Sem estimativa agora: faltam o histórico do CDI e a taxa atual.",
+      "paidOn": "Paga em {{date}}",
+      "dueSince": "Venceu em {{date}}",
+      "matures": "Vence em {{date}} ({{days}} dias)",
+      "indexUpTo": "Índice até {{date}}"
+    },
+    "actions": {
+      "settle": "Baixar título",
+      "edit": "Editar",
+      "delete": "Excluir",
+      "unsettle": "Desfazer baixa"
+    },
+    "section": {
+      "title": "Aplicações",
+      "viewAll": "Ver investimentos",
+      "matures": "Vence em {{date}}"
+    },
+    "summary": {
+      "title": "Patrimônio",
+      "netWorth": "Patrimônio estimado",
+      "includesAccrued": "Inclui {{amount}} de rendimento já acumulado e ainda não recebido.",
+      "accountsAndCash": "Contas e dinheiro",
+      "investments": "Investimentos",
+      "openStatements": "Faturas em aberto: {{amount}}. Não descontadas do patrimônio.",
+      "fixedIncome": "Renda fixa",
+      "applied": "Aplicado",
+      "value": "Valor estimado",
+      "yield": "Rendimento",
+      "positions": "{{count}} posições",
+      "withoutEstimate": "{{count}} sem estimativa, contadas pelo valor aplicado",
+      "accountsTitle": "Contas de investimento",
+      "balance": "Saldo",
+      "inPositions": "Em posições",
+      "unregistered": "Sem posição cadastrada",
+      "exceedTitle": "As posições somam mais que o saldo desta conta.",
+      "exceedHint": "Se algum título é anterior ao app, some o valor aplicado ao saldo inicial da conta para o saldo bater com o do banco.",
+      "editAccounts": "Abrir contas"
+    }
   }
 }

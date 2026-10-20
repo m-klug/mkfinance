@@ -44,6 +44,7 @@ import { VaultGoalBar } from "@/features/vaults/VaultGoalBar";
 import { VaultReallocateDialog } from "@/features/vaults/VaultReallocateDialog";
 import { VaultEntriesSheet } from "@/features/vaults/VaultEntriesSheet";
 import { VaultYieldDialog } from "@/features/vaults/VaultYieldDialog";
+import { VaultPositionsSection } from "@/features/investments/VaultPositionsSection";
 
 export default function VaultsPage() {
   const { t } = useTranslation();
@@ -414,6 +415,8 @@ export default function VaultsPage() {
           })}
         </div>
       )}
+
+      {workspaceId && accountId && <VaultPositionsSection workspaceId={workspaceId} accountId={accountId} />}
 
       {workspaceId && (
         <VaultFormDialog

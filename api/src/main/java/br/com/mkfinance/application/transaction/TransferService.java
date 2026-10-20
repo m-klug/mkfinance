@@ -1,5 +1,6 @@
 package br.com.mkfinance.application.transaction;
 
+import br.com.mkfinance.application.investment.FixedIncomePositionGuard;
 import br.com.mkfinance.application.vault.VaultBalanceService;
 import br.com.mkfinance.application.vault.VaultLinkService;
 import br.com.mkfinance.domain.exception.AppException;
@@ -66,6 +67,7 @@ public class TransferService {
     private final VaultEntryRepository vaultEntryRepository;
     private final VaultLinkService vaultLinkService;
     private final VaultBalanceService vaultBalanceService;
+    private final FixedIncomePositionGuard positionGuard;
 
     /**
      * Creates both legs atomically and returns them. Transfers start SETTLED — the contract's
@@ -166,6 +168,7 @@ public class TransferService {
             throw AppException.transactionNotFound();
         }
         Transaction sibling = requireSibling(leg);
+        guardPositionPurchase(leg, sibling, input);
 
         boolean legMoved = false;
         if (input.accountId() != null && !input.accountId().equals(leg.getAccountId())) {
@@ -262,6 +265,8 @@ public class TransferService {
      */
     public void delete(Transaction leg) {
         Transaction sibling = requireSibling(leg);
+        positionGuard.assertNotReferenced(leg.getId());
+        positionGuard.assertNotReferenced(sibling.getId());
         vaultLinkService.unlink(leg.getId());
         vaultLinkService.unlink(sibling.getId());
         leg.setTransferPairId(null);
@@ -269,6 +274,26 @@ public class TransferService {
         transactionRepository.saveAllAndFlush(List.of(leg, sibling));
         transactionRepository.deleteAll(List.of(leg, sibling));
         transactionRepository.flush();
+    }
+
+    /**
+     * A fixed-income position copied this transfer's amount, date and account when it was born, so
+     * none of them may move while it exists (TRANSACTION_HAS_POSITION): delete the position first.
+     * The description, the note, the pillar and the vault stay editable — the position does not
+     * depend on them.
+     */
+    private void guardPositionPurchase(Transaction leg, Transaction sibling, TransferUpdateInput input) {
+        Transaction incoming = leg.getTransferDirection() == TransferDirection.IN ? leg : sibling;
+        if (!positionGuard.isContribution(incoming.getId())) {
+            return;
+        }
+        boolean moves = input.amountCents() != incoming.getAmountCents()
+                || !input.date().equals(incoming.getDate())
+                || (input.accountId() != null && !input.accountId().equals(leg.getAccountId()))
+                || (input.status() != null && input.status() != incoming.getStatus());
+        if (moves) {
+            throw AppException.transactionHasPosition();
+        }
     }
 
     /**

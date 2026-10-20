@@ -42,5 +42,8 @@ function interpolationParams(
   if (typeof params.linkedCents === "number") {
     next.linkedAmount = formatCents(params.linkedCents);
   }
+  if (typeof params.principalCents === "number") {
+    next.principalAmount = formatCents(params.principalCents);
+  }
   return next;
 }

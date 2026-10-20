@@ -5,6 +5,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
   CalendarDays,
+  Calculator,
+  Landmark,
   CreditCard,
   Ellipsis,
   LayoutDashboard,
@@ -39,13 +41,15 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/categories", labelKey: "nav.categories", icon: Tags },
   { to: "/recurrences", labelKey: "nav.recurrences", icon: Repeat },
   { to: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
+  { to: "/investments", labelKey: "nav.investments", icon: Landmark },
+  { to: "/simulator", labelKey: "nav.simulator", icon: Calculator },
   { to: "/settings/pillars", labelKey: "nav.settings", icon: Settings },
 ];
 
 // Everything that lives inside the mobile "Mais" hub (design_handoff_mk_finance/README.md
 // §Mobile) — the tab bar's "Mais" item stays highlighted while the user is
 // anywhere under one of these, not just on /more itself.
-const MORE_HUB_PREFIXES = ["/more", "/cards", "/accounts", "/categories", "/recurrences", "/calendar", "/settings"];
+const MORE_HUB_PREFIXES = ["/more", "/cards", "/accounts", "/categories", "/recurrences", "/calendar", "/investments", "/simulator", "/settings"];
 
 /**
  * Icon-only rail, 9 destinations + theme/logout footer

@@ -14,7 +14,7 @@ export type ErrorResponseFieldErrorsItem = {
 };
 
 export interface ErrorResponse {
-  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT; reimbursements — REIMBURSEMENT_INVALID_LINK, REIMBURSEMENT_OVER_INCOME, REIMBURSEMENT_OVER_EXPENSE, REIMBURSEMENT_NOT_FOUND, REIMBURSABLE_INVALID, TRANSACTION_HAS_REIMBURSEMENTS; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; statement PDF import — PDF_PASSWORD_INVALID, PDF_UNREADABLE, STATEMENT_PDF_UNSUPPORTED, IMPORT_LINK_INVALID; bank statement (OFX) import — OFX_UNREADABLE, OFX_UNSUPPORTED, OFX_ITEM_ALREADY_IMPORTED, OFX_ITEM_INCOMPLETE; pillar targets — PILLAR_TARGETS_MUST_SUM_100; recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND; tags — TAG_NAME_DUPLICATE, TAG_NOT_FOUND; vaults — VAULT_NOT_FOUND, VAULT_REQUIRED, VAULT_PILLAR_CONFLICT, VAULT_ACCOUNT_MISMATCH, VAULT_INSUFFICIENT_BALANCE, VAULT_NAME_DUPLICATE, VAULT_NOT_EMPTY, VAULT_HAS_ENTRIES, VAULT_ARCHIVED, VAULT_REALLOCATION_NOT_FOUND; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
+  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT; reimbursements — REIMBURSEMENT_INVALID_LINK, REIMBURSEMENT_OVER_INCOME, REIMBURSEMENT_OVER_EXPENSE, REIMBURSEMENT_NOT_FOUND, REIMBURSABLE_INVALID, TRANSACTION_HAS_REIMBURSEMENTS; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; statement PDF import — PDF_PASSWORD_INVALID, PDF_UNREADABLE, STATEMENT_PDF_UNSUPPORTED, IMPORT_LINK_INVALID; bank statement (OFX) import — OFX_UNREADABLE, OFX_UNSUPPORTED, OFX_ITEM_ALREADY_IMPORTED, OFX_ITEM_INCOMPLETE; pillar targets — PILLAR_TARGETS_MUST_SUM_100; recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND; tags — TAG_NAME_DUPLICATE, TAG_NOT_FOUND; vaults — VAULT_NOT_FOUND, VAULT_REQUIRED, VAULT_PILLAR_CONFLICT, VAULT_ACCOUNT_MISMATCH, VAULT_INSUFFICIENT_BALANCE, VAULT_NAME_DUPLICATE, VAULT_NOT_EMPTY, VAULT_HAS_ENTRIES, VAULT_ARCHIVED, VAULT_REALLOCATION_NOT_FOUND; fixed-income simulator — SIMULATION_INDEXER_NOT_AVAILABLE, SIMULATION_NOTHING_APPLIED, MARKET_RATE_UNAVAILABLE; fixed-income positions — POSITION_NOT_FOUND, POSITION_ORIGIN_INVALID, POSITION_CONTRIBUTION_INVALID, POSITION_ALREADY_EXISTS, POSITION_ACCOUNT_INVALID, POSITION_VAULT_INVALID, POSITION_INDEXER_NOT_AVAILABLE, POSITION_DATES_INVALID, POSITION_SETTLED, POSITION_NOT_SETTLED, POSITION_RECEIVED_BELOW_PRINCIPAL, POSITION_RETURN_TRANSFER_INVALID, TRANSACTION_HAS_POSITION; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
  */
   code: string;
   params?: ErrorResponseParams;
@@ -1179,6 +1179,486 @@ export interface CalendarEntry {
   recurrenceId?: string | null;
 }
 
+export interface FixedIncomeSimulationRequest {
+  /**
+   * @minItems 1
+   * @maxItems 2
+   */
+  simulations: FixedIncomeSimulationItem[];
+}
+
+export type FixedIncomeSimulationItemType = typeof FixedIncomeSimulationItemType[keyof typeof FixedIncomeSimulationItemType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const FixedIncomeSimulationItemType = {
+  CDB: 'CDB',
+  LC: 'LC',
+  LCI: 'LCI',
+  LCA: 'LCA',
+  TESOURO_SELIC: 'TESOURO_SELIC',
+  TESOURO_PREFIXADO: 'TESOURO_PREFIXADO',
+  TESOURO_IPCA: 'TESOURO_IPCA',
+} as const;
+
+export type FixedIncomeSimulationItemIndexer = typeof FixedIncomeSimulationItemIndexer[keyof typeof FixedIncomeSimulationItemIndexer];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const FixedIncomeSimulationItemIndexer = {
+  PREFIXED: 'PREFIXED',
+  CDI_PERCENT: 'CDI_PERCENT',
+  SELIC_PERCENT: 'SELIC_PERCENT',
+  IPCA_PLUS: 'IPCA_PLUS',
+} as const;
+
+export interface FixedIncomeSimulationItem {
+  type: FixedIncomeSimulationItemType;
+  indexer: FixedIncomeSimulationItemIndexer;
+  /**
+   * % a.a. for PREFIXED and IPCA_PLUS; % of the CDI or Selic for the other two (110 = 110%).
+   * @minimum 0
+   * @maximum 1000
+   */
+  rate: number;
+  /**
+   * Omitted means none.
+   * @minimum 0
+   */
+  initialCents?: number;
+  /**
+   * Omitted means none.
+   * @minimum 0
+   */
+  monthlyContributionCents?: number;
+  /**
+   * @minimum 1
+   * @maximum 600
+   */
+  months: number;
+  /** Omitted means today. */
+  startDate?: string;
+  /** Premise, % a.a.; omitted is filled from the market. */
+  cdiAnnualPercent?: number;
+  /** Premise, % a.a.; omitted is filled from the market. */
+  selicAnnualPercent?: number;
+  /** Projected IPCA, % a.a.; omitted is filled with the 12-month IPCA. */
+  ipcaAnnualPercent?: number;
+}
+
+export interface FixedIncomeSimulationResponse {
+  results: FixedIncomeResult[];
+  comparison?: FixedIncomeComparison;
+}
+
+/**
+ * The premises the projection ran with; only those the indexer uses are present.
+ */
+export type FixedIncomeResultAssumptions = {
+  cdiAnnualPercent?: number;
+  selicAnnualPercent?: number;
+  ipcaAnnualPercent?: number;
+};
+
+export type FixedIncomeResultSeriesItem = {
+  month: number;
+  date: string;
+  investedCents: number;
+  grossCents: number;
+  netCents: number;
+};
+
+export interface FixedIncomeResult {
+  type: string;
+  indexer: string;
+  rate: number;
+  startDate: string;
+  endDate: string;
+  months: number;
+  /** The premises the projection ran with; only those the indexer uses are present. */
+  assumptions: FixedIncomeResultAssumptions;
+  investedCents: number;
+  grossCents: number;
+  grossYieldCents: number;
+  iofCents: number;
+  incomeTaxCents: number;
+  custodyCents: number;
+  netCents: number;
+  netYieldCents: number;
+  /** Net yield over the amount invested */
+  netReturnPercent: number;
+  /** The rate a.a. that makes each contribution reach the net amount; the figure to compare by. */
+  netAnnualEquivalentPercent: number;
+  /** One point per month from the start to the redemption, each as if redeemed that day. */
+  series: FixedIncomeResultSeriesItem[];
+}
+
+/**
+ * Position in the request of the simulation that yields more net; absent on a tie.
+ */
+export type FixedIncomeComparisonBetterIndex = typeof FixedIncomeComparisonBetterIndex[keyof typeof FixedIncomeComparisonBetterIndex];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const FixedIncomeComparisonBetterIndex = {
+  NUMBER_0: 0,
+  NUMBER_1: 1,
+} as const;
+
+export interface FixedIncomeComparison {
+  /** Position in the request of the simulation that yields more net; absent on a tie. */
+  betterIndex?: FixedIncomeComparisonBetterIndex;
+  netDifferenceCents: number;
+  /** In percentage points. */
+  netAnnualEquivalentDifferencePercent: number;
+}
+
+export type InvestmentSummaryAssetClassesItemCode = typeof InvestmentSummaryAssetClassesItemCode[keyof typeof InvestmentSummaryAssetClassesItemCode];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const InvestmentSummaryAssetClassesItemCode = {
+  FIXED_INCOME: 'FIXED_INCOME',
+} as const;
+
+export type InvestmentSummaryAssetClassesItem = {
+  code: InvestmentSummaryAssetClassesItemCode;
+  /** Principal of the active positions. */
+  appliedCents: number;
+  /** What they are worth today */
+  estimatedValueCents: number;
+  accruedYieldCents: number;
+  positions: number;
+  positionsWithoutEstimate: number;
+};
+
+export type InvestmentSummaryAccountsItem = {
+  accountId: string;
+  name: string;
+  balanceCents: number;
+  positionsPrincipalCents: number;
+  accruedYieldCents: number;
+  /** Balance minus the principal of the positions */
+  unregisteredCents: number;
+  /** The positions claim more than the account holds — usually a title bought before the app whose amount was never added to the account's initial balance.
+ */
+  positionsExceedBalance: boolean;
+};
+
+export interface InvestmentSummary {
+  /** Balance of the non-archived accounts that are not investment or savings. */
+  accountsAndCashCents: number;
+  /** Balance of the investment and savings accounts plus the accrued net yield of the active positions. */
+  investmentsCents: number;
+  /** accountsAndCashCents + investmentsCents. */
+  estimatedNetWorthCents: number;
+  /** Still owed on card bills; informational */
+  openStatementsCents: number;
+  /** One entry per class of asset; today only FIXED_INCOME, so variable income can be added without a redesign. */
+  assetClasses: InvestmentSummaryAssetClassesItem[];
+  /** The investment and savings accounts, each with how much of its balance positions explain. */
+  accounts: InvestmentSummaryAccountsItem[];
+  /** The part of the investment balances no active position accounts for. */
+  unregisteredInvestmentCents: number;
+  /** True when any account has more principal in positions than it holds. */
+  positionsExceedBalance: boolean;
+}
+
+export interface UnlinkedContribution {
+  /** The entering leg; pass it as contributionTransactionId. */
+  transactionId: string;
+  accountId: string;
+  accountName: string;
+  /** @nullable */
+  vaultId?: string | null;
+  /** @nullable */
+  vaultName?: string | null;
+  amountCents: number;
+  date: string;
+  description: string;
+}
+
+export type PositionRequestType = typeof PositionRequestType[keyof typeof PositionRequestType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PositionRequestType = {
+  CDB: 'CDB',
+  LC: 'LC',
+  LCI: 'LCI',
+  LCA: 'LCA',
+  TESOURO_SELIC: 'TESOURO_SELIC',
+  TESOURO_PREFIXADO: 'TESOURO_PREFIXADO',
+  TESOURO_IPCA: 'TESOURO_IPCA',
+} as const;
+
+/**
+ * IPCA_PLUS is not accepted yet.
+ */
+export type PositionRequestIndexer = typeof PositionRequestIndexer[keyof typeof PositionRequestIndexer];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PositionRequestIndexer = {
+  PREFIXED: 'PREFIXED',
+  CDI_PERCENT: 'CDI_PERCENT',
+  SELIC_PERCENT: 'SELIC_PERCENT',
+  IPCA_PLUS: 'IPCA_PLUS',
+} as const;
+
+export interface PositionRequest {
+  /** Origin 1: the purchase transfer leg. */
+  contributionTransactionId?: string;
+  /** Origin 2 (a title bought before the app): the investment or savings account. */
+  accountId?: string;
+  /**
+   * Origin 2: the amount applied.
+   * @minimum 1
+   */
+  principalCents?: number;
+  /** Origin 2: when it was bought; not in the future. */
+  purchaseDate?: string;
+  /** Where the yield goes on payment; optional. */
+  vaultId?: string;
+  /** @maxLength 80 */
+  name?: string;
+  type: PositionRequestType;
+  /** IPCA_PLUS is not accepted yet. */
+  indexer: PositionRequestIndexer;
+  /**
+   * % a.a. for PREFIXED; % of the CDI or Selic for the other indexers (110 = 110%).
+   * @minimum 0
+   * @maximum 1000
+   */
+  rate: number;
+  /** After the purchase date. */
+  maturityDate: string;
+}
+
+export type PositionUpdateRequestType = typeof PositionUpdateRequestType[keyof typeof PositionUpdateRequestType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PositionUpdateRequestType = {
+  CDB: 'CDB',
+  LC: 'LC',
+  LCI: 'LCI',
+  LCA: 'LCA',
+  TESOURO_SELIC: 'TESOURO_SELIC',
+  TESOURO_PREFIXADO: 'TESOURO_PREFIXADO',
+  TESOURO_IPCA: 'TESOURO_IPCA',
+} as const;
+
+export type PositionUpdateRequestIndexer = typeof PositionUpdateRequestIndexer[keyof typeof PositionUpdateRequestIndexer];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PositionUpdateRequestIndexer = {
+  PREFIXED: 'PREFIXED',
+  CDI_PERCENT: 'CDI_PERCENT',
+  SELIC_PERCENT: 'SELIC_PERCENT',
+  IPCA_PLUS: 'IPCA_PLUS',
+} as const;
+
+export interface PositionUpdateRequest {
+  /**
+   * Only for a position bought before the app.
+   * @minimum 1
+   */
+  principalCents?: number;
+  /** Only for a position bought before the app. */
+  purchaseDate?: string;
+  /** Omitted clears it. */
+  vaultId?: string;
+  /** @maxLength 80 */
+  name?: string;
+  type: PositionUpdateRequestType;
+  indexer: PositionUpdateRequestIndexer;
+  /**
+   * @minimum 0
+   * @maximum 1000
+   */
+  rate: number;
+  maturityDate: string;
+}
+
+/**
+ * CONTRIBUTION when born from a purchase transfer, MANUAL for a title bought before the app.
+ */
+export type PositionOrigin = typeof PositionOrigin[keyof typeof PositionOrigin];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PositionOrigin = {
+  CONTRIBUTION: 'CONTRIBUTION',
+  MANUAL: 'MANUAL',
+} as const;
+
+export type PositionType = typeof PositionType[keyof typeof PositionType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PositionType = {
+  CDB: 'CDB',
+  LC: 'LC',
+  LCI: 'LCI',
+  LCA: 'LCA',
+  TESOURO_SELIC: 'TESOURO_SELIC',
+  TESOURO_PREFIXADO: 'TESOURO_PREFIXADO',
+  TESOURO_IPCA: 'TESOURO_IPCA',
+} as const;
+
+export type PositionIndexer = typeof PositionIndexer[keyof typeof PositionIndexer];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PositionIndexer = {
+  PREFIXED: 'PREFIXED',
+  CDI_PERCENT: 'CDI_PERCENT',
+  SELIC_PERCENT: 'SELIC_PERCENT',
+  IPCA_PLUS: 'IPCA_PLUS',
+} as const;
+
+export type PositionStatus = typeof PositionStatus[keyof typeof PositionStatus];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const PositionStatus = {
+  ACTIVE: 'ACTIVE',
+  SETTLED: 'SETTLED',
+} as const;
+
+/**
+ * Present once the title was paid.
+ * @nullable
+ */
+export type PositionSettlement = {
+  settledDate: string;
+  receivedCents: number;
+  /**
+   * What the app estimated on that day.
+   * @nullable
+   */
+  estimatedNetCents?: number | null;
+  /** @nullable */
+  yieldCents?: number | null;
+  /** @nullable */
+  returnTransferTransactionId?: string | null;
+} | null;
+
+/**
+ * Absent for a settled position, and when it cannot be computed (a post-fixed title with no stored index and no current rate). Not money in the account: only information.
+
+ * @nullable
+ */
+export type PositionEstimate = {
+  today: PositionValuation;
+  atMaturity: PositionValuation;
+} | null;
+
+export interface Position {
+  id: string;
+  /** CONTRIBUTION when born from a purchase transfer, MANUAL for a title bought before the app. */
+  origin: PositionOrigin;
+  /** @nullable */
+  contributionTransactionId?: string | null;
+  accountId: string;
+  accountName: string;
+  /** @nullable */
+  vaultId?: string | null;
+  /** @nullable */
+  vaultName?: string | null;
+  /** @nullable */
+  name?: string | null;
+  type: PositionType;
+  indexer: PositionIndexer;
+  rate: number;
+  principalCents: number;
+  purchaseDate: string;
+  maturityDate: string;
+  status: PositionStatus;
+  /** Active and past its maturity — due, with the credit not booked yet. Derived, never stored. */
+  awaitingPayment: boolean;
+  /**
+   * Present once the title was paid.
+   * @nullable
+   */
+  settlement?: PositionSettlement;
+  /**
+   * Absent for a settled position, and when it cannot be computed (a post-fixed title with no stored index and no current rate). Not money in the account: only information.
+
+   * @nullable
+   */
+  estimate?: PositionEstimate;
+}
+
+/**
+ * What the title is worth on asOf if redeemed that day, net of IOF, income tax and custody.
+ */
+export interface PositionValuation {
+  /** Capped at the maturity. */
+  asOf: string;
+  grossCents: number;
+  grossYieldCents: number;
+  iofCents: number;
+  incomeTaxCents: number;
+  custodyCents: number;
+  netCents: number;
+  netYieldCents: number;
+  /**
+   * Latest daily CDI/Selic actually used for the days already lived; earlier than yesterday when the Banco Central is behind. Absent for a fixed rate.
+
+   * @nullable
+   */
+  lastIndexDate?: string | null;
+}
+
+export interface PositionSettleRequest {
+  /** The day the credit fell; not before the purchase, not in the future. */
+  settledDate: string;
+  /**
+   * The net amount received: principal plus the yield, already net of income tax and IOF. Not below the principal.
+   * @minimum 1
+   */
+  receivedCents: number;
+  /** The outgoing leg of the transfer back, when already registered. Optional. */
+  returnTransferTransactionId?: string;
+}
+
+export interface PositionReturnTransferRequest {
+  /**
+   * A null value unlinks.
+   * @nullable
+   */
+  returnTransferTransactionId?: string | null;
+}
+
+/**
+ * CDI and SELIC are % a.a.; IPCA is the % accumulated over 12 months, offered only as a suggestion for the IPCA projection the user informs.
+
+ */
+export type MarketRateCode = typeof MarketRateCode[keyof typeof MarketRateCode];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const MarketRateCode = {
+  CDI: 'CDI',
+  SELIC: 'SELIC',
+  IPCA: 'IPCA',
+} as const;
+
+export interface MarketRate {
+  /** CDI and SELIC are % a.a.; IPCA is the % accumulated over 12 months, offered only as a suggestion for the IPCA projection the user informs.
+ */
+  code: MarketRateCode;
+  /** Percent, e.g. 13.65 means 13,65%. */
+  ratePercent: number;
+  /** The date the Banco Central dates the value. */
+  referenceDate: string;
+  /** When this app last confirmed the value. */
+  fetchedAt: string;
+}
+
 export interface Tag {
   id: string;
   name: string;
@@ -1509,6 +1989,19 @@ page?: number;
  */
 size?: number;
 };
+
+export type ListPositionsParams = {
+status?: ListPositionsStatus;
+};
+
+export type ListPositionsStatus = typeof ListPositionsStatus[keyof typeof ListPositionsStatus];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ListPositionsStatus = {
+  ACTIVE: 'ACTIVE',
+  SETTLED: 'SETTLED',
+} as const;
 
 export type ListCardsParams = {
 includeArchived?: boolean;

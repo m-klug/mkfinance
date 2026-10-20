@@ -2,6 +2,7 @@ package br.com.mkfinance.application.vault;
 
 import br.com.mkfinance.application.transaction.TransactionInput;
 import br.com.mkfinance.application.transaction.TransactionService;
+import br.com.mkfinance.domain.exception.AppException;
 import br.com.mkfinance.domain.model.Account;
 import br.com.mkfinance.domain.model.Transaction;
 import br.com.mkfinance.domain.model.TransactionType;
@@ -61,8 +62,46 @@ public class VaultYieldService {
      */
     public VaultYieldResult create(UUID workspaceId, UUID accountId, VaultYieldInput input) {
         Account account = vaultService.ownedAccount(workspaceId, accountId);
-        UUID categoryId = categoryProvider.categoryIdFor(workspaceId);
+        Transaction transaction = book(workspaceId, account, input);
 
+        List<Share> shares = YieldDistributor.distribute(input.amountCents(), basesOf(workspaceId, account.getId()));
+        List<VaultEntry> entries = shares.stream().map(share -> entry(workspaceId, transaction.getId(), share)).toList();
+        // A yield share is always positive — it can never overdraw a vault, so unlike every other
+        // vault_entry writer here there is no assertNotOverdrawn call: §4.3's guard only ever fires
+        // on money leaving.
+        vaultEntryRepository.saveAll(entries);
+
+        return new VaultYieldResult(transaction.getId(), input.amountCents(), input.date(), shares);
+    }
+
+    /**
+     * Books a yield that belongs to one vault, or to none: the whole amount goes to {@code vaultId}
+     * (no split by balance, unlike {@link #create}), and a null {@code vaultId} leaves it in the
+     * account's unallocated slice even when the account has vaults. It is what a paid fixed-income
+     * position uses, since the yield of that title is not shared with the account's other vaults.
+     *
+     * @param vaultId a non-archived vault of {@code accountId}, or null
+     * @throws br.com.mkfinance.domain.exception.AppException VAULT_NOT_FOUND when {@code vaultId} is
+     *     not a vault of that account
+     */
+    public VaultYieldResult createForVault(UUID workspaceId, UUID accountId, VaultYieldInput input, UUID vaultId) {
+        Account account = vaultService.ownedAccount(workspaceId, accountId);
+        if (vaultId == null) {
+            Transaction transaction = book(workspaceId, account, input);
+            return new VaultYieldResult(transaction.getId(), input.amountCents(), input.date(), List.of());
+        }
+        Vault vault = vaultRepository.findByIdAndWorkspaceId(vaultId, workspaceId)
+                .filter(candidate -> candidate.getAccountId().equals(account.getId()) && !candidate.isArchived())
+                .orElseThrow(AppException::vaultNotFound);
+        Transaction transaction = book(workspaceId, account, input);
+        Share share = new Share(vault.getId(), input.amountCents());
+        vaultEntryRepository.save(entry(workspaceId, transaction.getId(), share));
+        return new VaultYieldResult(transaction.getId(), input.amountCents(), input.date(), List.of(share));
+    }
+
+    /** The INCOME transaction every yield is, flushed so a {@code vault_entry} can reference it. */
+    private Transaction book(UUID workspaceId, Account account, VaultYieldInput input) {
+        UUID categoryId = categoryProvider.categoryIdFor(workspaceId);
         Transaction transaction = transactionService.create(
                 workspaceId,
                 new TransactionInput(
@@ -80,15 +119,7 @@ public class VaultYieldService {
         // TransferService follows (armadilha 5, DESENVOLVIMENTO-CAIXINHAS.md §7), one call flatter
         // since TransactionService#create already issued the save.
         transactionRepository.flush();
-
-        List<Share> shares = YieldDistributor.distribute(input.amountCents(), basesOf(workspaceId, account.getId()));
-        List<VaultEntry> entries = shares.stream().map(share -> entry(workspaceId, transaction.getId(), share)).toList();
-        // A yield share is always positive — it can never overdraw a vault, so unlike every other
-        // vault_entry writer here there is no assertNotOverdrawn call: §4.3's guard only ever fires
-        // on money leaving.
-        vaultEntryRepository.saveAll(entries);
-
-        return new VaultYieldResult(transaction.getId(), input.amountCents(), input.date(), shares);
+        return transaction;
     }
 
     /** Every active vault of the account, based on its settled ("current") balance (§4.5's base_i). */

@@ -1,6 +1,7 @@
 package br.com.mkfinance.application.transaction;
 
 import br.com.mkfinance.application.recurrence.RecurrenceOccurrenceMaterializer;
+import br.com.mkfinance.application.investment.FixedIncomePositionGuard;
 import br.com.mkfinance.application.reimbursement.ReimbursementService;
 import br.com.mkfinance.application.tag.TagService;
 import br.com.mkfinance.domain.exception.AppException;
@@ -65,6 +66,7 @@ public class TransactionService {
     private final TagService tagService;
     private final RecurrenceOccurrenceMaterializer recurrenceMaterializer;
     private final ReimbursementService reimbursementService;
+    private final FixedIncomePositionGuard positionGuard;
 
     /**
      * The extrato listing: optional filters, newest first, paginated (contract: TransactionPage).
@@ -186,6 +188,7 @@ public class TransactionService {
         Category category = requireMatchingCategory(workspaceId, input.categoryId(), type);
         Long reimbursable = resolveReimbursable(transaction, type, input);
         guardLinkedEdit(transaction, type, input, reimbursable);
+        guardPositionYield(transaction, type, input);
 
         transaction.setAccountId(account.getId());
         transaction.setCategoryId(category.getId());
@@ -208,6 +211,27 @@ public class TransactionService {
     }
 
     /**
+     * The yield a paid fixed-income position booked was copied into the position (its amount is the
+     * real yield), so its amount, date, account, category, type and status may not change while the
+     * position references it (TRANSACTION_HAS_POSITION). The way out is to undo the position's
+     * settlement, which removes this row. Description and note stay editable.
+     */
+    private void guardPositionYield(Transaction transaction, TransactionType type, TransactionInput input) {
+        if (!positionGuard.isReferenced(transaction.getId())) {
+            return;
+        }
+        boolean changes = input.amountCents() != transaction.getAmountCents()
+                || !input.date().equals(transaction.getDate())
+                || !input.accountId().equals(transaction.getAccountId())
+                || !input.categoryId().equals(transaction.getCategoryId())
+                || type != transaction.getType()
+                || (input.status() != null && input.status() != transaction.getStatus());
+        if (changes) {
+            throw AppException.transactionHasPosition();
+        }
+    }
+
+    /**
      * Deleting one leg of a transfer deletes its pair too (contract), never leaving a half-transfer.
      *
      * <p>A statement payment's debit is refused instead: the row is still referenced by
@@ -226,6 +250,7 @@ public class TransactionService {
             transferService.delete(transaction);
             return;
         }
+        positionGuard.assertNotReferenced(transaction.getId());
         long linked = reimbursementService.linkedTotal(transaction.getId());
         if (linked > 0) {
             throw AppException.transactionHasReimbursements(linked);

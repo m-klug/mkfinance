@@ -299,4 +299,63 @@ public class AppException extends RuntimeException {
     public static AppException transactionHasReimbursements(long linkedCents) {
         return of(ErrorCode.TRANSACTION_HAS_REIMBURSEMENTS, HttpStatus.CONFLICT, Map.of("linkedCents", linkedCents));
     }
+
+    public static AppException positionNotFound() {
+        return of(ErrorCode.POSITION_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    /** Neither or both origins were given, or the manual ones are incomplete. */
+    public static AppException positionOriginInvalid() {
+        return of(ErrorCode.POSITION_ORIGIN_INVALID, HttpStatus.BAD_REQUEST);
+    }
+
+    /** Not the IN leg of a settled transfer into an investment/savings account of this workspace. */
+    public static AppException positionContributionInvalid() {
+        return of(ErrorCode.POSITION_CONTRIBUTION_INVALID, HttpStatus.BAD_REQUEST);
+    }
+
+    public static AppException positionAlreadyExists() {
+        return of(ErrorCode.POSITION_ALREADY_EXISTS, HttpStatus.CONFLICT);
+    }
+
+    public static AppException positionAccountInvalid() {
+        return of(ErrorCode.POSITION_ACCOUNT_INVALID, HttpStatus.BAD_REQUEST);
+    }
+
+    public static AppException positionVaultInvalid() {
+        return of(ErrorCode.POSITION_VAULT_INVALID, HttpStatus.BAD_REQUEST);
+    }
+
+    public static AppException positionIndexerNotAvailable(String type, String indexer) {
+        return of(ErrorCode.POSITION_INDEXER_NOT_AVAILABLE, HttpStatus.BAD_REQUEST,
+                Map.of("type", type, "indexer", indexer));
+    }
+
+    public static AppException positionDatesInvalid() {
+        return of(ErrorCode.POSITION_DATES_INVALID, HttpStatus.BAD_REQUEST);
+    }
+
+    public static AppException positionSettled() {
+        return of(ErrorCode.POSITION_SETTLED, HttpStatus.CONFLICT);
+    }
+
+    /** The transaction is the purchase, the booked yield or the return transfer of a position. */
+    public static AppException transactionHasPosition() {
+        return of(ErrorCode.TRANSACTION_HAS_POSITION, HttpStatus.CONFLICT);
+    }
+
+    public static AppException positionNotSettled() {
+        return of(ErrorCode.POSITION_NOT_SETTLED, HttpStatus.CONFLICT);
+    }
+
+    /** @param principalCents what was applied, so the client can say what the amount may not go below */
+    public static AppException positionReceivedBelowPrincipal(long principalCents) {
+        return of(ErrorCode.POSITION_RECEIVED_BELOW_PRINCIPAL, HttpStatus.BAD_REQUEST,
+                Map.of("principalCents", principalCents));
+    }
+
+    /** Not an outgoing leg of a transfer out of the position's account, or already claimed by another position. */
+    public static AppException positionReturnTransferInvalid() {
+        return of(ErrorCode.POSITION_RETURN_TRANSFER_INVALID, HttpStatus.BAD_REQUEST);
+    }
 }

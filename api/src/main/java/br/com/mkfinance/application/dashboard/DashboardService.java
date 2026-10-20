@@ -63,6 +63,17 @@ public class DashboardService {
         return month != null ? month : YearMonth.from(clock.today());
     }
 
+    /**
+     * What is still owed on the workspace's card statements: the unpaid part of every bill that is not
+     * fully paid, the same bills {@link #summary} lists as open. Informational for the net-worth view,
+     * where it is shown next to the total and never subtracted from it.
+     */
+    public long openStatementsRemainingCents(UUID workspaceId) {
+        return openStatements(workspaceId).stream()
+                .mapToLong(view -> view.totalCents() - view.paidCents())
+                .sum();
+    }
+
     /** The pillar allocation report for a month (R2, R9, R10). */
     public PillarAllocationCalculator.Report pillarAllocation(UUID workspaceId, YearMonth month) {
         LocalDate from = month.atDay(1);

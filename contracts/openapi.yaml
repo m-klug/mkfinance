@@ -26,6 +26,9 @@ tags:
   - name: reimbursements
   - name: vaults
   - name: export
+  - name: marketRates
+  - name: fixedIncome
+  - name: investments
 
 paths:
   /auth/register:
@@ -82,6 +85,68 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CurrentUser' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /market-rates:
+    get:
+      tags: [marketRates]
+      operationId: listMarketRates
+      description: >
+        Current CDI, Selic and IPCA from the Banco Central (SGS), the values the fixed-income
+        simulator pre-fills. Public market data, so not tied to a workspace. Served from the database;
+        a value older than a few hours is refreshed first, and if the Banco Central cannot be reached
+        the last stored value is returned as is (see fetchedAt). A rate never stored and not
+        reachable is left out of the list.
+      responses:
+        '200':
+          description: One entry per available rate, in the order CDI, SELIC, IPCA.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MarketRate' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /fixed-income/simulations:
+    post:
+      tags: [fixedIncome]
+      operationId: simulateFixedIncome
+      description: >
+        Projects one fixed-income investment to its redemption, or two to compare. Persists nothing and
+        is not tied to a workspace. The initial amount is applied on startDate and the monthly
+        contribution on the same day of each following month up to the month before the end; the
+        redemption is `months` months after the start. Each contribution accrues over business days
+        (252 a year) and is taxed by its own age (income tax regressive 22.5/20/17.5/15%; IOF below
+        30 days; LCI and LCA exempt; B3 custody on Tesouro). CDI, Selic and the IPCA projection are held
+        constant over the term; any left out is filled from GET /market-rates and echoed in
+        `assumptions`. With two simulations the winner is the one with the higher net annual equivalent.
+        Instruments and indexers — CDB, LC, LCI, LCA: PREFIXED, CDI_PERCENT, IPCA_PLUS;
+        TESOURO_SELIC: SELIC_PERCENT; TESOURO_PREFIXADO: PREFIXED; TESOURO_IPCA: IPCA_PLUS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FixedIncomeSimulationRequest' }
+      responses:
+        '200':
+          description: One result per simulation, in request order; comparison only when there are two.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FixedIncomeSimulationResponse' }
+        '400':
+          description: >
+            VALIDATION_ERROR, or SIMULATION_INDEXER_NOT_AVAILABLE / SIMULATION_NOTHING_APPLIED with
+            params.index naming the offending simulation (0 or 1).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503':
+          description: >
+            MARKET_RATE_UNAVAILABLE (params.rate): an assumption was left out, nothing is stored and the
+            Banco Central cannot be reached.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /workspaces:
     get:
@@ -498,6 +563,278 @@ paths:
       responses:
         '204': { description: Unlinked. }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /workspaces/{workspaceId}/investments/summary:
+    get:
+      tags: [investments]
+      operationId: getInvestmentSummary
+      description: >
+        Net worth as of today. The balance of an account only gains a title's yield when the title is
+        paid, so it understates what is owned in the meantime; estimatedNetWorthCents adds the net
+        yield the active positions have accrued. Investment and savings accounts are grouped as
+        investments, every other non-archived account as accountsAndCash. Card bills still owed are
+        reported beside the total and never subtracted. A paid position is not counted again (its yield
+        is already in its account's balance).
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      responses:
+        '200':
+          description: The summary.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvestmentSummary' }
+
+  /workspaces/{workspaceId}/investments/unlinked-contributions:
+    get:
+      tags: [investments]
+      operationId: listUnlinkedContributions
+      description: >
+        Purchases a position can still be born from: settled transfers into an investment or savings
+        account that no position claims yet, newest first. Only the entering leg is listed.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      responses:
+        '200':
+          description: Purchases without a position.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UnlinkedContribution' }
+
+  /workspaces/{workspaceId}/investments/positions:
+    get:
+      tags: [investments]
+      operationId: listPositions
+      description: >
+        Fixed-income positions, soonest maturity first. Each active one carries what the app estimates
+        for it today and at its maturity.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [ACTIVE, SETTLED] }
+      responses:
+        '200':
+          description: Positions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Position' }
+    post:
+      tags: [investments]
+      operationId: createPosition
+      description: >
+        Creates a position with exactly one origin: contributionTransactionId (the entering leg of the
+        purchase transfer, which supplies account, amount, date and vault), or accountId +
+        principalCents + purchaseDate (a title bought before the app; it creates no transfer and
+        changes no balance). Never moves money.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PositionRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '400':
+          description: >
+            VALIDATION_ERROR, POSITION_ORIGIN_INVALID, POSITION_CONTRIBUTION_INVALID,
+            POSITION_ACCOUNT_INVALID, POSITION_VAULT_INVALID, POSITION_INDEXER_NOT_AVAILABLE or
+            POSITION_DATES_INVALID.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: POSITION_ALREADY_EXISTS — the purchase already originated a position.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /workspaces/{workspaceId}/investments/positions/{positionId}:
+    parameters:
+      - { $ref: '#/components/parameters/workspaceId' }
+      - { name: positionId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [investments]
+      operationId: getPosition
+      responses:
+        '200':
+          description: The position.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '404':
+          description: POSITION_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    put:
+      tags: [investments]
+      operationId: updatePosition
+      description: >
+        Replaces the editable facts of an ACTIVE position, so an omitted vaultId clears it. A position
+        born from a purchase transfer takes principal and purchase date from it and ignores
+        principalCents/purchaseDate here.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PositionUpdateRequest' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '400':
+          description: VALIDATION_ERROR, POSITION_VAULT_INVALID, POSITION_INDEXER_NOT_AVAILABLE or POSITION_DATES_INVALID.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: POSITION_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: POSITION_SETTLED — a settled position is not edited.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+    delete:
+      tags: [investments]
+      operationId: deletePosition
+      description: Removes the registration only; the purchase transfer is untouched. Not for a settled position.
+      responses:
+        '204': { description: Deleted. }
+        '404':
+          description: POSITION_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: POSITION_SETTLED.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /workspaces/{workspaceId}/investments/positions/{positionId}/settle:
+    post:
+      tags: [investments]
+      operationId: settlePosition
+      description: >
+        Books the payment of a title. The real yield (receivedCents minus the principal) is booked as
+        income on the position's account, entirely in the position's vault, or left in the account's
+        unallocated slice when the position has no vault (even if the account has other vaults). The
+        position remembers what was received next to what the app had estimated for that day. Records
+        NO transfer: the credit that fell in checking keeps coming from the bank statement import or a
+        manual entry, and can be linked with returnTransferTransactionId or later through
+        PUT .../return-transfer. Book the yield before the transfer back: that transfer takes
+        principal and yield out of the vault, which only holds them once the yield is booked.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { name: positionId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PositionSettleRequest' }
+      responses:
+        '200':
+          description: The settled position.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '400':
+          description: >
+            VALIDATION_ERROR, POSITION_DATES_INVALID (before the purchase or in the future),
+            POSITION_RECEIVED_BELOW_PRINCIPAL (params.principalCents), POSITION_RETURN_TRANSFER_INVALID
+            or POSITION_VAULT_INVALID (the position's vault was archived; edit the position first).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: POSITION_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: POSITION_SETTLED — already paid.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /workspaces/{workspaceId}/investments/positions/{positionId}/unsettle:
+    post:
+      tags: [investments]
+      operationId: unsettlePosition
+      description: >
+        Undoes a payment: deletes the booked yield (and its split with it), forgets what was received
+        and the link to the transfer back, and returns the position to ACTIVE. This is how a wrong
+        amount is fixed: undo, then settle again. While a position holds its yield, that income cannot be
+        deleted or have its amount, date, account or category changed (TRANSACTION_HAS_POSITION).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { name: positionId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The position, active again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '404':
+          description: POSITION_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: POSITION_NOT_SETTLED.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /workspaces/{workspaceId}/investments/positions/{positionId}/return-transfer:
+    put:
+      tags: [investments]
+      operationId: linkPositionReturnTransfer
+      description: >
+        Links, or with a null id unlinks, the transfer that brought the paid money back to checking.
+        Informational: changes no balance. Only the outgoing leg of a transfer out of the position's own
+        account that no other position claims is accepted, and a linked transfer cannot be deleted.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { name: positionId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PositionReturnTransferRequest' }
+      responses:
+        '200':
+          description: The position.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Position' }
+        '400':
+          description: POSITION_RETURN_TRANSFER_INVALID.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          description: POSITION_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: POSITION_NOT_SETTLED — only a paid position takes a link.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /workspaces/{workspaceId}/transfers:
     post:
@@ -1464,6 +1801,13 @@ components:
             vaults — VAULT_NOT_FOUND, VAULT_REQUIRED, VAULT_PILLAR_CONFLICT, VAULT_ACCOUNT_MISMATCH,
             VAULT_INSUFFICIENT_BALANCE, VAULT_NAME_DUPLICATE, VAULT_NOT_EMPTY, VAULT_HAS_ENTRIES,
             VAULT_ARCHIVED, VAULT_REALLOCATION_NOT_FOUND;
+            fixed-income simulator — SIMULATION_INDEXER_NOT_AVAILABLE, SIMULATION_NOTHING_APPLIED,
+            MARKET_RATE_UNAVAILABLE;
+            fixed-income positions — POSITION_NOT_FOUND, POSITION_ORIGIN_INVALID,
+            POSITION_CONTRIBUTION_INVALID, POSITION_ALREADY_EXISTS, POSITION_ACCOUNT_INVALID,
+            POSITION_VAULT_INVALID, POSITION_INDEXER_NOT_AVAILABLE, POSITION_DATES_INVALID, POSITION_SETTLED,
+            POSITION_NOT_SETTLED, POSITION_RECEIVED_BELOW_PRINCIPAL, POSITION_RETURN_TRANSFER_INVALID,
+            TRANSACTION_HAS_POSITION;
             generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
         params:
           type: object
@@ -2324,6 +2668,290 @@ components:
           format: uuid
           nullable: true
           description: Set when this pending transaction came from a recurrence.
+
+    FixedIncomeSimulationRequest:
+      type: object
+      required: [simulations]
+      properties:
+        simulations:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items: { $ref: '#/components/schemas/FixedIncomeSimulationItem' }
+
+    FixedIncomeSimulationItem:
+      type: object
+      required: [type, indexer, rate, months]
+      properties:
+        type: { type: string, enum: [CDB, LC, LCI, LCA, TESOURO_SELIC, TESOURO_PREFIXADO, TESOURO_IPCA] }
+        indexer: { type: string, enum: [PREFIXED, CDI_PERCENT, SELIC_PERCENT, IPCA_PLUS] }
+        rate:
+          type: number
+          minimum: 0
+          maximum: 1000
+          description: '% a.a. for PREFIXED and IPCA_PLUS; % of the CDI or Selic for the other two (110 = 110%).'
+        initialCents: { type: integer, format: int64, minimum: 0, description: Omitted means none. }
+        monthlyContributionCents: { type: integer, format: int64, minimum: 0, description: Omitted means none. }
+        months: { type: integer, minimum: 1, maximum: 600 }
+        startDate: { type: string, format: date, description: Omitted means today. }
+        cdiAnnualPercent: { type: number, description: 'Premise, % a.a.; omitted is filled from the market.' }
+        selicAnnualPercent: { type: number, description: 'Premise, % a.a.; omitted is filled from the market.' }
+        ipcaAnnualPercent: { type: number, description: 'Projected IPCA, % a.a.; omitted is filled with the 12-month IPCA.' }
+
+    FixedIncomeSimulationResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/FixedIncomeResult' }
+        comparison: { $ref: '#/components/schemas/FixedIncomeComparison' }
+
+    FixedIncomeResult:
+      type: object
+      required: [type, indexer, rate, startDate, endDate, months, assumptions, investedCents, grossCents,
+                 grossYieldCents, iofCents, incomeTaxCents, custodyCents, netCents, netYieldCents,
+                 netReturnPercent, netAnnualEquivalentPercent, series]
+      properties:
+        type: { type: string }
+        indexer: { type: string }
+        rate: { type: number }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        months: { type: integer }
+        assumptions:
+          type: object
+          description: The premises the projection ran with; only those the indexer uses are present.
+          properties:
+            cdiAnnualPercent: { type: number }
+            selicAnnualPercent: { type: number }
+            ipcaAnnualPercent: { type: number }
+        investedCents: { type: integer, format: int64 }
+        grossCents: { type: integer, format: int64 }
+        grossYieldCents: { type: integer, format: int64 }
+        iofCents: { type: integer, format: int64 }
+        incomeTaxCents: { type: integer, format: int64 }
+        custodyCents: { type: integer, format: int64 }
+        netCents: { type: integer, format: int64 }
+        netYieldCents: { type: integer, format: int64 }
+        netReturnPercent: { type: number, description: Net yield over the amount invested, in percent. }
+        netAnnualEquivalentPercent:
+          type: number
+          description: The rate a.a. that makes each contribution reach the net amount; the figure to compare by.
+        series:
+          type: array
+          description: One point per month from the start to the redemption, each as if redeemed that day.
+          items:
+            type: object
+            required: [month, date, investedCents, grossCents, netCents]
+            properties:
+              month: { type: integer }
+              date: { type: string, format: date }
+              investedCents: { type: integer, format: int64 }
+              grossCents: { type: integer, format: int64 }
+              netCents: { type: integer, format: int64 }
+
+    FixedIncomeComparison:
+      type: object
+      required: [netDifferenceCents, netAnnualEquivalentDifferencePercent]
+      properties:
+        betterIndex:
+          type: integer
+          enum: [0, 1]
+          description: Position in the request of the simulation that yields more net; absent on a tie.
+        netDifferenceCents: { type: integer, format: int64 }
+        netAnnualEquivalentDifferencePercent: { type: number, description: In percentage points. }
+
+    InvestmentSummary:
+      type: object
+      required: [accountsAndCashCents, investmentsCents, estimatedNetWorthCents, openStatementsCents,
+                 assetClasses, accounts, unregisteredInvestmentCents, positionsExceedBalance]
+      properties:
+        accountsAndCashCents: { type: integer, format: int64, description: Balance of the non-archived accounts that are not investment or savings. }
+        investmentsCents:
+          type: integer
+          format: int64
+          description: Balance of the investment and savings accounts plus the accrued net yield of the active positions.
+        estimatedNetWorthCents: { type: integer, format: int64, description: accountsAndCashCents + investmentsCents. }
+        openStatementsCents: { type: integer, format: int64, description: Still owed on card bills; informational, never subtracted. }
+        assetClasses:
+          type: array
+          description: One entry per class of asset; today only FIXED_INCOME, so variable income can be added without a redesign.
+          items:
+            type: object
+            required: [code, appliedCents, estimatedValueCents, accruedYieldCents, positions, positionsWithoutEstimate]
+            properties:
+              code: { type: string, enum: [FIXED_INCOME] }
+              appliedCents: { type: integer, format: int64, description: Principal of the active positions. }
+              estimatedValueCents: { type: integer, format: int64, description: What they are worth today, net; a position the app cannot value counts at its principal. }
+              accruedYieldCents: { type: integer, format: int64 }
+              positions: { type: integer }
+              positionsWithoutEstimate: { type: integer }
+        accounts:
+          type: array
+          description: The investment and savings accounts, each with how much of its balance positions explain.
+          items:
+            type: object
+            required: [accountId, name, balanceCents, positionsPrincipalCents, accruedYieldCents, unregisteredCents, positionsExceedBalance]
+            properties:
+              accountId: { type: string, format: uuid }
+              name: { type: string }
+              balanceCents: { type: integer, format: int64 }
+              positionsPrincipalCents: { type: integer, format: int64 }
+              accruedYieldCents: { type: integer, format: int64 }
+              unregisteredCents: { type: integer, format: int64, description: Balance minus the principal of the positions, never below zero. }
+              positionsExceedBalance:
+                type: boolean
+                description: >
+                  The positions claim more than the account holds — usually a title bought before the app
+                  whose amount was never added to the account's initial balance.
+        unregisteredInvestmentCents: { type: integer, format: int64, description: The part of the investment balances no active position accounts for. }
+        positionsExceedBalance: { type: boolean, description: True when any account has more principal in positions than it holds. }
+
+    UnlinkedContribution:
+      type: object
+      required: [transactionId, accountId, accountName, amountCents, date, description]
+      properties:
+        transactionId: { type: string, format: uuid, description: 'The entering leg; pass it as contributionTransactionId.' }
+        accountId: { type: string, format: uuid }
+        accountName: { type: string }
+        vaultId: { type: string, format: uuid, nullable: true }
+        vaultName: { type: string, nullable: true }
+        amountCents: { type: integer, format: int64 }
+        date: { type: string, format: date }
+        description: { type: string }
+
+    PositionRequest:
+      type: object
+      required: [type, indexer, rate, maturityDate]
+      properties:
+        contributionTransactionId: { type: string, format: uuid, description: 'Origin 1: the purchase transfer leg.' }
+        accountId: { type: string, format: uuid, description: 'Origin 2 (a title bought before the app): the investment or savings account.' }
+        principalCents: { type: integer, format: int64, minimum: 1, description: 'Origin 2: the amount applied.' }
+        purchaseDate: { type: string, format: date, description: 'Origin 2: when it was bought; not in the future.' }
+        vaultId: { type: string, format: uuid, description: 'Where the yield goes on payment; optional.' }
+        name: { type: string, maxLength: 80 }
+        type: { type: string, enum: [CDB, LC, LCI, LCA, TESOURO_SELIC, TESOURO_PREFIXADO, TESOURO_IPCA] }
+        indexer: { type: string, enum: [PREFIXED, CDI_PERCENT, SELIC_PERCENT, IPCA_PLUS], description: 'IPCA_PLUS is not accepted yet.' }
+        rate:
+          type: number
+          minimum: 0
+          maximum: 1000
+          description: '% a.a. for PREFIXED; % of the CDI or Selic for the other indexers (110 = 110%).'
+        maturityDate: { type: string, format: date, description: 'After the purchase date.' }
+
+    PositionUpdateRequest:
+      type: object
+      required: [type, indexer, rate, maturityDate]
+      properties:
+        principalCents: { type: integer, format: int64, minimum: 1, description: 'Only for a position bought before the app.' }
+        purchaseDate: { type: string, format: date, description: 'Only for a position bought before the app.' }
+        vaultId: { type: string, format: uuid, description: 'Omitted clears it.' }
+        name: { type: string, maxLength: 80 }
+        type: { type: string, enum: [CDB, LC, LCI, LCA, TESOURO_SELIC, TESOURO_PREFIXADO, TESOURO_IPCA] }
+        indexer: { type: string, enum: [PREFIXED, CDI_PERCENT, SELIC_PERCENT, IPCA_PLUS] }
+        rate: { type: number, minimum: 0, maximum: 1000 }
+        maturityDate: { type: string, format: date }
+
+    Position:
+      type: object
+      required: [id, origin, accountId, accountName, type, indexer, rate, principalCents, purchaseDate,
+                 maturityDate, status, awaitingPayment]
+      properties:
+        id: { type: string, format: uuid }
+        origin:
+          type: string
+          enum: [CONTRIBUTION, MANUAL]
+          description: CONTRIBUTION when born from a purchase transfer, MANUAL for a title bought before the app.
+        contributionTransactionId: { type: string, format: uuid, nullable: true }
+        accountId: { type: string, format: uuid }
+        accountName: { type: string }
+        vaultId: { type: string, format: uuid, nullable: true }
+        vaultName: { type: string, nullable: true }
+        name: { type: string, nullable: true }
+        type: { type: string, enum: [CDB, LC, LCI, LCA, TESOURO_SELIC, TESOURO_PREFIXADO, TESOURO_IPCA] }
+        indexer: { type: string, enum: [PREFIXED, CDI_PERCENT, SELIC_PERCENT, IPCA_PLUS] }
+        rate: { type: number }
+        principalCents: { type: integer, format: int64 }
+        purchaseDate: { type: string, format: date }
+        maturityDate: { type: string, format: date }
+        status: { type: string, enum: [ACTIVE, SETTLED] }
+        awaitingPayment:
+          type: boolean
+          description: Active and past its maturity — due, with the credit not booked yet. Derived, never stored.
+        settlement:
+          type: object
+          nullable: true
+          description: Present once the title was paid.
+          required: [settledDate, receivedCents]
+          properties:
+            settledDate: { type: string, format: date }
+            receivedCents: { type: integer, format: int64 }
+            estimatedNetCents: { type: integer, format: int64, nullable: true, description: What the app estimated on that day. }
+            yieldCents: { type: integer, format: int64, nullable: true }
+            returnTransferTransactionId: { type: string, format: uuid, nullable: true }
+        estimate:
+          type: object
+          nullable: true
+          description: >
+            Absent for a settled position, and when it cannot be computed (a post-fixed title with no
+            stored index and no current rate). Not money in the account: only information.
+          required: [today, atMaturity]
+          properties:
+            today: { $ref: '#/components/schemas/PositionValuation' }
+            atMaturity: { $ref: '#/components/schemas/PositionValuation' }
+
+    PositionValuation:
+      type: object
+      required: [asOf, grossCents, grossYieldCents, iofCents, incomeTaxCents, custodyCents, netCents, netYieldCents]
+      description: What the title is worth on asOf if redeemed that day, net of IOF, income tax and custody.
+      properties:
+        asOf: { type: string, format: date, description: Capped at the maturity. }
+        grossCents: { type: integer, format: int64 }
+        grossYieldCents: { type: integer, format: int64 }
+        iofCents: { type: integer, format: int64 }
+        incomeTaxCents: { type: integer, format: int64 }
+        custodyCents: { type: integer, format: int64 }
+        netCents: { type: integer, format: int64 }
+        netYieldCents: { type: integer, format: int64 }
+        lastIndexDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            Latest daily CDI/Selic actually used for the days already lived; earlier than yesterday when
+            the Banco Central is behind. Absent for a fixed rate.
+
+    PositionSettleRequest:
+      type: object
+      required: [settledDate, receivedCents]
+      properties:
+        settledDate: { type: string, format: date, description: 'The day the credit fell; not before the purchase, not in the future.' }
+        receivedCents:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 'The net amount received: principal plus the yield, already net of income tax and IOF. Not below the principal.'
+        returnTransferTransactionId: { type: string, format: uuid, description: 'The outgoing leg of the transfer back, when already registered. Optional.' }
+
+    PositionReturnTransferRequest:
+      type: object
+      properties:
+        returnTransferTransactionId: { type: string, format: uuid, nullable: true, description: A null value unlinks. }
+
+    MarketRate:
+      type: object
+      required: [code, ratePercent, referenceDate, fetchedAt]
+      properties:
+        code:
+          type: string
+          enum: [CDI, SELIC, IPCA]
+          description: >
+            CDI and SELIC are % a.a.; IPCA is the % accumulated over 12 months, offered only as a
+            suggestion for the IPCA projection the user informs.
+        ratePercent: { type: number, description: 'Percent, e.g. 13.65 means 13,65%.' }
+        referenceDate: { type: string, format: date, description: 'The date the Banco Central dates the value.' }
+        fetchedAt: { type: string, format: date-time, description: 'When this app last confirmed the value.' }
 
     Tag:
       type: object
