@@ -43,5 +43,16 @@ public record TransactionResponse(
          * Always sent, empty when the transaction has none (CT-1). Transfer legs are always empty —
          * {@code TransferRequest} has no {@code tags} field to set them with (BE-8 scope).
          */
-        List<TagResponse> tags) {
+        List<TagResponse> tags,
+        /** How much of an EXPENSE the user expects back from other people (ADR-0002); null when none. */
+        Long reimbursableCents,
+        /**
+         * Sum of the reimbursement links touching this row (ADR-0002): received so far on an EXPENSE,
+         * applied to expenses on an INCOME; 0 when none.
+         */
+        long reimbursedCents,
+        /** EXPENSE with a reimbursable amount only: still to receive. Null otherwise. */
+        Long pendingReimbursementCents,
+        /** EXPENSE only: {@code amountCents − reimbursedCents}, what it really cost. Null otherwise. */
+        Long effectiveAmountCents) {
 }

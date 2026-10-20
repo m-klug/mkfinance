@@ -5,6 +5,11 @@ spring:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:mkfinance}
     username: ${POSTGRES_USER:mkfinance}
     password: ${POSTGRES_PASSWORD:mkfinance}
+  servlet:
+    multipart:
+      # Statement PDFs are a few hundred KB; leave headroom without opening the door to huge uploads.
+      max-file-size: 10MB
+      max-request-size: 10MB
   jpa:
     open-in-view: false
     hibernate:

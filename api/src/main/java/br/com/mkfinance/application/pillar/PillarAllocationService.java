@@ -1,4 +1,4 @@
-package br.com.mkfinance.application.category;
+package br.com.mkfinance.application.pillar;
 
 import br.com.mkfinance.application.common.BusinessClock;
 import br.com.mkfinance.domain.exception.AppException;

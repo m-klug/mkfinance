@@ -3,11 +3,12 @@ import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronLeft, ChevronRight, Receipt, Undo2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, FileUp, Receipt, Undo2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ListRow } from "@/components/ui/list-row";
 import {
   Table,
   TableBody,
@@ -45,6 +46,7 @@ import {
   isPayable,
   remainingCents,
 } from "@/features/cards/cardOptions";
+import { StatementImportDialog } from "@/features/cards/StatementImportDialog";
 import { StatementPaymentDialog } from "@/features/cards/StatementPaymentDialog";
 
 type BadgeVariant = "neutral" | "success" | "alert";
@@ -65,6 +67,7 @@ export default function CardStatementsPage() {
 
   const [month, setMonth] = useState(CURRENT_MONTH);
   const [payOpen, setPayOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [reversing, setReversing] = useState<string | undefined>();
 
   const enabled = Boolean(workspaceId) && Boolean(cardId);
@@ -165,6 +168,15 @@ export default function CardStatementsPage() {
             })}
           </span>
         </div>
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          className="rounded-field bg-card text-ink-secondary"
+          aria-label={t("statement.import.action")}
+          onClick={() => setImportOpen(true)}
+        >
+          <FileUp className="size-4" />
+        </Button>
       </div>
 
       {/* Mobile month chips. */}
@@ -213,6 +225,10 @@ export default function CardStatementsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <FileUp className="size-4" />
+            {t("statement.import.action")}
+          </Button>
           {card && (
             <span className="hidden text-sm text-ink-secondary sm:inline">
               {t("cards.availableLimit")}:{" "}
@@ -305,29 +321,28 @@ export default function CardStatementsPage() {
                   {(detail?.items ?? []).map((item) => (
                     <li
                       key={item.installmentId}
-                      className="flex items-center gap-2.5 border-b border-divider-row px-2.5 py-2.5 last:border-0"
+                      className="border-b border-divider-row px-2.5 last:border-0"
                     >
-                      <span className="flex size-[36px] shrink-0 items-center justify-center rounded-field bg-field text-ink-secondary">
-                        <Receipt className="size-4" />
-                      </span>
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-[13px] font-bold text-ink-primary">
-                          {item.description}
-                        </span>
-                        <span className="truncate text-[11px] text-ink-tertiary">
-                          {formatDate(item.purchaseDate)}
-                          {item.installmentCount > 1 &&
-                            ` · ${t("statement.installmentOf", {
+                      <ListRow
+                        leading={
+                          <span className="flex size-[36px] items-center justify-center rounded-field bg-field text-ink-secondary">
+                            <Receipt className="size-4" />
+                          </span>
+                        }
+                        title={item.description}
+                        subtitle={[
+                          formatDate(item.purchaseDate),
+                          item.installmentCount > 1 &&
+                            t("statement.installmentOf", {
                               number: item.installmentNumber,
                               count: item.installmentCount,
-                            })}`}
-                          {lookupName(categories, item.categoryId) &&
-                            ` · ${lookupName(categories, item.categoryId)}`}
-                        </span>
-                      </div>
-                      <span className="ml-auto shrink-0 tabular-nums text-[13px] font-extrabold text-ink-primary">
-                        {formatCents(item.amountCents)}
-                      </span>
+                            }),
+                          lookupName(categories, item.categoryId),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        value={formatCents(item.amountCents)}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -449,6 +464,20 @@ export default function CardStatementsPage() {
             />
           )}
         </div>
+      )}
+
+      {workspaceId && (
+        <StatementImportDialog
+          workspaceId={workspaceId}
+          cardId={cardId}
+          categories={categories}
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onImported={(statementMonth) => {
+            setMonth(statementMonth);
+            invalidateAfterWrite();
+          }}
+        />
       )}
 
       <ConfirmDialog

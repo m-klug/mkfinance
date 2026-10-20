@@ -7,6 +7,7 @@ import br.com.mkfinance.application.card.CardInput;
 import br.com.mkfinance.application.card.CardPurchaseInput;
 import br.com.mkfinance.application.card.StatementPaymentInput;
 import br.com.mkfinance.application.card.StatementView;
+import br.com.mkfinance.application.card.statementimport.StatementImportPreview;
 import br.com.mkfinance.domain.model.Card;
 import br.com.mkfinance.domain.model.CardPurchase;
 import br.com.mkfinance.domain.model.Installment;
@@ -45,6 +46,49 @@ public class CardMapper {
                 request.totalAmountCents(),
                 request.purchaseDate(),
                 installments);
+    }
+
+    public List<CardPurchaseInput> toInputs(CardPurchaseBatchRequest request) {
+        YearMonth statementMonth = YearMonth.parse(request.statementMonth());
+        return request.items().stream()
+                .map(item -> new CardPurchaseInput(
+                        item.categoryId(),
+                        item.description(),
+                        item.totalAmountCents(),
+                        item.purchaseDate(),
+                        SINGLE_INSTALLMENT,
+                        statementMonth,
+                        item.externalId(),
+                        item.linkInstallmentId()))
+                .toList();
+    }
+
+    public StatementImportPreviewResponse toResponse(StatementImportPreview preview) {
+        return new StatementImportPreviewResponse(
+                preview.statementMonth().toString(),
+                preview.dueDate(),
+                preview.totalCents(),
+                preview.lines().stream()
+                        .map(l -> new StatementImportPreviewResponse.LineResponse(
+                                l.cardLast4(),
+                                l.date(),
+                                l.description(),
+                                l.amountCents(),
+                                l.kind(),
+                                l.installmentNumber(),
+                                l.installmentCount(),
+                                l.status(),
+                                l.duplicate(),
+                                l.externalId(),
+                                l.candidates().stream()
+                                        .map(c -> new StatementImportPreviewResponse.CandidateResponse(
+                                                c.installmentId(), c.description(), c.purchaseDate()))
+                                        .toList(),
+                                l.suggestedCategoryId()))
+                        .toList(),
+                preview.warnings().stream()
+                        .map(w -> new StatementImportPreviewResponse.WarningResponse(w.code(), w.detail()))
+                        .toList());
     }
 
     public StatementPaymentInput toInput(StatementPaymentRequest request) {

@@ -54,10 +54,10 @@ class StatementPaymentIntegrationTest extends AbstractCardIntegrationTest {
     class CanonicalScenario {
 
         @Test
-        void purchaseOnClosingDaySplitsInThreeAndThePaymentDebitsTheAccount() {
-            // Bought exactly on the closing day: R3 keeps it on the statement still open (July),
-            // not the next one — the boundary case users notice when an app gets it wrong.
-            LocalDate purchaseDate = LocalDate.of(2026, 7, CLOSING_DAY);
+        void purchaseOnLastDayOfAStatementSplitsInThreeAndThePaymentDebitsTheAccount() {
+            // Bought the day before closing: R3 keeps it on the statement still open (July); the
+            // closing day itself already opens the next one.
+            LocalDate purchaseDate = LocalDate.of(2026, 7, CLOSING_DAY - 1);
 
             CardPurchaseResponse purchase = createPurchase(card.id(), "Notebook", 10_000L, purchaseDate, 3);
 

@@ -21,7 +21,8 @@ import type {
 
 import type {
   Card,
-  CardPurchase
+  CardPurchase,
+  StatementImportPreview
 } from '../mKFinanceAPI.schemas';
 
 
@@ -34,6 +35,10 @@ export const getUpdateCardResponseMock = (overrideResponse: Partial< Card > = {}
 export const getArchiveCardResponseMock = (overrideResponse: Partial< Card > = {}): Card => ({id: faker.string.uuid(), name: faker.string.alpha({length: {min: 10, max: 20}}), brand: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), limitCents: faker.number.int({min: undefined, max: undefined}), availableLimitCents: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.number.int({min: undefined, max: undefined}), null]), undefined]), closingDay: faker.number.int({min: 1, max: 28}), dueDay: faker.number.int({min: 1, max: 28}), defaultPaymentAccountId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), color: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), archived: faker.datatype.boolean(), ...overrideResponse})
 
 export const getCreateCardPurchaseResponseMock = (overrideResponse: Partial< CardPurchase > = {}): CardPurchase => ({id: faker.string.uuid(), cardId: faker.string.uuid(), categoryId: faker.string.uuid(), description: faker.string.alpha({length: {min: 10, max: 20}}), totalAmountCents: faker.number.int({min: undefined, max: undefined}), purchaseDate: faker.date.past().toISOString().split('T')[0], installmentCount: faker.number.int({min: undefined, max: undefined}), installments: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({id: faker.string.uuid(), number: faker.number.int({min: undefined, max: undefined}), amountCents: faker.number.int({min: undefined, max: undefined}), statementId: faker.string.uuid(), statementMonth: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined])})), ...overrideResponse})
+
+export const getCreateCardPurchasesBatchResponseMock = (): CardPurchase[] => (Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({id: faker.string.uuid(), cardId: faker.string.uuid(), categoryId: faker.string.uuid(), description: faker.string.alpha({length: {min: 10, max: 20}}), totalAmountCents: faker.number.int({min: undefined, max: undefined}), purchaseDate: faker.date.past().toISOString().split('T')[0], installmentCount: faker.number.int({min: undefined, max: undefined}), installments: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({id: faker.string.uuid(), number: faker.number.int({min: undefined, max: undefined}), amountCents: faker.number.int({min: undefined, max: undefined}), statementId: faker.string.uuid(), statementMonth: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined])}))})))
+
+export const getPreviewStatementImportResponseMock = (overrideResponse: Partial< StatementImportPreview > = {}): StatementImportPreview => ({statementMonth: faker.string.alpha({length: {min: 10, max: 20}}), dueDate: faker.date.past().toISOString().split('T')[0], totalCents: faker.number.int({min: undefined, max: undefined}), lines: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({cardLast4: faker.string.alpha({length: {min: 10, max: 20}}), date: faker.date.past().toISOString().split('T')[0], description: faker.string.alpha({length: {min: 10, max: 20}}), amountCents: faker.number.int({min: undefined, max: undefined}), kind: faker.helpers.arrayElement(['EXPENSE','CREDIT','PAYMENT'] as const), installmentNumber: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.number.int({min: undefined, max: undefined}), null]), undefined]), installmentCount: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.number.int({min: undefined, max: undefined}), null]), undefined]), status: faker.helpers.arrayElement(['NEW','MATCH','AMBIGUOUS','ALREADY_IMPORTED'] as const), duplicate: faker.datatype.boolean(), externalId: faker.string.alpha({length: {min: 10, max: 20}}), candidates: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({installmentId: faker.string.uuid(), description: faker.string.alpha({length: {min: 10, max: 20}}), purchaseDate: faker.date.past().toISOString().split('T')[0]})), suggestedCategoryId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined])})), warnings: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({code: faker.helpers.arrayElement(['TOTAL_MISMATCH','CARD_TOTAL_MISMATCH','DUE_DATE_MISMATCH','PAYMENT_IGNORED'] as const), detail: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined])})), ...overrideResponse})
 
 export const getUpdateCardPurchaseResponseMock = (overrideResponse: Partial< CardPurchase > = {}): CardPurchase => ({id: faker.string.uuid(), cardId: faker.string.uuid(), categoryId: faker.string.uuid(), description: faker.string.alpha({length: {min: 10, max: 20}}), totalAmountCents: faker.number.int({min: undefined, max: undefined}), purchaseDate: faker.date.past().toISOString().split('T')[0], installmentCount: faker.number.int({min: undefined, max: undefined}), installments: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({id: faker.string.uuid(), number: faker.number.int({min: undefined, max: undefined}), amountCents: faker.number.int({min: undefined, max: undefined}), statementId: faker.string.uuid(), statementMonth: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), undefined])})), ...overrideResponse})
 
@@ -98,6 +103,30 @@ export const getCreateCardPurchaseMockHandler = (overrideResponse?: CardPurchase
   }, options)
 }
 
+export const getCreateCardPurchasesBatchMockHandler = (overrideResponse?: CardPurchase[] | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CardPurchase[]> | CardPurchase[]), options?: RequestHandlerOptions) => {
+  return http.post('*/workspaces/:workspaceId/cards/:cardId/purchases/batch', async (info) => {await delay(1000);
+  
+    return new HttpResponse(JSON.stringify(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getCreateCardPurchasesBatchResponseMock()),
+      { status: 201,
+        headers: { 'Content-Type': 'application/json' }
+      })
+  }, options)
+}
+
+export const getPreviewStatementImportMockHandler = (overrideResponse?: StatementImportPreview | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<StatementImportPreview> | StatementImportPreview), options?: RequestHandlerOptions) => {
+  return http.post('*/workspaces/:workspaceId/cards/:cardId/statement-imports/preview', async (info) => {await delay(1000);
+  
+    return new HttpResponse(JSON.stringify(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getPreviewStatementImportResponseMock()),
+      { status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+  }, options)
+}
+
 export const getUpdateCardPurchaseMockHandler = (overrideResponse?: CardPurchase | ((info: Parameters<Parameters<typeof http.patch>[1]>[0]) => Promise<CardPurchase> | CardPurchase), options?: RequestHandlerOptions) => {
   return http.patch('*/workspaces/:workspaceId/purchases/:purchaseId', async (info) => {await delay(1000);
   
@@ -125,6 +154,8 @@ export const getCardsMock = () => [
   getUpdateCardMockHandler(),
   getArchiveCardMockHandler(),
   getCreateCardPurchaseMockHandler(),
+  getCreateCardPurchasesBatchMockHandler(),
+  getPreviewStatementImportMockHandler(),
   getUpdateCardPurchaseMockHandler(),
   getDeleteCardPurchaseMockHandler()
 ]

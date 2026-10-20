@@ -1,6 +1,7 @@
 package br.com.mkfinance.infrastructure.persistence;
 
 import br.com.mkfinance.domain.model.Installment;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -18,6 +19,35 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from Installment i where i.purchaseId = :purchaseId")
     void deleteByPurchaseId(@Param("purchaseId") UUID purchaseId);
+
+    /** Installments of a card whose purchase date falls in the window, for reconciling a bill's lines. */
+    @Query("""
+            select new br.com.mkfinance.infrastructure.persistence.ImportCandidateRow(
+                       i.id, p.description, p.purchaseDate, i.number, p.installmentCount,
+                       i.amountCents, i.externalId)
+            from Installment i, CardPurchase p
+            where i.purchaseId = p.id
+              and p.workspaceId = :workspaceId and p.cardId = :cardId
+              and p.purchaseDate between :from and :to
+            order by p.purchaseDate asc, p.createdAt asc, i.number asc
+            """)
+    List<ImportCandidateRow> findImportCandidates(
+            @Param("workspaceId") UUID workspaceId,
+            @Param("cardId") UUID cardId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    /** Fingerprints among {@code externalIds} already stored on the card, to skip lines imported before. */
+    @Query("""
+            select i.externalId
+            from Installment i, CardPurchase p
+            where i.purchaseId = p.id and p.workspaceId = :workspaceId and p.cardId = :cardId
+              and i.externalId in :externalIds
+            """)
+    List<String> findExistingExternalIds(
+            @Param("workspaceId") UUID workspaceId,
+            @Param("cardId") UUID cardId,
+            @Param("externalIds") Collection<String> externalIds);
 
     /** A statement's total is the sum of the installments allocated to it — never a stored copy. */
     @Query("""

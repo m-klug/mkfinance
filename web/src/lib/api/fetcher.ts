@@ -95,11 +95,21 @@ export async function apiFetch<T>(config: ApiRequestConfig): Promise<T> {
     }
   }
 
+  // FormData goes out as-is: the browser sets the multipart Content-Type (with its boundary) itself.
+  const isForm = typeof FormData !== "undefined" && data instanceof FormData;
+  if (isForm) {
+    // The generated client labels multipart calls with a bare Content-Type, which would leave the
+    // browser unable to add the boundary parameter. Drop it so fetch derives the right header.
+    for (const name of Object.keys(finalHeaders)) {
+      if (name.toLowerCase() === "content-type") delete finalHeaders[name];
+    }
+  }
+
   const init: RequestInit = {
     method,
     credentials: "include",
     headers: finalHeaders,
-    body: data !== undefined ? JSON.stringify(data) : undefined,
+    body: data === undefined ? undefined : isForm ? (data as FormData) : JSON.stringify(data),
     signal,
   };
 

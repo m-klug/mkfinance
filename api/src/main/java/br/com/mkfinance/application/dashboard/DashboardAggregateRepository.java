@@ -40,10 +40,15 @@ public interface DashboardAggregateRepository extends Repository<Transaction, UU
      * class that doubles as both R10's denominator and the dashboard's "receitas do mês" tile
      * ({@code DashboardSummaryResponse.incomeCents}) — excluding system categories here keeps both
      * readings of "income" the same single definition, so they can never quietly disagree.
+     *
+     * <p>What a settled INCOME has been linked to expenses (ADR-0002) is a reimbursement, not income:
+     * it is subtracted here, so a PIX that paid back a shared boleto never inflates the month's base.
      */
     @Query(
             """
-            select coalesce(sum(t.amountCents), 0)
+            select coalesce(sum(t.amountCents
+                       - (select coalesce(sum(r.amountCents), 0) from Reimbursement r
+                          where r.incomeTransactionId = t.id)), 0)
             from Transaction t, Category c
             where t.categoryId = c.id
               and t.workspaceId = :workspaceId
@@ -57,11 +62,17 @@ public interface DashboardAggregateRepository extends Repository<Transaction, UU
     /**
      * EXPENSE transactions of the month grouped by category, pillar and the system flag. The system
      * bucket is the statement-payment debit, which the allocation and category reports drop (R2).
+     *
+     * <p>Each expense counts for what it really cost: its amount minus the reimbursements linked to
+     * it (ADR-0002), in the month of the expense itself — never the month the money came back.
      */
     @Query(
             """
             select new br.com.mkfinance.application.dashboard.CategoryPillarSpent(
-                       t.categoryId, c.pillar, c.system, sum(t.amountCents))
+                       t.categoryId, c.pillar, c.system,
+                       sum(t.amountCents
+                           - (select coalesce(sum(r.amountCents), 0) from Reimbursement r
+                              where r.expenseTransactionId = t.id)))
             from Transaction t, Category c
             where t.categoryId = c.id
               and t.workspaceId = :workspaceId

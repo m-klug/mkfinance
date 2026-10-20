@@ -23,6 +23,7 @@ tags:
   - name: recurrences
   - name: calendar
   - name: tags
+  - name: reimbursements
   - name: vaults
   - name: export
 
@@ -416,6 +417,88 @@ paths:
               schema: { $ref: '#/components/schemas/Transaction' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /workspaces/{workspaceId}/transactions/reimbursable-pending:
+    get:
+      tags: [reimbursements]
+      operationId: listReimbursablePending
+      description: >
+        Expenses that still expect money back (reimbursableCents above what is linked), of any
+        month, oldest first — what the "link to expenses" dialog offers. Each row carries
+        pendingReimbursementCents.
+      parameters: [{ $ref: '#/components/parameters/workspaceId' }]
+      responses:
+        '200':
+          description: Expenses with a pending reimbursement.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Transaction' }
+
+  /workspaces/{workspaceId}/transactions/{transactionId}/reimbursements:
+    get:
+      tags: [reimbursements]
+      operationId: listReimbursements
+      description: The links touching this transaction, whichever side (INCOME or EXPENSE) it is on.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/transactionId' }
+      responses:
+        '200':
+          description: Links, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Reimbursement' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [reimbursements]
+      operationId: createReimbursement
+      description: >
+        Links amountCents of the INCOME in the path to an EXPENSE. The income must be SETTLED, the
+        sum of its links cannot exceed its amount (REIMBURSEMENT_OVER_INCOME) and the sum of the
+        expense's links cannot exceed its reimbursableCents (REIMBURSEMENT_OVER_EXPENSE). Linking
+        the same pair again adds to the existing link. Nothing changes in account balances; the
+        expense's cost drops in the month of the expense and the income stops counting as income
+        (ADR-0002).
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - name: transactionId
+          in: path
+          required: true
+          description: The INCOME that was received.
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReimbursementRequest' }
+      responses:
+        '201':
+          description: Linked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reimbursement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/reimbursements/{reimbursementId}:
+    delete:
+      tags: [reimbursements]
+      operationId: deleteReimbursement
+      description: Unlinks. The expense counts for what it cost again and the income counts as income again.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - name: reimbursementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Unlinked. }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /workspaces/{workspaceId}/transfers:
     post:
       tags: [transfers]
@@ -558,6 +641,132 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CardPurchase' }
+
+  /workspaces/{workspaceId}/cards/{cardId}/purchases/batch:
+    post:
+      tags: [cards]
+      operationId: createCardPurchasesBatch
+      description: >
+        Creates several outright purchases at once, all charged to `statementMonth` regardless of
+        their purchase dates (used by statement imports, where the bank decides the bill).
+        All-or-nothing: if any item is refused (e.g. STATEMENT_IMMUTABLE) none is created.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/cardId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CardPurchaseBatchRequest' }
+      responses:
+        '201':
+          description: The created purchases, in request order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CardPurchase' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /workspaces/{workspaceId}/cards/{cardId}/statement-imports/preview:
+    post:
+      tags: [cards]
+      operationId: previewStatementImport
+      description: >
+        Reads a card statement PDF (Banco Inter) and returns the lines it would import. Writes
+        nothing and keeps nothing: neither the file nor the password is stored or logged. The
+        password goes in the form body, never the URL.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/cardId' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                password:
+                  type: string
+                  format: password
+                  description: Opens the PDF; empty or omitted for an unprotected file.
+      responses:
+        '200':
+          description: Preview of the statement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatementImportPreview' }
+        '422':
+          description: PDF_PASSWORD_INVALID, PDF_UNREADABLE or STATEMENT_PDF_UNSUPPORTED.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /workspaces/{workspaceId}/accounts/{accountId}/statement-imports/preview:
+    post:
+      tags: [accounts]
+      operationId: previewBankStatementImport
+      description: >
+        Reads a bank statement file (OFX, Banco Inter checking account) and returns the movements it
+        would import, each with a suggested mode (entry, transfer or card bill payment). Writes
+        nothing and keeps nothing: the file is read in memory.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/accountId' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Preview of the statement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BankStatementImportPreview' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422':
+          description: OFX_UNREADABLE or OFX_UNSUPPORTED.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /workspaces/{workspaceId}/accounts/{accountId}/statement-imports/confirm:
+    post:
+      tags: [accounts]
+      operationId: confirmBankStatementImport
+      description: >
+        Records the confirmed lines of a preview, all or nothing (up to 500). Each line is created
+        by the rule that owns it: ENTRY like an ordinary transaction, TRANSFER like a transfer (R4,
+        R9), STATEMENT_PAYMENT like a payment of the statement (R2). The bank's id of each line is
+        kept on the account, so confirming the same file again is refused, never duplicated.
+      parameters:
+        - { $ref: '#/components/parameters/workspaceId' }
+        - { $ref: '#/components/parameters/accountId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BankStatementImportRequest' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BankStatementImportResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422':
+          description: OFX_ITEM_INCOMPLETE, or the error of the rule that refused a line.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /workspaces/{workspaceId}/purchases/{purchaseId}:
     patch:
@@ -1239,9 +1448,16 @@ components:
             transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED,
             TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS,
             CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT;
+            reimbursements — REIMBURSEMENT_INVALID_LINK, REIMBURSEMENT_OVER_INCOME,
+            REIMBURSEMENT_OVER_EXPENSE, REIMBURSEMENT_NOT_FOUND, REIMBURSABLE_INVALID,
+            TRANSACTION_HAS_REIMBURSEMENTS;
             cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND,
             STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE,
             STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY;
+            statement PDF import — PDF_PASSWORD_INVALID, PDF_UNREADABLE, STATEMENT_PDF_UNSUPPORTED,
+            IMPORT_LINK_INVALID;
+            bank statement (OFX) import — OFX_UNREADABLE, OFX_UNSUPPORTED, OFX_ITEM_ALREADY_IMPORTED,
+            OFX_ITEM_INCOMPLETE;
             pillar targets — PILLAR_TARGETS_MUST_SUM_100;
             recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND;
             tags — TAG_NAME_DUPLICATE, TAG_NOT_FOUND;
@@ -1518,6 +1734,49 @@ components:
             Always sent by the server, empty when the transaction has none. Optional here only so
             that clients written before Phase 2 keep type-checking.
           items: { $ref: '#/components/schemas/Tag' }
+        reimbursableCents:
+          type: integer
+          format: int64
+          nullable: true
+          description: >
+            EXPENSE only: how much the user expects to get back from other people. Null when none.
+            The ceiling for the sum of the expense's reimbursement links.
+        reimbursedCents:
+          type: integer
+          format: int64
+          description: >
+            Sum of the reimbursement links touching this row: received so far on an EXPENSE,
+            applied to expenses on an INCOME. 0 when none. Optional only so older clients keep
+            type-checking.
+        pendingReimbursementCents:
+          type: integer
+          format: int64
+          nullable: true
+          description: EXPENSE with reimbursableCents only — what is still to receive. Null otherwise.
+        effectiveAmountCents:
+          type: integer
+          format: int64
+          nullable: true
+          description: >
+            EXPENSE only — amountCents minus reimbursedCents, what it really cost and what feeds
+            the pillar and category reports. Null otherwise.
+
+    Reimbursement:
+      type: object
+      required: [id, incomeTransactionId, expenseTransactionId, amountCents, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        incomeTransactionId: { type: string, format: uuid }
+        expenseTransactionId: { type: string, format: uuid }
+        amountCents: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+
+    ReimbursementRequest:
+      type: object
+      required: [expenseTransactionId, amountCents]
+      properties:
+        expenseTransactionId: { type: string, format: uuid }
+        amountCents: { type: integer, format: int64, minimum: 1 }
 
     TransactionRequest:
       type: object
@@ -1542,6 +1801,16 @@ components:
             it. Duplicates within the list are collapsed case-insensitively. Sending the field
             replaces the whole set; omitting it leaves the current tags alone.
           items: { type: string, maxLength: 40 }
+        reimbursableCents:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+          description: >
+            EXPENSE only: how much the user expects to get back, between 1 and amountCents
+            (REIMBURSABLE_INVALID otherwise). Omitting it leaves the current value alone on an
+            edit; sending 0 clears it. An expense with reimbursement links cannot have it lowered
+            below what is linked (TRANSACTION_HAS_REIMBURSEMENTS).
 
     TransactionPage:
       type: object
@@ -1668,6 +1937,199 @@ components:
         totalAmountCents: { type: integer, format: int64, minimum: 1 }
         purchaseDate: { type: string, format: date }
         installmentCount: { type: integer, minimum: 1, maximum: 60, default: 1 }
+
+    CardPurchaseBatchRequest:
+      type: object
+      required: [statementMonth, items]
+      properties:
+        statementMonth:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: Statement (reference month) every item is charged to.
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [description, totalAmountCents, purchaseDate]
+            properties:
+              categoryId: { type: string, format: uuid, nullable: true, description: Required unless linkInstallmentId is set. }
+              description: { type: string, maxLength: 255 }
+              totalAmountCents: { type: integer, format: int64, minimum: 1 }
+              purchaseDate: { type: string, format: date }
+              externalId:
+                type: string
+                maxLength: 64
+                nullable: true
+                description: >-
+                  Fingerprint of the statement line, as returned by the preview. A line whose fingerprint
+                  is already stored on the card is skipped, so confirming a preview twice creates nothing.
+              linkInstallmentId:
+                type: string
+                format: uuid
+                nullable: true
+                description: >-
+                  Attach the line to this hand-typed installment (a preview candidate) instead of creating
+                  a purchase. 409 IMPORT_LINK_INVALID when it is gone, on another card, or already linked.
+
+    StatementImportPreview:
+      type: object
+      required: [statementMonth, dueDate, totalCents, lines, warnings]
+      properties:
+        statementMonth: { type: string, example: '2026-09', description: Statement the lines will be charged to, from the bill's due date. }
+        dueDate: { type: string, format: date }
+        totalCents: { type: integer, format: int64 }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [cardLast4, date, description, amountCents, kind, status, duplicate, externalId, candidates]
+            properties:
+              cardLast4: { type: string }
+              date: { type: string, format: date }
+              description: { type: string }
+              amountCents: { type: integer, format: int64, description: Always positive; see kind. }
+              kind:
+                type: string
+                enum: [EXPENSE, CREDIT, PAYMENT]
+                description: Payments of the previous bill are never returned as lines.
+              installmentNumber: { type: integer, nullable: true }
+              installmentCount: { type: integer, nullable: true }
+              status:
+                type: string
+                enum: [NEW, MATCH, AMBIGUOUS, ALREADY_IMPORTED]
+                description: >-
+                  NEW creates a purchase. MATCH: one hand-typed installment has the same amount and
+                  installment and a date within 3 days (description is ignored). AMBIGUOUS: several do.
+                  ALREADY_IMPORTED: this line was imported or linked before.
+              duplicate: { type: boolean, description: Shorthand for status = ALREADY_IMPORTED. }
+              externalId: { type: string, description: Fingerprint of the line; send it back when confirming. }
+              candidates:
+                type: array
+                description: Hand-typed installments the line may be, closest date first. One for MATCH, several for AMBIGUOUS.
+                items:
+                  type: object
+                  required: [installmentId, description, purchaseDate]
+                  properties:
+                    installmentId: { type: string, format: uuid }
+                    description: { type: string }
+                    purchaseDate: { type: string, format: date }
+              suggestedCategoryId: { type: string, format: uuid, nullable: true }
+        warnings:
+          type: array
+          items:
+            type: object
+            required: [code]
+            properties:
+              code:
+                type: string
+                enum: [TOTAL_MISMATCH, CARD_TOTAL_MISMATCH, DUE_DATE_MISMATCH, PAYMENT_IGNORED]
+              detail: { type: string, nullable: true, description: Card last four digits when the warning is about one card. }
+
+    BankStatementImportPreview:
+      type: object
+      required: [accountBalanceCents, lines, warnings]
+      properties:
+        bankId: { type: string, nullable: true, example: '077', description: Bank code the file declares. }
+        accountLast4: { type: string, nullable: true, description: Last digits of the account number in the file, to check it is the account picked. }
+        periodStart: { type: string, format: date, nullable: true }
+        periodEnd: { type: string, format: date, nullable: true }
+        accountBalanceCents: { type: integer, format: int64, description: What the account holds in the app now. }
+        ledgerBalanceCents: { type: integer, format: int64, nullable: true, description: Balance the bank reports at ledgerBalanceDate. }
+        ledgerBalanceDate: { type: string, format: date, nullable: true }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [externalId, date, description, type, amountCents, kind, mode, duplicate, statementCandidates, selectedByDefault]
+            properties:
+              externalId: { type: string, description: The bank's id for the movement (OFX FITID); unique within the account. }
+              date: { type: string, format: date }
+              description: { type: string }
+              type:
+                type: string
+                enum: [INCOME, EXPENSE]
+                description: INCOME when money enters the account, EXPENSE when it leaves.
+              amountCents: { type: integer, format: int64, description: Always positive; see type. }
+              kind:
+                type: string
+                enum: [NORMAL, CARD_BILL_PAYMENT, INVESTMENT_OUT, INVESTMENT_IN]
+                description: What the bank's description says the movement is; only picks the default mode.
+              mode:
+                type: string
+                enum: [ENTRY, TRANSFER, STATEMENT_PAYMENT]
+              duplicate:
+                type: string
+                enum: [NONE, EXACT, POSSIBLE]
+                description: EXACT when the account already holds this bank id; POSSIBLE when something typed by hand has the same day, amount and direction.
+              suggestedCategoryId: { type: string, format: uuid, nullable: true }
+              suggestedCounterpartAccountId: { type: string, format: uuid, nullable: true, description: The only investment account of the workspace, for investment movements. }
+              suggestedStatementId: { type: string, format: uuid, nullable: true, description: The single open statement due around the date whose remaining amount equals the line. }
+              statementCandidates:
+                type: array
+                description: Open statements due within five days of the date, to choose from when there is no single match.
+                items:
+                  type: object
+                  required: [statementId, cardId, cardName, referenceMonth, dueDate, remainingCents]
+                  properties:
+                    statementId: { type: string, format: uuid }
+                    cardId: { type: string, format: uuid }
+                    cardName: { type: string }
+                    referenceMonth: { type: string, example: '2026-09' }
+                    dueDate: { type: string, format: date }
+                    remainingCents: { type: integer, format: int64 }
+              selectedByDefault: { type: boolean }
+        warnings:
+          type: array
+          items:
+            type: object
+            required: [code]
+            properties:
+              code:
+                type: string
+                enum: [ZERO_AMOUNT_IGNORED, STATEMENT_PAYMENT_UNMATCHED]
+              detail: { type: string, nullable: true, description: The bank id for ZERO_AMOUNT_IGNORED, a count for STATEMENT_PAYMENT_UNMATCHED. }
+
+    BankStatementImportRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [externalId, mode, type, amountCents, date, description]
+            properties:
+              externalId: { type: string, maxLength: 64 }
+              mode:
+                type: string
+                enum: [ENTRY, TRANSFER, STATEMENT_PAYMENT]
+              type:
+                type: string
+                enum: [INCOME, EXPENSE]
+                description: INCOME when money entered the imported account. For TRANSFER it decides the direction.
+              amountCents: { type: integer, format: int64, minimum: 1 }
+              date: { type: string, format: date }
+              description: { type: string, maxLength: 255 }
+              categoryId: { type: string, format: uuid, nullable: true, description: Required for ENTRY. }
+              counterpartAccountId: { type: string, format: uuid, nullable: true, description: Required for TRANSFER; the other account. }
+              contributionPillar:
+                nullable: true
+                description: Only for a TRANSFER out into an investment account (R9); omitted takes the account's default.
+                allOf:
+                  - { $ref: '#/components/schemas/ContributionPillar' }
+              statementId: { type: string, format: uuid, nullable: true, description: Required for STATEMENT_PAYMENT, which must be an EXPENSE. }
+
+    BankStatementImportResult:
+      type: object
+      required: [entries, transfers, statementPayments]
+      properties:
+        entries: { type: integer }
+        transfers: { type: integer }
+        statementPayments: { type: integer }
 
     CardPurchase:
       type: object

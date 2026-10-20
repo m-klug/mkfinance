@@ -112,7 +112,8 @@ public class StatementService {
                 paymentCategoryProvider.categoryIdFor(workspaceId),
                 input.amountCents(),
                 input.paymentDate(),
-                describe(card, statement));
+                describe(card, statement),
+                input.externalId());
 
         paymentRepository.save(StatementPayment.builder()
                 .statementId(statement.getId())

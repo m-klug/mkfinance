@@ -1,6 +1,7 @@
 package br.com.mkfinance.application.transaction;
 
 import br.com.mkfinance.application.recurrence.RecurrenceOccurrenceMaterializer;
+import br.com.mkfinance.application.reimbursement.ReimbursementService;
 import br.com.mkfinance.application.tag.TagService;
 import br.com.mkfinance.domain.exception.AppException;
 import br.com.mkfinance.domain.model.Account;
@@ -9,6 +10,7 @@ import br.com.mkfinance.domain.model.CategoryType;
 import br.com.mkfinance.domain.model.Transaction;
 import br.com.mkfinance.domain.model.TransactionStatus;
 import br.com.mkfinance.domain.model.TransactionType;
+import br.com.mkfinance.domain.service.ReimbursementRules;
 import br.com.mkfinance.infrastructure.persistence.AccountRepository;
 import br.com.mkfinance.infrastructure.persistence.CategoryRepository;
 import br.com.mkfinance.infrastructure.persistence.TransactionRepository;
@@ -62,6 +64,7 @@ public class TransactionService {
     private final TransferService transferService;
     private final TagService tagService;
     private final RecurrenceOccurrenceMaterializer recurrenceMaterializer;
+    private final ReimbursementService reimbursementService;
 
     /**
      * The extrato listing: optional filters, newest first, paginated (contract: TransactionPage).
@@ -124,6 +127,10 @@ public class TransactionService {
         TransactionType type = requireEntryType(input.type());
         Account account = TransactionLookup.ownedAccount(accountRepository, workspaceId, input.accountId());
         Category category = requireMatchingCategory(workspaceId, input.categoryId(), type);
+        Long reimbursable = input.reimbursableCents() == null || input.reimbursableCents() == 0
+                ? null
+                : input.reimbursableCents();
+        ReimbursementRules.validateReimbursable(type, input.amountCents(), reimbursable);
 
         Transaction transaction = Transaction.builder()
                 .workspaceId(workspaceId)
@@ -135,6 +142,8 @@ public class TransactionService {
                 .description(input.description())
                 .note(input.note())
                 .status(input.status() != null ? input.status() : TransactionStatus.SETTLED)
+                .externalId(input.externalId())
+                .reimbursableCents(reimbursable)
                 .build();
         transaction = transactionRepository.save(transaction);
         if (input.tags() != null) {
@@ -175,6 +184,8 @@ public class TransactionService {
         TransactionType type = requireEntryType(input.type());
         Account account = TransactionLookup.ownedAccount(accountRepository, workspaceId, input.accountId());
         Category category = requireMatchingCategory(workspaceId, input.categoryId(), type);
+        Long reimbursable = resolveReimbursable(transaction, type, input);
+        guardLinkedEdit(transaction, type, input, reimbursable);
 
         transaction.setAccountId(account.getId());
         transaction.setCategoryId(category.getId());
@@ -183,6 +194,7 @@ public class TransactionService {
         transaction.setDate(input.date());
         transaction.setDescription(input.description());
         transaction.setNote(input.note());
+        transaction.setReimbursableCents(reimbursable);
         if (input.status() != null) {
             transaction.setStatus(input.status());
         }
@@ -213,6 +225,10 @@ public class TransactionService {
         if (transaction.isTransfer()) {
             transferService.delete(transaction);
             return;
+        }
+        long linked = reimbursementService.linkedTotal(transaction.getId());
+        if (linked > 0) {
+            throw AppException.transactionHasReimbursements(linked);
         }
         transactionRepository.delete(transaction);
     }
@@ -256,6 +272,18 @@ public class TransactionService {
             long amountCents,
             LocalDate date,
             String description) {
+        return createSettledExpense(workspaceId, accountId, categoryId, amountCents, date, description, null);
+    }
+
+    /** Same, stamping the bank's id on the debit so a statement import can recognise it later. */
+    public Transaction createSettledExpense(
+            UUID workspaceId,
+            UUID accountId,
+            UUID categoryId,
+            long amountCents,
+            LocalDate date,
+            String description,
+            String externalId) {
         return create(
                 workspaceId,
                 new TransactionInput(
@@ -267,7 +295,45 @@ public class TransactionService {
                         description,
                         null,
                         TransactionStatus.SETTLED,
-                        null));
+                        null,
+                        externalId));
+    }
+
+    /**
+     * The reimbursable amount an edit leaves behind: the request's own value (0 clears it), or the
+     * one already stored when the request says nothing — dropped if the row stops being an EXPENSE.
+     */
+    private Long resolveReimbursable(Transaction transaction, TransactionType type, TransactionInput input) {
+        Long requested = input.reimbursableCents();
+        Long resolved;
+        if (requested == null) {
+            resolved = type == TransactionType.EXPENSE ? transaction.getReimbursableCents() : null;
+        } else {
+            resolved = requested == 0 ? null : requested;
+        }
+        ReimbursementRules.validateReimbursable(type, input.amountCents(), resolved);
+        return resolved;
+    }
+
+    /**
+     * A row with reimbursement links keeps what they depend on (ADR-0002): its type, an INCOME its
+     * SETTLED status, and neither side may be edited below what is linked.
+     */
+    private void guardLinkedEdit(Transaction transaction, TransactionType newType, TransactionInput input, Long reimbursable) {
+        long linked = reimbursementService.linkedTotal(transaction.getId());
+        if (linked == 0) {
+            return;
+        }
+        boolean broken = newType != transaction.getType();
+        if (newType == TransactionType.INCOME) {
+            broken |= input.amountCents() < linked
+                    || (input.status() != null && input.status() != TransactionStatus.SETTLED);
+        } else {
+            broken |= reimbursable == null || reimbursable < linked;
+        }
+        if (broken) {
+            throw AppException.transactionHasReimbursements(linked);
+        }
     }
 
     /** The transactions endpoint only accepts INCOME/EXPENSE — transfers need the /transfers one. */

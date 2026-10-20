@@ -28,8 +28,14 @@ import type {
 import type {
   Account,
   AccountRequest,
+  BankStatementImportPreview,
+  BankStatementImportRequest,
+  BankStatementImportResult,
   ConflictResponse,
-  ListAccountsParams
+  ErrorResponse,
+  ListAccountsParams,
+  NotFoundResponse,
+  PreviewBankStatementImportBody
 } from '../mKFinanceAPI.schemas';
 
 import { apiFetch } from '../../fetcher';
@@ -362,6 +368,136 @@ const {mutation: mutationOptions} = options ?
       > => {
 
       const mutationOptions = getArchiveAccountMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Reads a bank statement file (OFX, Banco Inter checking account) and returns the movements it would import, each with a suggested mode (entry, transfer or card bill payment). Writes nothing and keeps nothing: the file is read in memory.
+
+ */
+export const previewBankStatementImport = (
+    workspaceId: string,
+    accountId: string,
+    previewBankStatementImportBody: PreviewBankStatementImportBody,
+ signal?: AbortSignal
+) => {
+      
+      const formData = new FormData();
+formData.append(`file`, previewBankStatementImportBody.file)
+
+      return apiFetch<BankStatementImportPreview>(
+      {url: `/workspaces/${workspaceId}/accounts/${accountId}/statement-imports/preview`, method: 'POST',
+      headers: {'Content-Type': 'multipart/form-data', },
+       data: formData, signal
+    },
+      );
+    }
+  
+
+
+export const getPreviewBankStatementImportMutationOptions = <TError = NotFoundResponse | ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBankStatementImport>>, TError,{workspaceId: string;accountId: string;data: PreviewBankStatementImportBody}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof previewBankStatementImport>>, TError,{workspaceId: string;accountId: string;data: PreviewBankStatementImportBody}, TContext> => {
+
+const mutationKey = ['previewBankStatementImport'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewBankStatementImport>>, {workspaceId: string;accountId: string;data: PreviewBankStatementImportBody}> = (props) => {
+          const {workspaceId,accountId,data} = props ?? {};
+
+          return  previewBankStatementImport(workspaceId,accountId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewBankStatementImportMutationResult = NonNullable<Awaited<ReturnType<typeof previewBankStatementImport>>>
+    export type PreviewBankStatementImportMutationBody = PreviewBankStatementImportBody
+    export type PreviewBankStatementImportMutationError = NotFoundResponse | ErrorResponse
+
+    export const usePreviewBankStatementImport = <TError = NotFoundResponse | ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewBankStatementImport>>, TError,{workspaceId: string;accountId: string;data: PreviewBankStatementImportBody}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof previewBankStatementImport>>,
+        TError,
+        {workspaceId: string;accountId: string;data: PreviewBankStatementImportBody},
+        TContext
+      > => {
+
+      const mutationOptions = getPreviewBankStatementImportMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Records the confirmed lines of a preview, all or nothing (up to 500). Each line is created by the rule that owns it: ENTRY like an ordinary transaction, TRANSFER like a transfer (R4, R9), STATEMENT_PAYMENT like a payment of the statement (R2). The bank's id of each line is kept on the account, so confirming the same file again is refused, never duplicated.
+
+ */
+export const confirmBankStatementImport = (
+    workspaceId: string,
+    accountId: string,
+    bankStatementImportRequest: BankStatementImportRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return apiFetch<BankStatementImportResult>(
+      {url: `/workspaces/${workspaceId}/accounts/${accountId}/statement-imports/confirm`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: bankStatementImportRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getConfirmBankStatementImportMutationOptions = <TError = NotFoundResponse | ConflictResponse | ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmBankStatementImport>>, TError,{workspaceId: string;accountId: string;data: BankStatementImportRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof confirmBankStatementImport>>, TError,{workspaceId: string;accountId: string;data: BankStatementImportRequest}, TContext> => {
+
+const mutationKey = ['confirmBankStatementImport'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmBankStatementImport>>, {workspaceId: string;accountId: string;data: BankStatementImportRequest}> = (props) => {
+          const {workspaceId,accountId,data} = props ?? {};
+
+          return  confirmBankStatementImport(workspaceId,accountId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmBankStatementImportMutationResult = NonNullable<Awaited<ReturnType<typeof confirmBankStatementImport>>>
+    export type ConfirmBankStatementImportMutationBody = BankStatementImportRequest
+    export type ConfirmBankStatementImportMutationError = NotFoundResponse | ConflictResponse | ErrorResponse
+
+    export const useConfirmBankStatementImport = <TError = NotFoundResponse | ConflictResponse | ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmBankStatementImport>>, TError,{workspaceId: string;accountId: string;data: BankStatementImportRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof confirmBankStatementImport>>,
+        TError,
+        {workspaceId: string;accountId: string;data: BankStatementImportRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getConfirmBankStatementImportMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

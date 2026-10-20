@@ -21,6 +21,7 @@ import {
   useUpdateTransaction,
 } from "@/lib/api/generated/transactions/transactions";
 import { useUpdateTransfer } from "@/lib/api/generated/transfers/transfers";
+import { getListReimbursablePendingQueryKey } from "@/lib/api/generated/reimbursements/reimbursements";
 import { useListVaults } from "@/lib/api/generated/vaults/vaults";
 import {
   CategoryType,
@@ -65,6 +66,8 @@ interface FormState {
   /** This leg's own vault (§4.4), "" meaning none — never forced (see BE-10's fix). */
   vaultId: string;
   tags: string[];
+  /** ADR-0002: how much of an expense other people pay back; 0 = none. */
+  reimbursableCents: number;
 }
 
 function toFormState(transaction: Transaction): FormState {
@@ -82,6 +85,7 @@ function toFormState(transaction: Transaction): FormState {
     // Transaction.tags is optional in the generated type only so pre-Phase 2
     // clients keep type-checking — the server always sends it (empty when none).
     tags: transaction.tags?.map((tag) => tag.name) ?? [],
+    reimbursableCents: transaction.reimbursableCents ?? 0,
   };
 }
 
@@ -101,9 +105,11 @@ export function TransactionFormDialog({
     description?: string;
     category?: string;
     vault?: string;
+    reimbursable?: string;
   }>({});
 
   const isTransfer = transaction.type === TransactionType.TRANSFER;
+  const isExpense = transaction.type === TransactionType.EXPENSE;
 
   useEffect(() => {
     if (open) {
@@ -152,6 +158,7 @@ export function TransactionFormDialog({
   function invalidateAfterWrite() {
     void queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey(workspaceId) });
     void queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey(workspaceId) });
+    void queryClient.invalidateQueries({ queryKey: getListReimbursablePendingQueryKey(workspaceId) });
     // A caixinha muda de saldo com o mesmo lançamento que muda a conta — sem isto uma
     // composição aberta segue mostrando o número de antes até o staleTime vencer.
     void queryClient.invalidateQueries(vaultCompositionQueryFilter(workspaceId));
@@ -159,11 +166,19 @@ export function TransactionFormDialog({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextErrors: { amount?: string; description?: string; category?: string; vault?: string } =
-      {};
+    const nextErrors: {
+      amount?: string;
+      description?: string;
+      category?: string;
+      vault?: string;
+      reimbursable?: string;
+    } = {};
     if (form.amountCents <= 0) nextErrors.amount = t("validation.amountPositive");
     if (!form.description.trim()) nextErrors.description = t("validation.required");
     if (!isTransfer && !form.categoryId) nextErrors.category = t("validation.required");
+    if (isExpense && form.reimbursableCents > form.amountCents) {
+      nextErrors.reimbursable = t("validation.reimbursableExceedsAmount");
+    }
     // The requirement only bites the leg actually being re-pointed — moved to
     // another account, since a vault untouched by this edit simply carries
     // forward, including having none (BE-10's review fix, §4.4).
@@ -222,6 +237,8 @@ export function TransactionFormDialog({
       // Always sent (even empty) so clearing every tag here actually clears
       // them server-side — omitting the field would leave the old set as-is.
       tags: form.tags,
+      // 0 clears it server-side; omitting would leave the old value (ADR-0002).
+      ...(isExpense ? { reimbursableCents: form.reimbursableCents } : {}),
     };
 
     updateMutation.mutate(
@@ -353,6 +370,17 @@ export function TransactionFormDialog({
             value={form.note}
             onChange={(event) => setForm({ ...form, note: event.target.value })}
           />
+          {isExpense && (
+            <MoneyField
+              id="transaction-reimbursable"
+              label={t("reimbursement.reimbursableLabel")}
+              hint={t("reimbursement.reimbursableHint")}
+              value={form.reimbursableCents}
+              error={errors.reimbursable}
+              fieldClassName={FORM_FIELD_CLASSNAME}
+              onValueChange={(cents) => setForm({ ...form, reimbursableCents: cents })}
+            />
+          )}
           {!isTransfer && (
             <TagsInput
               id="transaction-tags"

@@ -83,6 +83,7 @@ interface FormErrors {
   category?: string;
   accounts?: string;
   card?: string;
+  reimbursable?: string;
   fromVault?: string;
   toVault?: string;
 }
@@ -111,6 +112,8 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
   const [cardId, setCardId] = useState("");
   const [installmentCount, setInstallmentCount] = useState(1);
   const [tags, setTags] = useState<string[]>([]);
+  // ADR-0002: how much of an expense other people will pay back. 0 = none.
+  const [reimbursableCents, setReimbursableCents] = useState(0);
   const [pending, setPending] = useState(false);
   // Null means "follow the destination account default" (R9).
   const [pillarOverride, setPillarOverride] = useState<ContributionPillar | null>(null);
@@ -178,6 +181,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     setCategoryId("");
     setInstallmentCount(1);
     setTags([]);
+    setReimbursableCents(0);
     setPillarOverride(null);
     setFromVaultId("");
     setToVaultId("");
@@ -301,6 +305,9 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
     if (amountCents <= 0) next.amount = t("validation.amountPositive");
     if (!description.trim()) next.description = t("validation.required");
     if (!isTransferLike && !categoryId) next.category = t("validation.required");
+    if (mode === "EXPENSE" && reimbursableCents > amountCents) {
+      next.reimbursable = t("validation.reimbursableExceedsAmount");
+    }
     if (isCardMode) {
       if (!cardId) next.card = t("validation.required");
     } else if (isTransferLike) {
@@ -395,6 +402,7 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
       // Optional and off the critical path (≤5-interaction target) — an empty
       // list here is equivalent to omitting the field on a brand-new entry.
       tags,
+      reimbursableCents: mode === "EXPENSE" && reimbursableCents > 0 ? reimbursableCents : null,
     };
     createTransaction.mutate({ workspaceId, data }, { onSuccess, onError });
   }
@@ -616,6 +624,17 @@ export function QuickTransactionDialog({ open, onOpenChange }: QuickTransactionD
                 </div>
               )}
             </>
+          )}
+
+          {mode === "EXPENSE" && (
+            <MoneyField
+              id="quick-reimbursable"
+              label={t("reimbursement.reimbursableLabel")}
+              hint={t("reimbursement.reimbursableHint")}
+              value={reimbursableCents}
+              error={errors.reimbursable}
+              onValueChange={setReimbursableCents}
+            />
           )}
 
           {supportsTags && (

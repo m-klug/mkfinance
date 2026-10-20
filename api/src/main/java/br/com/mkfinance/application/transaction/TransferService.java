@@ -99,7 +99,8 @@ public class TransferService {
                 input.date(),
                 input.description(),
                 TransactionStatus.SETTLED,
-                null);
+                null,
+                externalIdFor(input, source.getId()));
         Transaction incoming = leg(
                 workspaceId,
                 destination.getId(),
@@ -108,7 +109,8 @@ public class TransferService {
                 input.date(),
                 input.description(),
                 TransactionStatus.SETTLED,
-                pillar);
+                pillar,
+                externalIdFor(input, destination.getId()));
 
         TransferPair pair = link(outgoing, incoming);
 
@@ -437,7 +439,8 @@ public class TransferService {
             LocalDate date,
             String description,
             TransactionStatus status,
-            ContributionPillar contributionPillar) {
+            ContributionPillar contributionPillar,
+            String externalId) {
         return Transaction.builder()
                 .workspaceId(workspaceId)
                 .accountId(accountId)
@@ -449,6 +452,12 @@ public class TransferService {
                 .description(description)
                 .status(status)
                 .contributionPillar(contributionPillar)
+                .externalId(externalId)
                 .build();
+    }
+
+    /** The bank's id goes only on the leg of the account the statement was imported into. */
+    private static String externalIdFor(TransferInput input, UUID accountId) {
+        return accountId.equals(input.externalIdAccountId()) ? input.externalId() : null;
     }
 }

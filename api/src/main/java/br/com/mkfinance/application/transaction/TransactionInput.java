@@ -18,6 +18,10 @@ import java.util.UUID;
  * @param tags names, not ids (CT-1) — {@code null} means "leave the current tags alone" on an edit
  *     (there is nothing to leave alone on a create, so it means "no tags" there); a present list,
  *     even empty, replaces the whole set.
+ * @param externalId the bank's id for the movement (OFX FITID) when the entry comes from a statement
+ *     import; ignored on an edit, since the origin of a row never changes
+ * @param reimbursableCents how much of an EXPENSE the user expects to get back (ADR-0002) —
+ *     {@code null} means "none" on a create and "leave it alone" on an edit; {@code 0} clears it
  */
 public record TransactionInput(
         UUID accountId,
@@ -28,5 +32,36 @@ public record TransactionInput(
         String description,
         String note,
         TransactionStatus status,
-        List<String> tags) {
+        List<String> tags,
+        String externalId,
+        Long reimbursableCents) {
+
+    /** An entry without a reimbursable amount. */
+    public TransactionInput(
+            UUID accountId,
+            UUID categoryId,
+            TransactionType type,
+            long amountCents,
+            LocalDate date,
+            String description,
+            String note,
+            TransactionStatus status,
+            List<String> tags,
+            String externalId) {
+        this(accountId, categoryId, type, amountCents, date, description, note, status, tags, externalId, null);
+    }
+
+    /** An entry that did not come from a bank import. */
+    public TransactionInput(
+            UUID accountId,
+            UUID categoryId,
+            TransactionType type,
+            long amountCents,
+            LocalDate date,
+            String description,
+            String note,
+            TransactionStatus status,
+            List<String> tags) {
+        this(accountId, categoryId, type, amountCents, date, description, note, status, tags, null, null);
+    }
 }

@@ -11,10 +11,11 @@ import java.util.List;
  * <p>Two rules, and the whole credit-card feature hangs off them:
  *
  * <ol>
- *   <li>A purchase made <strong>up to and including</strong> the closing day lands on the statement
- *       currently open; one made after it lands on the next. The boundary is inclusive — buying on
- *       the closing day itself still makes the current statement, which is the case users notice
- *       when it is wrong.
+ *   <li>A purchase made <strong>before</strong> the closing day lands on the statement currently
+ *       open; one made on the closing day or after lands on the next. The boundary is exclusive —
+ *       the closing day already belongs to the new bill, which is how Banco Inter cuts it (a bill
+ *       with closing day 3 holds purchases from the 3rd through the 2nd of the following month) and
+ *       the case users notice when it is wrong.
  *   <li>Installments occupy <strong>consecutive</strong> reference months from there, so a 12×
  *       purchase simply walks forward twelve months, rolling over the year without any special
  *       casing.
@@ -47,8 +48,8 @@ public final class StatementAllocator {
     public static YearMonth firstReferenceMonth(LocalDate purchaseDate, int closingDay) {
         requireDayOfMonth(closingDay, "closingDay");
         YearMonth month = YearMonth.from(purchaseDate);
-        // Inclusive: a purchase on the closing day itself still makes the current statement.
-        return purchaseDate.getDayOfMonth() <= closingDay ? month : month.plusMonths(1);
+        // Exclusive: the closing day itself already opens the next statement.
+        return purchaseDate.getDayOfMonth() < closingDay ? month : month.plusMonths(1);
     }
 
     /**
@@ -59,9 +60,17 @@ public final class StatementAllocator {
         if (installmentCount < 1) {
             throw new IllegalArgumentException("installmentCount must be at least 1, got " + installmentCount);
         }
-        YearMonth first = firstReferenceMonth(purchaseDate, closingDay);
-        List<YearMonth> months = new ArrayList<>(installmentCount);
-        for (int i = 0; i < installmentCount; i++) {
+        return consecutiveMonths(firstReferenceMonth(purchaseDate, closingDay), installmentCount);
+    }
+
+    /**
+     * {@code count} consecutive reference months starting at {@code first}. Used directly when the
+     * statement is dictated from outside — an imported bill says which statement a line belongs to,
+     * whatever the purchase date would have computed.
+     */
+    public static List<YearMonth> consecutiveMonths(YearMonth first, int count) {
+        List<YearMonth> months = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
             months.add(first.plusMonths(i));
         }
         return months;

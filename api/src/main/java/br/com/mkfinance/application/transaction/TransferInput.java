@@ -13,6 +13,10 @@ import java.util.UUID;
  * <p>{@code fromVaultId}/{@code toVaultId} are only meaningful when the corresponding account has
  * at least one non-archived vault, in which case they are required, not optional (§4.4): the
  * source's for the withdrawal leg, the destination's for the contribution leg and its pillar.
+ *
+ * <p>{@code externalId} is the bank's id for the movement (OFX FITID) and belongs to exactly one
+ * leg: the one on {@code externalIdAccountId}, the account the statement was imported into. The
+ * other leg has no bank record of its own in that file.
  */
 public record TransferInput(
         UUID fromAccountId,
@@ -22,5 +26,20 @@ public record TransferInput(
         String description,
         ContributionPillar contributionPillar,
         UUID fromVaultId,
-        UUID toVaultId) {
+        UUID toVaultId,
+        String externalId,
+        UUID externalIdAccountId) {
+
+    /** A transfer that did not come from a bank import. */
+    public TransferInput(
+            UUID fromAccountId,
+            UUID toAccountId,
+            long amountCents,
+            LocalDate date,
+            String description,
+            ContributionPillar contributionPillar,
+            UUID fromVaultId,
+            UUID toVaultId) {
+        this(fromAccountId, toAccountId, amountCents, date, description, contributionPillar, fromVaultId, toVaultId, null, null);
+    }
 }

@@ -2,7 +2,9 @@ package br.com.mkfinance.infrastructure.persistence;
 
 import br.com.mkfinance.domain.model.Transaction;
 import br.com.mkfinance.domain.model.TransactionStatus;
+import br.com.mkfinance.domain.model.TransactionType;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +22,25 @@ import org.springframework.data.repository.query.Param;
 public interface TransactionRepository extends JpaRepository<Transaction, UUID>, JpaSpecificationExecutor<Transaction> {
 
     Optional<Transaction> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
+
+    /** Which of these bank ids (OFX FITID) the account already holds — a statement import's dedup. */
+    @Query("""
+            select t.externalId from Transaction t
+            where t.accountId = :accountId and t.externalId in :externalIds
+            """)
+    List<String> findExistingExternalIds(
+            @Param("accountId") UUID accountId, @Param("externalIds") Collection<String> externalIds);
+
+    /**
+     * Rows of the account inside the file's period that did not come from an import — what a
+     * statement import compares against to flag a movement already typed in by hand.
+     */
+    List<Transaction> findByAccountIdAndWorkspaceIdAndExternalIdIsNullAndDateBetween(
+            UUID accountId, UUID workspaceId, LocalDate from, LocalDate to);
+
+    /** The category of the latest entry with this description, to suggest one for an imported line. */
+    Optional<Transaction> findFirstByWorkspaceIdAndTypeAndDescriptionIgnoreCaseAndCategoryIdIsNotNullOrderByDateDescCreatedAtDesc(
+            UUID workspaceId, TransactionType type, String description);
 
     /** Both legs of a mirrored transfer pair (R4) — used to keep edits/deletes atomic. */
     List<Transaction> findByTransferPairId(UUID transferPairId);
@@ -56,4 +77,20 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
             group by t.accountId, t.type, t.status, t.transferDirection
             """)
     List<TransactionBalanceBucket> aggregateBalanceBuckets(@Param("workspaceId") UUID workspaceId);
+
+    /**
+     * Expenses that still expect money back (ADR-0002): {@code reimbursableCents} above what is
+     * linked, any month, oldest first — what the "link to expenses" dialog offers.
+     */
+    @Query("""
+            select t from Transaction t
+            where t.workspaceId = :workspaceId
+              and t.type = br.com.mkfinance.domain.model.TransactionType.EXPENSE
+              and t.reimbursableCents is not null
+              and t.reimbursableCents > (
+                  select coalesce(sum(r.amountCents), 0) from Reimbursement r
+                  where r.expenseTransactionId = t.id)
+            order by t.date asc, t.createdAt asc
+            """)
+    List<Transaction> findReimbursablePending(@Param("workspaceId") UUID workspaceId);
 }

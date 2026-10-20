@@ -100,12 +100,27 @@ public class Transaction {
     private ContributionPillar contributionPillar;
 
     /**
+     * How much of this EXPENSE the user expects to get back from other people (V23, ADR-0002); null
+     * when none. The ceiling for the sum of its {@code reimbursement} links. Always null on
+     * INCOME/TRANSFER rows.
+     */
+    @Column(name = "reimbursable_cents")
+    private Long reimbursableCents;
+
+    /**
      * The {@link RecurrenceRule} that materialized this row, when it came from a recurrence (CT-1,
      * V14__recurrences.sql). Null for every ordinary entry. The extrato and the calendar both use it
      * to badge the row and offer editing the whole series.
      */
     @Column(name = "recurrence_id")
     private UUID recurrenceId;
+
+    /**
+     * The bank's id for the movement this row came from (OFX {@code FITID}), set only by a statement
+     * import. Unique per account, which is what makes re-importing the same file a no-op.
+     */
+    @Column(name = "external_id", length = 64)
+    private String externalId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

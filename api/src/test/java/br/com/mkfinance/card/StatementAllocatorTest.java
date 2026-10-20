@@ -33,23 +33,32 @@ class StatementAllocatorTest {
         }
 
         @Test
-        @DisplayName("ON the closing day → still the current statement (the boundary is inclusive)")
-        void onClosingDay() {
-            assertThat(StatementAllocator.firstReferenceMonth(LocalDate.of(2026, 7, 20), 20))
+        @DisplayName("the day before closing → still the current statement")
+        void dayBeforeClosing() {
+            assertThat(StatementAllocator.firstReferenceMonth(LocalDate.of(2026, 7, 19), 20))
                     .isEqualTo(YearMonth.of(2026, 7));
         }
 
         @Test
-        @DisplayName("the day after closing → the next statement")
-        void dayAfterClosing() {
-            assertThat(StatementAllocator.firstReferenceMonth(LocalDate.of(2026, 7, 21), 20))
+        @DisplayName("ON the closing day → the next statement (the boundary is exclusive)")
+        void onClosingDay() {
+            assertThat(StatementAllocator.firstReferenceMonth(LocalDate.of(2026, 7, 20), 20))
                     .isEqualTo(YearMonth.of(2026, 8));
         }
 
         @Test
-        @DisplayName("first day of the month is always inside the current statement")
+        @DisplayName("Inter, closing day 3: 02/08 is the old bill, 03/08 opens the new one")
+        void interClosingDayThree() {
+            assertThat(StatementAllocator.firstReferenceMonth(LocalDate.of(2026, 8, 2), 3))
+                    .isEqualTo(YearMonth.of(2026, 8));
+            assertThat(StatementAllocator.firstReferenceMonth(LocalDate.of(2026, 8, 3), 3))
+                    .isEqualTo(YearMonth.of(2026, 9));
+        }
+
+        @Test
+        @DisplayName("first day of the month with closing on the 2nd is inside the current statement")
         void firstDayOfMonth() {
-            assertThat(StatementAllocator.firstReferenceMonth(LocalDate.of(2026, 7, 1), 1))
+            assertThat(StatementAllocator.firstReferenceMonth(LocalDate.of(2026, 7, 1), 2))
                     .isEqualTo(YearMonth.of(2026, 7));
         }
 
@@ -63,9 +72,9 @@ class StatementAllocatorTest {
         @ParameterizedTest(name = "bought {0} with closing on day {1} → {2}")
         @CsvSource({
             "2026-02-27, 28, 2026-02",
-            "2026-02-28, 28, 2026-02",
-            "2027-02-28, 28, 2027-02",
-            "2028-02-28, 28, 2028-02",
+            "2026-02-28, 28, 2026-03",
+            "2027-02-28, 28, 2027-03",
+            "2028-02-27, 28, 2028-02",
             "2028-02-29, 28, 2028-03",
             "2026-01-31, 28, 2026-02",
             "2026-03-29, 28, 2026-04"
@@ -87,9 +96,9 @@ class StatementAllocatorTest {
         }
 
         @Test
-        @DisplayName("3 installments bought on the closing day → July, August, September")
-        void threeInstallmentsFromTheClosingDay() {
-            assertThat(StatementAllocator.referenceMonths(LocalDate.of(2026, 7, 20), 20, 3))
+        @DisplayName("3 installments bought the day before closing → July, August, September")
+        void threeInstallmentsFromTheLastDayOfAStatement() {
+            assertThat(StatementAllocator.referenceMonths(LocalDate.of(2026, 7, 19), 20, 3))
                     .containsExactly(YearMonth.of(2026, 7), YearMonth.of(2026, 8), YearMonth.of(2026, 9));
         }
 

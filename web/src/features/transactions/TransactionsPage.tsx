@@ -9,16 +9,19 @@ import {
   ChevronLeft,
   ChevronRight,
   Equal,
+  HandCoins,
   Pencil,
   Plus,
   SlidersHorizontal,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ListRow } from "@/components/ui/list-row";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Table,
@@ -39,6 +42,7 @@ import { SelectField, TextField } from "@/components/form/fields";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
+import { getListReimbursablePendingQueryKey } from "@/lib/api/generated/reimbursements/reimbursements";
 import { useFormatCents } from "@/hooks/useFormatCents";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { translateApiError } from "@/lib/errors";
@@ -62,7 +66,9 @@ import {
   type ListTransactionsParams,
   type Transaction,
 } from "@/lib/api/generated/mKFinanceAPI.schemas";
+import { BankStatementImportDialog } from "@/features/transactions/BankStatementImportDialog";
 import { QuickTransactionDialog } from "@/features/transactions/QuickTransactionDialog";
+import { ReimbursementLinkDialog } from "@/features/transactions/ReimbursementLinkDialog";
 import { TransactionFormDialog } from "@/features/transactions/TransactionFormDialog";
 import { TagsInput } from "@/features/transactions/TagsInput";
 import {
@@ -126,8 +132,11 @@ export default function TransactionsPage() {
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [page, setPage] = useState(0);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | undefined>();
   const [deleting, setDeleting] = useState<Transaction | undefined>();
+  // ADR-0002: the received INCOME whose "link to expenses" dialog is open.
+  const [linking, setLinking] = useState<Transaction | undefined>();
   const [filtersSheetOpen, setFiltersSheetOpen] = useState(false);
 
   const enabled = Boolean(workspaceId);
@@ -203,9 +212,23 @@ export default function TransactionsPage() {
     if (!workspaceId) return;
     void queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey(workspaceId) });
     void queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey(workspaceId) });
+    void queryClient.invalidateQueries({ queryKey: getListReimbursablePendingQueryKey(workspaceId) });
     // A caixinha muda de saldo com o mesmo lançamento que muda a conta — sem isto uma
     // composição aberta segue mostrando o número de antes até o staleTime vencer.
     void queryClient.invalidateQueries(vaultCompositionQueryFilter(workspaceId));
+  }
+
+  // An imported extrato can pay card bills and move money between accounts, so besides the extrato
+  // and the balances it changes what the cards and their statements show.
+  function invalidateAfterImport() {
+    if (!workspaceId) return;
+    invalidateAfterWrite();
+    void queryClient.invalidateQueries({
+      predicate: ({ queryKey }) =>
+        typeof queryKey[0] === "string" &&
+        (queryKey[0].startsWith(`/workspaces/${workspaceId}/cards`) ||
+          queryKey[0].startsWith(`/workspaces/${workspaceId}/statements`)),
+    });
   }
 
   // R5: settling a pending entry is a single click, no confirmation step.
@@ -239,6 +262,41 @@ export default function TransactionsPage() {
           toast.error(translateApiError(t, error));
         },
       },
+    );
+  }
+
+  // ADR-0002: only a settled INCOME can be linked to the expenses it paid back.
+  function canLinkReimbursement(transaction: Transaction): boolean {
+    return (
+      transaction.type === TransactionType.INCOME && transaction.status === TransactionStatus.SETTLED
+    );
+  }
+
+  /** Short text for the mobile subtitle; empty when the row has nothing to do with reimbursement. */
+  function reimbursementNote(transaction: Transaction): string {
+    if (transaction.type === TransactionType.EXPENSE && transaction.reimbursableCents) {
+      const pendingCents = transaction.pendingReimbursementCents ?? 0;
+      return ` · ${
+        pendingCents > 0
+          ? t("reimbursement.pendingBadge", { amount: formatCents(pendingCents) })
+          : t("reimbursement.doneBadge", { amount: formatCents(transaction.effectiveAmountCents ?? 0) })
+      }`;
+    }
+    if (transaction.type === TransactionType.INCOME && transaction.reimbursedCents) {
+      return ` · ${t("reimbursement.incomeBadge", { amount: formatCents(transaction.reimbursedCents) })}`;
+    }
+    return "";
+  }
+
+  function reimbursementBadge(transaction: Transaction) {
+    const note = reimbursementNote(transaction).replace(/^ · /, "");
+    if (!note) return null;
+    const waiting =
+      transaction.type === TransactionType.EXPENSE && (transaction.pendingReimbursementCents ?? 0) > 0;
+    return (
+      <Badge variant={waiting ? "alert" : "success"} className="normal-case">
+        {note}
+      </Badge>
     );
   }
 
@@ -336,10 +394,16 @@ export default function TransactionsPage() {
             {t("transactions.total", { count: totalElements })}
           </p>
         </div>
-        <Button onClick={() => setQuickOpen(true)}>
-          <Plus className="size-4" />
-          {t("quickEntry.open")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="size-4" />
+            {t("bankImport.action")}
+          </Button>
+          <Button onClick={() => setQuickOpen(true)}>
+            <Plus className="size-4" />
+            {t("quickEntry.open")}
+          </Button>
+        </div>
       </div>
 
       {isMobile ? (
@@ -562,67 +626,77 @@ export default function TransactionsPage() {
                       return (
                         <div key={transaction.id}>
                           {index > 0 && <div className="h-px bg-divider-row" />}
-                          <div className="flex items-center gap-2 py-2.5">
-                            <button
-                              type="button"
-                              className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                              onClick={() => setEditing(transaction)}
-                              aria-label={t("transactions.editAction", {
-                                description: transaction.description,
-                              })}
-                            >
-                              <span className="flex min-w-0 flex-1 flex-col">
-                                <span className="truncate text-[13px] font-bold text-ink-primary">
-                                  {transaction.description}
-                                </span>
-                                <span className="flex min-w-0 items-center gap-1 truncate text-[11px] text-ink-tertiary">
-                                  <span
-                                    className="size-1.5 shrink-0 rounded-swatch"
-                                    style={{ backgroundColor: categoryTone(category) }}
-                                    aria-hidden
-                                  />
-                                  <span className="truncate">
-                                    {lookupName(accounts, transaction.accountId) ?? "—"} ·{" "}
-                                    {transaction.type === TransactionType.TRANSFER
-                                      ? t("transactionType.TRANSFER")
-                                      : (category?.name ?? "—")}
-                                  </span>
+                          <ListRow
+                            onClick={() => setEditing(transaction)}
+                            aria-label={t("transactions.editAction", {
+                              description: transaction.description,
+                            })}
+                            title={transaction.description}
+                            subtitle={
+                              <span className="flex min-w-0 items-center gap-1">
+                                <span
+                                  className="size-1.5 shrink-0 rounded-swatch"
+                                  style={{ backgroundColor: categoryTone(category) }}
+                                  aria-hidden
+                                />
+                                <span className="truncate">
+                                  {lookupName(accounts, transaction.accountId) ?? "—"} ·{" "}
+                                  {transaction.type === TransactionType.TRANSFER
+                                    ? t("transactionType.TRANSFER")
+                                    : (category?.name ?? "—")}
+                                  {reimbursementNote(transaction)}
                                 </span>
                               </span>
+                            }
+                            value={
                               <span
-                                className={cn(
-                                  "shrink-0 text-[13px] font-extrabold tabular-nums",
-                                  signed > 0 ? "text-success-ink" : "text-ink-primary",
-                                )}
+                                className={signed > 0 ? "text-success-ink" : "text-ink-primary"}
                               >
                                 {formatCents(signed)}
                               </span>
-                            </button>
-                            {pending && (
-                              <Button
-                                size="sm"
-                                className="h-8 shrink-0 rounded-full px-3 text-[11px]"
-                                disabled={settleMutation.isPending}
-                                aria-label={t("transactions.settleAction", {
-                                  description: transaction.description,
-                                })}
-                                onClick={() => handleSettle(transaction)}
-                              >
-                                {t("transactions.settleShort")}
-                              </Button>
-                            )}
-                            <Button
-                              variant="secondary"
-                              size="icon-sm"
-                              className="shrink-0 rounded-full"
-                              aria-label={t("transactions.deleteAction", {
-                                description: transaction.description,
-                              })}
-                              onClick={() => setDeleting(transaction)}
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </div>
+                            }
+                            trailing={
+                              <>
+                                {pending && (
+                                  <Button
+                                    size="sm"
+                                    className="h-8 rounded-full px-3 text-[11px]"
+                                    disabled={settleMutation.isPending}
+                                    aria-label={t("transactions.settleAction", {
+                                      description: transaction.description,
+                                    })}
+                                    onClick={() => handleSettle(transaction)}
+                                  >
+                                    {t("transactions.settleShort")}
+                                  </Button>
+                                )}
+                                {canLinkReimbursement(transaction) && (
+                                  <Button
+                                    variant="secondary"
+                                    size="icon-sm"
+                                    className="rounded-full"
+                                    aria-label={t("reimbursement.linkAction", {
+                                      description: transaction.description,
+                                    })}
+                                    onClick={() => setLinking(transaction)}
+                                  >
+                                    <HandCoins className="size-3.5" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="secondary"
+                                  size="icon-sm"
+                                  className="rounded-full"
+                                  aria-label={t("transactions.deleteAction", {
+                                    description: transaction.description,
+                                  })}
+                                  onClick={() => setDeleting(transaction)}
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </>
+                            }
+                          />
                         </div>
                       );
                     })}
@@ -675,6 +749,7 @@ export default function TransactionsPage() {
                               {vaultNameById.get(transaction.vaultId)}
                             </Badge>
                           )}
+                          {reimbursementBadge(transaction)}
                           {transaction.tags && transaction.tags.length > 0 && (
                             <span className="flex flex-wrap gap-1">
                               {transaction.tags.map((tag) => (
@@ -737,6 +812,19 @@ export default function TransactionsPage() {
                               onClick={() => handleSettle(transaction)}
                             >
                               <Check className="size-3.5" />
+                            </Button>
+                          )}
+                          {canLinkReimbursement(transaction) && (
+                            <Button
+                              variant="secondary"
+                              size="icon-sm"
+                              className="rounded-full"
+                              aria-label={t("reimbursement.linkAction", {
+                                description: transaction.description,
+                              })}
+                              onClick={() => setLinking(transaction)}
+                            >
+                              <HandCoins className="size-3.5" />
                             </Button>
                           )}
                           {/* Transfer legs are mirrored pairs (R4); editing one
@@ -809,6 +897,17 @@ export default function TransactionsPage() {
       </Card>
 
       <QuickTransactionDialog open={quickOpen} onOpenChange={setQuickOpen} />
+
+      {workspaceId && (
+        <BankStatementImportDialog
+          workspaceId={workspaceId}
+          accounts={accounts}
+          categories={categories}
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onImported={invalidateAfterImport}
+        />
+      )}
 
       {/* Mobile filters bottom sheet (design_handoff_mk_finance mobile screen
           02): the same fields as the desktop filter card, reused as-is, just
@@ -917,6 +1016,15 @@ export default function TransactionsPage() {
           transaction={editing}
           accounts={accounts}
           categories={categories}
+        />
+      )}
+
+      {workspaceId && linking && (
+        <ReimbursementLinkDialog
+          workspaceId={workspaceId}
+          open={Boolean(linking)}
+          onOpenChange={(open) => !open && setLinking(undefined)}
+          income={linking}
         />
       )}
 

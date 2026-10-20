@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 
 /**
  * Drives the real API exactly like a browser-based SPA would: keeps whatever cookies the server
@@ -59,7 +60,9 @@ public class ApiSession {
         if (method != HttpMethod.GET && cookies.containsKey("XSRF-TOKEN")) {
             headers.add("X-XSRF-TOKEN", cookies.get("XSRF-TOKEN"));
         }
-        if (body != null) {
+        if (body instanceof MultiValueMap) {
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        } else if (body != null) {
             headers.setContentType(MediaType.APPLICATION_JSON);
         }
         HttpEntity<Object> entity = new HttpEntity<>(body, headers);

@@ -236,6 +236,52 @@ describe("TransactionsPage", () => {
     });
   });
 
+  it("sends reimbursableCents when editing an expense, and 0 to clear it (ADR-0002)", async () => {
+    const updates: TransactionRequest[] = [];
+    server.use(
+      http.patch("*/workspaces/:workspaceId/transactions/:transactionId", async ({ request }) => {
+        updates.push((await request.json()) as TransactionRequest);
+        return HttpResponse.json(settledExpense);
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: `Editar ${settledExpense.description}` }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Valor a reembolsar (opcional)"), "100,00");
+    await user.click(within(dialog).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(updates).toHaveLength(1));
+    expect(updates[0].reimbursableCents).toBe(10000);
+  });
+
+  it("refuses a reimbursable amount above the expense", async () => {
+    const updates: TransactionRequest[] = [];
+    server.use(
+      http.patch("*/workspaces/:workspaceId/transactions/:transactionId", async ({ request }) => {
+        updates.push((await request.json()) as TransactionRequest);
+        return HttpResponse.json(settledExpense);
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: `Editar ${settledExpense.description}` }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Valor a reembolsar (opcional)"), "999,00");
+    await user.click(within(dialog).getByRole("button", { name: "Salvar" }));
+
+    expect(
+      await within(dialog).findByText("O valor a reembolsar não pode passar do valor da despesa."),
+    ).toBeInTheDocument();
+    expect(updates).toHaveLength(0);
+  });
+
   it("rejects an edit that empties the description", async () => {
     const updates: TransactionRequest[] = [];
     server.use(

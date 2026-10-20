@@ -14,7 +14,7 @@ export type ErrorResponseFieldErrorsItem = {
 };
 
 export interface ErrorResponse {
-  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; pillar targets — PILLAR_TARGETS_MUST_SUM_100; recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND; tags — TAG_NAME_DUPLICATE, TAG_NOT_FOUND; vaults — VAULT_NOT_FOUND, VAULT_REQUIRED, VAULT_PILLAR_CONFLICT, VAULT_ACCOUNT_MISMATCH, VAULT_INSUFFICIENT_BALANCE, VAULT_NAME_DUPLICATE, VAULT_NOT_EMPTY, VAULT_HAS_ENTRIES, VAULT_ARCHIVED, VAULT_REALLOCATION_NOT_FOUND; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
+  /** Machine-readable code translated by the client. Kept in sync with domain/exception/ErrorCode.java. Known codes include: auth — EMAIL_ALREADY_USED, INVALID_CREDENTIALS, UNAUTHENTICATED; workspace — NOT_A_MEMBER, WORKSPACE_NOT_FOUND, ACCESS_DENIED, INVITE_EXPIRED; accounts — ACCOUNT_NOT_FOUND, ACCOUNT_HAS_TRANSACTIONS, INVALID_CONTRIBUTION_PILLAR; categories — CATEGORY_NOT_FOUND, CATEGORY_IN_USE, CATEGORY_PILLAR_REQUIRED, CATEGORY_PILLAR_FORBIDDEN, SYSTEM_CATEGORY_READONLY; transactions and transfers — TRANSACTION_NOT_FOUND, TRANSACTION_ALREADY_SETTLED, TRANSACTION_TYPE_IMMUTABLE, CATEGORY_TYPE_MISMATCH, INSUFFICIENT_TRANSFER_ACCOUNTS, CONTRIBUTION_PILLAR_REQUIRED, TRANSACTION_LOCKED_BY_PAYMENT; reimbursements — REIMBURSEMENT_INVALID_LINK, REIMBURSEMENT_OVER_INCOME, REIMBURSEMENT_OVER_EXPENSE, REIMBURSEMENT_NOT_FOUND, REIMBURSABLE_INVALID, TRANSACTION_HAS_REIMBURSEMENTS; cards and statements — CARD_NOT_FOUND, CARD_ARCHIVED, PURCHASE_NOT_FOUND, STATEMENT_NOT_FOUND, STATEMENT_PAYMENT_NOT_FOUND, STATEMENT_IMMUTABLE, STATEMENT_ALREADY_PAID, PAYMENT_EXCEEDS_REMAINING, STATEMENT_EMPTY; statement PDF import — PDF_PASSWORD_INVALID, PDF_UNREADABLE, STATEMENT_PDF_UNSUPPORTED, IMPORT_LINK_INVALID; bank statement (OFX) import — OFX_UNREADABLE, OFX_UNSUPPORTED, OFX_ITEM_ALREADY_IMPORTED, OFX_ITEM_INCOMPLETE; pillar targets — PILLAR_TARGETS_MUST_SUM_100; recurrences — RECURRENCE_NOT_FOUND, RECURRENCE_OCCURRENCE_NOT_FOUND; tags — TAG_NAME_DUPLICATE, TAG_NOT_FOUND; vaults — VAULT_NOT_FOUND, VAULT_REQUIRED, VAULT_PILLAR_CONFLICT, VAULT_ACCOUNT_MISMATCH, VAULT_INSUFFICIENT_BALANCE, VAULT_NAME_DUPLICATE, VAULT_NOT_EMPTY, VAULT_HAS_ENTRIES, VAULT_ARCHIVED, VAULT_REALLOCATION_NOT_FOUND; generic — VALIDATION_ERROR, DATA_INTEGRITY_VIOLATION, INTERNAL_ERROR.
  */
   code: string;
   params?: ErrorResponseParams;
@@ -405,6 +405,41 @@ export interface Transaction {
   /** Always sent by the server, empty when the transaction has none. Optional here only so that clients written before Phase 2 keep type-checking.
  */
   tags?: Tag[];
+  /**
+   * EXPENSE only: how much the user expects to get back from other people. Null when none. The ceiling for the sum of the expense's reimbursement links.
+
+   * @nullable
+   */
+  reimbursableCents?: number | null;
+  /** Sum of the reimbursement links touching this row: received so far on an EXPENSE, applied to expenses on an INCOME. 0 when none. Optional only so older clients keep type-checking.
+ */
+  reimbursedCents?: number;
+  /**
+   * EXPENSE with reimbursableCents only — what is still to receive. Null otherwise.
+   * @nullable
+   */
+  pendingReimbursementCents?: number | null;
+  /**
+   * EXPENSE only — amountCents minus reimbursedCents, what it really cost and what feeds the pillar and category reports. Null otherwise.
+
+   * @nullable
+   */
+  effectiveAmountCents?: number | null;
+}
+
+export interface Reimbursement {
+  id: string;
+  incomeTransactionId: string;
+  expenseTransactionId: string;
+  /** @minimum 1 */
+  amountCents: number;
+  createdAt: string;
+}
+
+export interface ReimbursementRequest {
+  expenseTransactionId: string;
+  /** @minimum 1 */
+  amountCents: number;
 }
 
 export type TransactionRequestType = typeof TransactionRequestType[keyof typeof TransactionRequestType];
@@ -431,6 +466,13 @@ export interface TransactionRequest {
   /** Tag names, not ids: a tag is its name, and typing one that does not exist yet creates it. Duplicates within the list are collapsed case-insensitively. Sending the field replaces the whole set; omitting it leaves the current tags alone.
  */
   tags?: string[];
+  /**
+   * EXPENSE only: how much the user expects to get back, between 1 and amountCents (REIMBURSABLE_INVALID otherwise). Omitting it leaves the current value alone on an edit; sending 0 clears it. An expense with reimbursement links cannot have it lowered below what is linked (TRANSACTION_HAS_REIMBURSEMENTS).
+
+   * @minimum 0
+   * @nullable
+   */
+  reimbursableCents?: number | null;
 }
 
 export interface TransactionPage {
@@ -588,6 +630,339 @@ export interface CardPurchaseRequest {
    * @maximum 60
    */
   installmentCount?: number;
+}
+
+export type CardPurchaseBatchRequestItemsItem = {
+  /**
+   * Required unless linkInstallmentId is set.
+   * @nullable
+   */
+  categoryId?: string | null;
+  /** @maxLength 255 */
+  description: string;
+  /** @minimum 1 */
+  totalAmountCents: number;
+  purchaseDate: string;
+  /**
+   * Fingerprint of the statement line, as returned by the preview. A line whose fingerprint is already stored on the card is skipped, so confirming a preview twice creates nothing.
+   * @maxLength 64
+   * @nullable
+   */
+  externalId?: string | null;
+  /**
+   * Attach the line to this hand-typed installment (a preview candidate) instead of creating a purchase. 409 IMPORT_LINK_INVALID when it is gone, on another card, or already linked.
+   * @nullable
+   */
+  linkInstallmentId?: string | null;
+};
+
+export interface CardPurchaseBatchRequest {
+  /**
+   * Statement (reference month) every item is charged to.
+   * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+   */
+  statementMonth: string;
+  /**
+   * @minItems 1
+   * @maxItems 500
+   */
+  items: CardPurchaseBatchRequestItemsItem[];
+}
+
+/**
+ * Payments of the previous bill are never returned as lines.
+ */
+export type StatementImportPreviewLinesItemKind = typeof StatementImportPreviewLinesItemKind[keyof typeof StatementImportPreviewLinesItemKind];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const StatementImportPreviewLinesItemKind = {
+  EXPENSE: 'EXPENSE',
+  CREDIT: 'CREDIT',
+  PAYMENT: 'PAYMENT',
+} as const;
+
+/**
+ * NEW creates a purchase. MATCH: one hand-typed installment has the same amount and installment and a date within 3 days (description is ignored). AMBIGUOUS: several do. ALREADY_IMPORTED: this line was imported or linked before.
+ */
+export type StatementImportPreviewLinesItemStatus = typeof StatementImportPreviewLinesItemStatus[keyof typeof StatementImportPreviewLinesItemStatus];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const StatementImportPreviewLinesItemStatus = {
+  NEW: 'NEW',
+  MATCH: 'MATCH',
+  AMBIGUOUS: 'AMBIGUOUS',
+  ALREADY_IMPORTED: 'ALREADY_IMPORTED',
+} as const;
+
+export type StatementImportPreviewLinesItemCandidatesItem = {
+  installmentId: string;
+  description: string;
+  purchaseDate: string;
+};
+
+export type StatementImportPreviewLinesItem = {
+  cardLast4: string;
+  date: string;
+  description: string;
+  /** Always positive; see kind. */
+  amountCents: number;
+  /** Payments of the previous bill are never returned as lines. */
+  kind: StatementImportPreviewLinesItemKind;
+  /** @nullable */
+  installmentNumber?: number | null;
+  /** @nullable */
+  installmentCount?: number | null;
+  /** NEW creates a purchase. MATCH: one hand-typed installment has the same amount and installment and a date within 3 days (description is ignored). AMBIGUOUS: several do. ALREADY_IMPORTED: this line was imported or linked before. */
+  status: StatementImportPreviewLinesItemStatus;
+  /** Shorthand for status = ALREADY_IMPORTED. */
+  duplicate: boolean;
+  /** Fingerprint of the line; send it back when confirming. */
+  externalId: string;
+  /** Hand-typed installments the line may be, closest date first. One for MATCH, several for AMBIGUOUS. */
+  candidates: StatementImportPreviewLinesItemCandidatesItem[];
+  /** @nullable */
+  suggestedCategoryId?: string | null;
+};
+
+export type StatementImportPreviewWarningsItemCode = typeof StatementImportPreviewWarningsItemCode[keyof typeof StatementImportPreviewWarningsItemCode];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const StatementImportPreviewWarningsItemCode = {
+  TOTAL_MISMATCH: 'TOTAL_MISMATCH',
+  CARD_TOTAL_MISMATCH: 'CARD_TOTAL_MISMATCH',
+  DUE_DATE_MISMATCH: 'DUE_DATE_MISMATCH',
+  PAYMENT_IGNORED: 'PAYMENT_IGNORED',
+} as const;
+
+export type StatementImportPreviewWarningsItem = {
+  code: StatementImportPreviewWarningsItemCode;
+  /**
+   * Card last four digits when the warning is about one card.
+   * @nullable
+   */
+  detail?: string | null;
+};
+
+export interface StatementImportPreview {
+  /** Statement the lines will be charged to */
+  statementMonth: string;
+  dueDate: string;
+  totalCents: number;
+  lines: StatementImportPreviewLinesItem[];
+  warnings: StatementImportPreviewWarningsItem[];
+}
+
+/**
+ * INCOME when money enters the account, EXPENSE when it leaves.
+ */
+export type BankStatementImportPreviewLinesItemType = typeof BankStatementImportPreviewLinesItemType[keyof typeof BankStatementImportPreviewLinesItemType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const BankStatementImportPreviewLinesItemType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * What the bank's description says the movement is; only picks the default mode.
+ */
+export type BankStatementImportPreviewLinesItemKind = typeof BankStatementImportPreviewLinesItemKind[keyof typeof BankStatementImportPreviewLinesItemKind];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const BankStatementImportPreviewLinesItemKind = {
+  NORMAL: 'NORMAL',
+  CARD_BILL_PAYMENT: 'CARD_BILL_PAYMENT',
+  INVESTMENT_OUT: 'INVESTMENT_OUT',
+  INVESTMENT_IN: 'INVESTMENT_IN',
+} as const;
+
+export type BankStatementImportPreviewLinesItemMode = typeof BankStatementImportPreviewLinesItemMode[keyof typeof BankStatementImportPreviewLinesItemMode];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const BankStatementImportPreviewLinesItemMode = {
+  ENTRY: 'ENTRY',
+  TRANSFER: 'TRANSFER',
+  STATEMENT_PAYMENT: 'STATEMENT_PAYMENT',
+} as const;
+
+/**
+ * EXACT when the account already holds this bank id; POSSIBLE when something typed by hand has the same day, amount and direction.
+ */
+export type BankStatementImportPreviewLinesItemDuplicate = typeof BankStatementImportPreviewLinesItemDuplicate[keyof typeof BankStatementImportPreviewLinesItemDuplicate];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const BankStatementImportPreviewLinesItemDuplicate = {
+  NONE: 'NONE',
+  EXACT: 'EXACT',
+  POSSIBLE: 'POSSIBLE',
+} as const;
+
+export type BankStatementImportPreviewLinesItemStatementCandidatesItem = {
+  statementId: string;
+  cardId: string;
+  cardName: string;
+  referenceMonth: string;
+  dueDate: string;
+  remainingCents: number;
+};
+
+export type BankStatementImportPreviewLinesItem = {
+  /** The bank's id for the movement (OFX FITID); unique within the account. */
+  externalId: string;
+  date: string;
+  description: string;
+  /** INCOME when money enters the account, EXPENSE when it leaves. */
+  type: BankStatementImportPreviewLinesItemType;
+  /** Always positive; see type. */
+  amountCents: number;
+  /** What the bank's description says the movement is; only picks the default mode. */
+  kind: BankStatementImportPreviewLinesItemKind;
+  mode: BankStatementImportPreviewLinesItemMode;
+  /** EXACT when the account already holds this bank id; POSSIBLE when something typed by hand has the same day, amount and direction. */
+  duplicate: BankStatementImportPreviewLinesItemDuplicate;
+  /** @nullable */
+  suggestedCategoryId?: string | null;
+  /**
+   * The only investment account of the workspace
+   * @nullable
+   */
+  suggestedCounterpartAccountId?: string | null;
+  /**
+   * The single open statement due around the date whose remaining amount equals the line.
+   * @nullable
+   */
+  suggestedStatementId?: string | null;
+  /** Open statements due within five days of the date, to choose from when there is no single match. */
+  statementCandidates: BankStatementImportPreviewLinesItemStatementCandidatesItem[];
+  selectedByDefault: boolean;
+};
+
+export type BankStatementImportPreviewWarningsItemCode = typeof BankStatementImportPreviewWarningsItemCode[keyof typeof BankStatementImportPreviewWarningsItemCode];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const BankStatementImportPreviewWarningsItemCode = {
+  ZERO_AMOUNT_IGNORED: 'ZERO_AMOUNT_IGNORED',
+  STATEMENT_PAYMENT_UNMATCHED: 'STATEMENT_PAYMENT_UNMATCHED',
+} as const;
+
+export type BankStatementImportPreviewWarningsItem = {
+  code: BankStatementImportPreviewWarningsItemCode;
+  /**
+   * The bank id for ZERO_AMOUNT_IGNORED
+   * @nullable
+   */
+  detail?: string | null;
+};
+
+export interface BankStatementImportPreview {
+  /**
+   * Bank code the file declares.
+   * @nullable
+   */
+  bankId?: string | null;
+  /**
+   * Last digits of the account number in the file
+   * @nullable
+   */
+  accountLast4?: string | null;
+  /** @nullable */
+  periodStart?: string | null;
+  /** @nullable */
+  periodEnd?: string | null;
+  /** What the account holds in the app now. */
+  accountBalanceCents: number;
+  /**
+   * Balance the bank reports at ledgerBalanceDate.
+   * @nullable
+   */
+  ledgerBalanceCents?: number | null;
+  /** @nullable */
+  ledgerBalanceDate?: string | null;
+  lines: BankStatementImportPreviewLinesItem[];
+  warnings: BankStatementImportPreviewWarningsItem[];
+}
+
+export type BankStatementImportRequestItemsItemMode = typeof BankStatementImportRequestItemsItemMode[keyof typeof BankStatementImportRequestItemsItemMode];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const BankStatementImportRequestItemsItemMode = {
+  ENTRY: 'ENTRY',
+  TRANSFER: 'TRANSFER',
+  STATEMENT_PAYMENT: 'STATEMENT_PAYMENT',
+} as const;
+
+/**
+ * INCOME when money entered the imported account. For TRANSFER it decides the direction.
+ */
+export type BankStatementImportRequestItemsItemType = typeof BankStatementImportRequestItemsItemType[keyof typeof BankStatementImportRequestItemsItemType];
+
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const BankStatementImportRequestItemsItemType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * Only for a TRANSFER out into an investment account (R9); omitted takes the account's default.
+ * @nullable
+ */
+export type BankStatementImportRequestItemsItemContributionPillar = ContributionPillar | null;
+
+export type BankStatementImportRequestItemsItem = {
+  /** @maxLength 64 */
+  externalId: string;
+  mode: BankStatementImportRequestItemsItemMode;
+  /** INCOME when money entered the imported account. For TRANSFER it decides the direction. */
+  type: BankStatementImportRequestItemsItemType;
+  /** @minimum 1 */
+  amountCents: number;
+  date: string;
+  /** @maxLength 255 */
+  description: string;
+  /**
+   * Required for ENTRY.
+   * @nullable
+   */
+  categoryId?: string | null;
+  /**
+   * Required for TRANSFER; the other account.
+   * @nullable
+   */
+  counterpartAccountId?: string | null;
+  /**
+   * Only for a TRANSFER out into an investment account (R9); omitted takes the account's default.
+   * @nullable
+   */
+  contributionPillar?: BankStatementImportRequestItemsItemContributionPillar;
+  /**
+   * Required for STATEMENT_PAYMENT
+   * @nullable
+   */
+  statementId?: string | null;
+};
+
+export interface BankStatementImportRequest {
+  /**
+   * @minItems 1
+   * @maxItems 500
+   */
+  items: BankStatementImportRequestItemsItem[];
+}
+
+export interface BankStatementImportResult {
+  entries: number;
+  transfers: number;
+  statementPayments: number;
 }
 
 export interface CardPurchase {
@@ -1137,6 +1512,16 @@ size?: number;
 
 export type ListCardsParams = {
 includeArchived?: boolean;
+};
+
+export type PreviewStatementImportBody = {
+  file: Blob;
+  /** Opens the PDF; empty or omitted for an unprotected file. */
+  password?: string;
+};
+
+export type PreviewBankStatementImportBody = {
+  file: Blob;
 };
 
 export type ListStatementsParams = {

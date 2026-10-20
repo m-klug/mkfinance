@@ -51,4 +51,11 @@ public class Installment {
 
     @Column(name = "statement_id", nullable = false)
     private UUID statementId;
+
+    /**
+     * Fingerprint of the statement-PDF line this installment was imported from or linked to; null for
+     * installments typed by hand and never reconciled. See V22__installment_external_id.sql.
+     */
+    @Column(name = "external_id", length = 64)
+    private String externalId;
 }

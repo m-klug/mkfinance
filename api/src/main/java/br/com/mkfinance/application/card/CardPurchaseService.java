@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -92,9 +93,50 @@ public class CardPurchaseService {
                 .installmentCount(input.installmentCount())
                 .build());
 
-        writeInstallments(purchase, input, targets);
+        writeInstallments(purchase, input, targets, Map.of());
         refresh(targets);
         return purchase;
+    }
+
+    /**
+     * Applies every line of an imported statement or none: one refused line (paid statement, bad
+     * category, stale link) aborts the lot. A line with {@code linkInstallmentId} is attached to the
+     * hand-typed installment and creates nothing; a line whose fingerprint is already stored is
+     * skipped, so confirming the same preview twice (or two tabs racing) does not duplicate.
+     */
+    public List<CardPurchase> createBatch(UUID workspaceId, UUID cardId, List<CardPurchaseInput> inputs) {
+        Set<String> known = new LinkedHashSet<>(installmentRepository.findExistingExternalIds(
+                workspaceId,
+                cardId,
+                inputs.stream().map(CardPurchaseInput::externalId).filter(Objects::nonNull).toList()));
+        List<CardPurchase> created = new ArrayList<>();
+        for (CardPurchaseInput input : inputs) {
+            if (input.linkInstallmentId() != null) {
+                link(workspaceId, cardId, input);
+            } else if (input.externalId() == null || known.add(input.externalId())) {
+                if (input.categoryId() == null) {
+                    throw AppException.categoryNotFound();
+                }
+                created.add(create(workspaceId, cardId, input));
+            }
+        }
+        return created;
+    }
+
+    private void link(UUID workspaceId, UUID cardId, CardPurchaseInput input) {
+        Installment installment = installmentRepository
+                .findById(input.linkInstallmentId())
+                .orElseThrow(AppException::importLinkInvalid);
+        purchaseRepository
+                .findByIdAndWorkspaceId(installment.getPurchaseId(), workspaceId)
+                .filter(p -> p.getCardId().equals(cardId))
+                .orElseThrow(AppException::importLinkInvalid);
+        if (installment.getExternalId() != null || input.externalId() == null) {
+            throw AppException.importLinkInvalid();
+        }
+        installment.setExternalId(input.externalId());
+        installmentRepository.save(installment);
+        // The user's own description and category stay: only the identity is attached.
     }
 
     /**
@@ -119,8 +161,13 @@ public class CardPurchaseService {
         purchase.setInstallmentCount(input.installmentCount());
         purchaseRepository.save(purchase);
 
+        // Rebuilding drops the rows, so the bill-line identities they carry are re-attached by position.
+        Map<Short, String> externalIds = new LinkedHashMap<>();
+        installmentRepository.findByPurchaseIdOrderByNumberAsc(purchase.getId()).stream()
+                .filter(i -> i.getExternalId() != null)
+                .forEach(i -> externalIds.put(i.getNumber(), i.getExternalId()));
         installmentRepository.deleteByPurchaseId(purchase.getId());
-        writeInstallments(purchase, input, targets);
+        writeInstallments(purchase, input, targets, externalIds);
 
         refresh(union(current, targets));
         return purchase;
@@ -138,12 +185,15 @@ public class CardPurchaseService {
 
     /** The statements this purchase's installments would occupy, materializing them as needed (R3). */
     private List<Statement> allocate(Card card, CardPurchaseInput input) {
-        List<YearMonth> months = StatementAllocator.referenceMonths(
-                input.purchaseDate(), card.getClosingDay(), input.installmentCount());
+        List<YearMonth> months = input.statementMonth() != null
+                ? StatementAllocator.consecutiveMonths(input.statementMonth(), input.installmentCount())
+                : StatementAllocator.referenceMonths(
+                        input.purchaseDate(), card.getClosingDay(), input.installmentCount());
         return months.stream().map(month -> statementProvider.statementOf(card, month)).toList();
     }
 
-    private void writeInstallments(CardPurchase purchase, CardPurchaseInput input, List<Statement> targets) {
+    private void writeInstallments(
+            CardPurchase purchase, CardPurchaseInput input, List<Statement> targets, Map<Short, String> keptExternalIds) {
         long[] amounts = InstallmentSplitter.split(input.totalAmountCents(), input.installmentCount());
         List<Installment> installments = new ArrayList<>(amounts.length);
         for (int i = 0; i < amounts.length; i++) {
@@ -152,6 +202,9 @@ public class CardPurchaseService {
                     .number((short) (i + 1))
                     .amountCents(amounts[i])
                     .statementId(targets.get(i).getId())
+                    .externalId(i == 0 && input.externalId() != null
+                            ? input.externalId()
+                            : keptExternalIds.get((short) (i + 1)))
                     .build());
         }
         installmentRepository.saveAll(installments);

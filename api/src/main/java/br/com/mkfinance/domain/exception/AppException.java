@@ -126,6 +126,10 @@ public class AppException extends RuntimeException {
         return of(ErrorCode.PURCHASE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
+    public static AppException importLinkInvalid() {
+        return of(ErrorCode.IMPORT_LINK_INVALID, HttpStatus.CONFLICT);
+    }
+
     public static AppException statementNotFound() {
         return of(ErrorCode.STATEMENT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
@@ -140,6 +144,34 @@ public class AppException extends RuntimeException {
      * @param statementMonth reference month (YYYY-MM) of the offending statement, so the client can
      *     tell the user <em>which</em> bill is blocking the change
      */
+    public static AppException pdfPasswordInvalid() {
+        return of(ErrorCode.PDF_PASSWORD_INVALID, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    public static AppException pdfUnreadable() {
+        return of(ErrorCode.PDF_UNREADABLE, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    public static AppException statementPdfUnsupported() {
+        return of(ErrorCode.STATEMENT_PDF_UNSUPPORTED, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    public static AppException ofxUnreadable() {
+        return of(ErrorCode.OFX_UNREADABLE, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    public static AppException ofxUnsupported() {
+        return of(ErrorCode.OFX_UNSUPPORTED, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    public static AppException ofxItemAlreadyImported(String externalId) {
+        return of(ErrorCode.OFX_ITEM_ALREADY_IMPORTED, HttpStatus.CONFLICT, Map.of("externalId", externalId));
+    }
+
+    public static AppException ofxItemIncomplete(String externalId) {
+        return of(ErrorCode.OFX_ITEM_INCOMPLETE, HttpStatus.UNPROCESSABLE_ENTITY, Map.of("externalId", externalId));
+    }
+
     public static AppException statementImmutable(String statementMonth) {
         return of(ErrorCode.STATEMENT_IMMUTABLE, HttpStatus.CONFLICT, Map.of("statementMonth", statementMonth));
     }
@@ -236,5 +268,35 @@ public class AppException extends RuntimeException {
 
     public static AppException vaultReallocationNotFound() {
         return of(ErrorCode.VAULT_REALLOCATION_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException reimbursementInvalidLink() {
+        return of(ErrorCode.REIMBURSEMENT_INVALID_LINK, HttpStatus.BAD_REQUEST);
+    }
+
+    /** @param remainingCents what is still unlinked on the income, so the client can cap the field */
+    public static AppException reimbursementOverIncome(long remainingCents) {
+        return of(
+                ErrorCode.REIMBURSEMENT_OVER_INCOME,
+                HttpStatus.CONFLICT,
+                Map.of("remainingCents", remainingCents));
+    }
+
+    /** @param pendingCents what the expense still expects to receive */
+    public static AppException reimbursementOverExpense(long pendingCents) {
+        return of(ErrorCode.REIMBURSEMENT_OVER_EXPENSE, HttpStatus.CONFLICT, Map.of("pendingCents", pendingCents));
+    }
+
+    public static AppException reimbursementNotFound() {
+        return of(ErrorCode.REIMBURSEMENT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    public static AppException reimbursableInvalid() {
+        return of(ErrorCode.REIMBURSABLE_INVALID, HttpStatus.BAD_REQUEST);
+    }
+
+    /** @param linkedCents how much is linked, so the client can say what the new value may not go below */
+    public static AppException transactionHasReimbursements(long linkedCents) {
+        return of(ErrorCode.TRANSACTION_HAS_REIMBURSEMENTS, HttpStatus.CONFLICT, Map.of("linkedCents", linkedCents));
     }
 }

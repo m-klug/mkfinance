@@ -1,5 +1,6 @@
 package br.com.mkfinance.api.transaction;
 
+import br.com.mkfinance.application.reimbursement.ReimbursementService;
 import br.com.mkfinance.application.tag.TagService;
 import br.com.mkfinance.application.transaction.TransactionFilter;
 import br.com.mkfinance.application.transaction.TransactionService;
@@ -50,6 +51,7 @@ public class TransactionController {
     private final TransactionMapper mapper;
     private final TagService tagService;
     private final TransferService transferService;
+    private final ReimbursementService reimbursementService;
     private final WorkspaceContext workspaceContext;
 
     @GetMapping
@@ -71,7 +73,8 @@ public class TransactionController {
         List<UUID> transactionIds = result.getContent().stream().map(Transaction::getId).toList();
         Map<UUID, List<Tag>> tagsByTransaction = tagService.tagsOf(transactionIds);
         Map<UUID, UUID> vaultIdByTransaction = transferService.vaultIdsOf(transactionIds);
-        return mapper.toPageResponse(result, tagsByTransaction, vaultIdByTransaction);
+        Map<UUID, Long> linkedByTransaction = reimbursementService.linkedTotals(transactionIds);
+        return mapper.toPageResponse(result, tagsByTransaction, vaultIdByTransaction, linkedByTransaction);
     }
 
     @PostMapping
@@ -80,7 +83,7 @@ public class TransactionController {
             @PathVariable UUID workspaceId, @Valid @RequestBody TransactionRequest request) {
         Transaction transaction =
                 transactionService.create(workspaceContext.getWorkspaceId(), mapper.toInput(request));
-        return mapper.toResponse(transaction, tagService.tagsOf(transaction.getId()), vaultIdOf(transaction.getId()));
+        return respond(transaction);
     }
 
     @PatchMapping("/{transactionId}")
@@ -90,7 +93,7 @@ public class TransactionController {
             @Valid @RequestBody TransactionRequest request) {
         Transaction transaction = transactionService.update(
                 workspaceContext.getWorkspaceId(), transactionId, mapper.toInput(request));
-        return mapper.toResponse(transaction, tagService.tagsOf(transaction.getId()), vaultIdOf(transaction.getId()));
+        return respond(transaction);
     }
 
     @DeleteMapping("/{transactionId}")
@@ -103,7 +106,16 @@ public class TransactionController {
     @PostMapping("/{transactionId}/settle")
     public TransactionResponse settle(@PathVariable UUID workspaceId, @PathVariable UUID transactionId) {
         Transaction transaction = transactionService.settle(workspaceContext.getWorkspaceId(), transactionId);
-        return mapper.toResponse(transaction, tagService.tagsOf(transaction.getId()), vaultIdOf(transaction.getId()));
+        return respond(transaction);
+    }
+
+    /** Single-row response with tags, vault badge and reimbursement totals. */
+    private TransactionResponse respond(Transaction transaction) {
+        return mapper.toResponse(
+                transaction,
+                tagService.tagsOf(transaction.getId()),
+                vaultIdOf(transaction.getId()),
+                reimbursementService.linkedTotal(transaction.getId()));
     }
 
     /** Single-row vault lookup (create/update/settle responses) built on the same batch query as {@link #list}. */

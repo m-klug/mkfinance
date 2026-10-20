@@ -24,7 +24,9 @@ import {
   ContributionPillar
 } from '../mKFinanceAPI.schemas';
 import type {
-  Account
+  Account,
+  BankStatementImportPreview,
+  BankStatementImportResult
 } from '../mKFinanceAPI.schemas';
 
 
@@ -35,6 +37,10 @@ export const getCreateAccountResponseMock = (overrideResponse: Partial< Account 
 export const getUpdateAccountResponseMock = (overrideResponse: Partial< Account > = {}): Account => ({id: faker.string.uuid(), name: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(Object.values(AccountType)), initialBalanceCents: faker.number.int({min: undefined, max: undefined}), balanceCents: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.number.int({min: undefined, max: undefined}), null]), undefined]), projectedBalanceCents: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.number.int({min: undefined, max: undefined}), null]), undefined]), defaultContributionPillar: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(ContributionPillar)), undefined]), color: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), icon: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), archived: faker.datatype.boolean(), hasVaults: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]), ...overrideResponse})
 
 export const getArchiveAccountResponseMock = (overrideResponse: Partial< Account > = {}): Account => ({id: faker.string.uuid(), name: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(Object.values(AccountType)), initialBalanceCents: faker.number.int({min: undefined, max: undefined}), balanceCents: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.number.int({min: undefined, max: undefined}), null]), undefined]), projectedBalanceCents: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.number.int({min: undefined, max: undefined}), null]), undefined]), defaultContributionPillar: faker.helpers.arrayElement([faker.helpers.arrayElement(Object.values(ContributionPillar)), undefined]), color: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), icon: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), archived: faker.datatype.boolean(), hasVaults: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]), ...overrideResponse})
+
+export const getPreviewBankStatementImportResponseMock = (overrideResponse: Partial< BankStatementImportPreview > = {}): BankStatementImportPreview => ({bankId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), accountLast4: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined]), periodStart: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.date.past().toISOString().split('T')[0], null]), undefined]), periodEnd: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.date.past().toISOString().split('T')[0], null]), undefined]), accountBalanceCents: faker.number.int({min: undefined, max: undefined}), ledgerBalanceCents: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.number.int({min: undefined, max: undefined}), null]), undefined]), ledgerBalanceDate: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.date.past().toISOString().split('T')[0], null]), undefined]), lines: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({externalId: faker.string.alpha({length: {min: 10, max: 20}}), date: faker.date.past().toISOString().split('T')[0], description: faker.string.alpha({length: {min: 10, max: 20}}), type: faker.helpers.arrayElement(['INCOME','EXPENSE'] as const), amountCents: faker.number.int({min: undefined, max: undefined}), kind: faker.helpers.arrayElement(['NORMAL','CARD_BILL_PAYMENT','INVESTMENT_OUT','INVESTMENT_IN'] as const), mode: faker.helpers.arrayElement(['ENTRY','TRANSFER','STATEMENT_PAYMENT'] as const), duplicate: faker.helpers.arrayElement(['NONE','EXACT','POSSIBLE'] as const), suggestedCategoryId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), suggestedCounterpartAccountId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), suggestedStatementId: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.uuid(), null]), undefined]), statementCandidates: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({statementId: faker.string.uuid(), cardId: faker.string.uuid(), cardName: faker.string.alpha({length: {min: 10, max: 20}}), referenceMonth: faker.string.alpha({length: {min: 10, max: 20}}), dueDate: faker.date.past().toISOString().split('T')[0], remainingCents: faker.number.int({min: undefined, max: undefined})})), selectedByDefault: faker.datatype.boolean()})), warnings: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({code: faker.helpers.arrayElement(['ZERO_AMOUNT_IGNORED','STATEMENT_PAYMENT_UNMATCHED'] as const), detail: faker.helpers.arrayElement([faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), undefined])})), ...overrideResponse})
+
+export const getConfirmBankStatementImportResponseMock = (overrideResponse: Partial< BankStatementImportResult > = {}): BankStatementImportResult => ({entries: faker.number.int({min: undefined, max: undefined}), transfers: faker.number.int({min: undefined, max: undefined}), statementPayments: faker.number.int({min: undefined, max: undefined}), ...overrideResponse})
 
 
 export const getListAccountsMockHandler = (overrideResponse?: Account[] | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<Account[]> | Account[]), options?: RequestHandlerOptions) => {
@@ -94,10 +100,36 @@ export const getArchiveAccountMockHandler = (overrideResponse?: Account | ((info
       })
   }, options)
 }
+
+export const getPreviewBankStatementImportMockHandler = (overrideResponse?: BankStatementImportPreview | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<BankStatementImportPreview> | BankStatementImportPreview), options?: RequestHandlerOptions) => {
+  return http.post('*/workspaces/:workspaceId/accounts/:accountId/statement-imports/preview', async (info) => {await delay(1000);
+  
+    return new HttpResponse(JSON.stringify(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getPreviewBankStatementImportResponseMock()),
+      { status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+  }, options)
+}
+
+export const getConfirmBankStatementImportMockHandler = (overrideResponse?: BankStatementImportResult | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<BankStatementImportResult> | BankStatementImportResult), options?: RequestHandlerOptions) => {
+  return http.post('*/workspaces/:workspaceId/accounts/:accountId/statement-imports/confirm', async (info) => {await delay(1000);
+  
+    return new HttpResponse(JSON.stringify(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getConfirmBankStatementImportResponseMock()),
+      { status: 201,
+        headers: { 'Content-Type': 'application/json' }
+      })
+  }, options)
+}
 export const getAccountsMock = () => [
   getListAccountsMockHandler(),
   getCreateAccountMockHandler(),
   getUpdateAccountMockHandler(),
   getDeleteAccountMockHandler(),
-  getArchiveAccountMockHandler()
+  getArchiveAccountMockHandler(),
+  getPreviewBankStatementImportMockHandler(),
+  getConfirmBankStatementImportMockHandler()
 ]

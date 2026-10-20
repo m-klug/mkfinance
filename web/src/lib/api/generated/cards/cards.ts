@@ -28,11 +28,15 @@ import type {
 import type {
   Card,
   CardPurchase,
+  CardPurchaseBatchRequest,
   CardPurchaseRequest,
   CardRequest,
   ConflictResponse,
+  ErrorResponse,
   ListCardsParams,
-  NotFoundResponse
+  NotFoundResponse,
+  PreviewStatementImportBody,
+  StatementImportPreview
 } from '../mKFinanceAPI.schemas';
 
 import { apiFetch } from '../../fetcher';
@@ -374,6 +378,139 @@ const {mutation: mutationOptions} = options ?
       > => {
 
       const mutationOptions = getCreateCardPurchaseMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Creates several outright purchases at once, all charged to `statementMonth` regardless of their purchase dates (used by statement imports, where the bank decides the bill). All-or-nothing: if any item is refused (e.g. STATEMENT_IMMUTABLE) none is created.
+
+ */
+export const createCardPurchasesBatch = (
+    workspaceId: string,
+    cardId: string,
+    cardPurchaseBatchRequest: CardPurchaseBatchRequest,
+ signal?: AbortSignal
+) => {
+      
+      
+      return apiFetch<CardPurchase[]>(
+      {url: `/workspaces/${workspaceId}/cards/${cardId}/purchases/batch`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: cardPurchaseBatchRequest, signal
+    },
+      );
+    }
+  
+
+
+export const getCreateCardPurchasesBatchMutationOptions = <TError = ConflictResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCardPurchasesBatch>>, TError,{workspaceId: string;cardId: string;data: CardPurchaseBatchRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof createCardPurchasesBatch>>, TError,{workspaceId: string;cardId: string;data: CardPurchaseBatchRequest}, TContext> => {
+
+const mutationKey = ['createCardPurchasesBatch'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCardPurchasesBatch>>, {workspaceId: string;cardId: string;data: CardPurchaseBatchRequest}> = (props) => {
+          const {workspaceId,cardId,data} = props ?? {};
+
+          return  createCardPurchasesBatch(workspaceId,cardId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCardPurchasesBatchMutationResult = NonNullable<Awaited<ReturnType<typeof createCardPurchasesBatch>>>
+    export type CreateCardPurchasesBatchMutationBody = CardPurchaseBatchRequest
+    export type CreateCardPurchasesBatchMutationError = ConflictResponse
+
+    export const useCreateCardPurchasesBatch = <TError = ConflictResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCardPurchasesBatch>>, TError,{workspaceId: string;cardId: string;data: CardPurchaseBatchRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createCardPurchasesBatch>>,
+        TError,
+        {workspaceId: string;cardId: string;data: CardPurchaseBatchRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getCreateCardPurchasesBatchMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Reads a card statement PDF (Banco Inter) and returns the lines it would import. Writes nothing and keeps nothing: neither the file nor the password is stored or logged. The password goes in the form body, never the URL.
+
+ */
+export const previewStatementImport = (
+    workspaceId: string,
+    cardId: string,
+    previewStatementImportBody: PreviewStatementImportBody,
+ signal?: AbortSignal
+) => {
+      
+      const formData = new FormData();
+formData.append(`file`, previewStatementImportBody.file)
+if(previewStatementImportBody.password !== undefined) {
+ formData.append(`password`, previewStatementImportBody.password)
+ }
+
+      return apiFetch<StatementImportPreview>(
+      {url: `/workspaces/${workspaceId}/cards/${cardId}/statement-imports/preview`, method: 'POST',
+      headers: {'Content-Type': 'multipart/form-data', },
+       data: formData, signal
+    },
+      );
+    }
+  
+
+
+export const getPreviewStatementImportMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewStatementImport>>, TError,{workspaceId: string;cardId: string;data: PreviewStatementImportBody}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof previewStatementImport>>, TError,{workspaceId: string;cardId: string;data: PreviewStatementImportBody}, TContext> => {
+
+const mutationKey = ['previewStatementImport'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewStatementImport>>, {workspaceId: string;cardId: string;data: PreviewStatementImportBody}> = (props) => {
+          const {workspaceId,cardId,data} = props ?? {};
+
+          return  previewStatementImport(workspaceId,cardId,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewStatementImportMutationResult = NonNullable<Awaited<ReturnType<typeof previewStatementImport>>>
+    export type PreviewStatementImportMutationBody = PreviewStatementImportBody
+    export type PreviewStatementImportMutationError = ErrorResponse
+
+    export const usePreviewStatementImport = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewStatementImport>>, TError,{workspaceId: string;cardId: string;data: PreviewStatementImportBody}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof previewStatementImport>>,
+        TError,
+        {workspaceId: string;cardId: string;data: PreviewStatementImportBody},
+        TContext
+      > => {
+
+      const mutationOptions = getPreviewStatementImportMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

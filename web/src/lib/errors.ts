@@ -16,7 +16,7 @@ export function translateApiError(t: TFunction, error: unknown): string {
 }
 
 /**
- * Money-shaped params (`shortfallCents`, `balanceCents` — VAULT_INSUFFICIENT_BALANCE and
+ * Money-shaped params (`shortfallCents`, `balanceCents`, `remainingCents`, `pendingCents`, `linkedCents` — VAULT_INSUFFICIENT_BALANCE and
  * VAULT_NOT_EMPTY, CT-2/AppException) arrive as raw integer cents, same as everywhere else in the
  * API. i18next interpolation only ever inserts what it is handed, so this formats the ones a
  * message actually needs into BRL before the translation runs — every other param rides through
@@ -32,6 +32,15 @@ function interpolationParams(
   }
   if (typeof params.balanceCents === "number") {
     next.balanceAmount = formatCents(params.balanceCents);
+  }
+  if (typeof params.remainingCents === "number") {
+    next.remainingAmount = formatCents(params.remainingCents);
+  }
+  if (typeof params.pendingCents === "number") {
+    next.pendingAmount = formatCents(params.pendingCents);
+  }
+  if (typeof params.linkedCents === "number") {
+    next.linkedAmount = formatCents(params.linkedCents);
   }
   return next;
 }

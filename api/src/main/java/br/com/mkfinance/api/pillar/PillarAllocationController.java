@@ -1,7 +1,7 @@
 package br.com.mkfinance.api.pillar;
 
-import br.com.mkfinance.application.category.PillarAllocationInput;
-import br.com.mkfinance.application.category.PillarAllocationService;
+import br.com.mkfinance.application.pillar.PillarAllocationInput;
+import br.com.mkfinance.application.pillar.PillarAllocationService;
 import br.com.mkfinance.domain.model.PillarAllocation;
 import br.com.mkfinance.infrastructure.security.WorkspaceContext;
 import jakarta.validation.Valid;

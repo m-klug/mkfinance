@@ -59,6 +59,8 @@ public final class ErrorCode {
     public static final String CARD_ARCHIVED = "CARD_ARCHIVED";
     public static final String PURCHASE_NOT_FOUND = "PURCHASE_NOT_FOUND";
     public static final String STATEMENT_NOT_FOUND = "STATEMENT_NOT_FOUND";
+    /** A statement line was linked to an installment that is gone, on another card, or already linked. */
+    public static final String IMPORT_LINK_INVALID = "IMPORT_LINK_INVALID";
     /** No such payment on this statement — unknown id, another workspace's, or another bill's. */
     public static final String STATEMENT_PAYMENT_NOT_FOUND = "STATEMENT_PAYMENT_NOT_FOUND";
     /** R6: a PAID statement is frozen — its installments cannot be edited, moved or deleted. */
@@ -68,6 +70,24 @@ public final class ErrorCode {
     public static final String PAYMENT_EXCEEDS_REMAINING = "PAYMENT_EXCEEDS_REMAINING";
     /** Nothing to pay: the statement has no installments allocated to it yet. */
     public static final String STATEMENT_EMPTY = "STATEMENT_EMPTY";
+
+    // statement PDF import (BE-12)
+    /** The PDF is encrypted and the password supplied does not open it. */
+    public static final String PDF_PASSWORD_INVALID = "PDF_PASSWORD_INVALID";
+    /** The file is not a readable PDF. */
+    public static final String PDF_UNREADABLE = "PDF_UNREADABLE";
+    /** The PDF opened, but it is not a statement the importer knows how to read. */
+    public static final String STATEMENT_PDF_UNSUPPORTED = "STATEMENT_PDF_UNSUPPORTED";
+
+    // bank statement OFX import (BE-13)
+    /** The file is not an OFX statement, or has no transactions to import. */
+    public static final String OFX_UNREADABLE = "OFX_UNREADABLE";
+    /** Valid OFX, but of a shape the importer does not handle (several accounts, non-BRL). */
+    public static final String OFX_UNSUPPORTED = "OFX_UNSUPPORTED";
+    /** A confirmed line carries a bank id the account already has (two confirmations raced). */
+    public static final String OFX_ITEM_ALREADY_IMPORTED = "OFX_ITEM_ALREADY_IMPORTED";
+    /** A confirmed line is missing what its mode needs (category, counterpart account, statement). */
+    public static final String OFX_ITEM_INCOMPLETE = "OFX_ITEM_INCOMPLETE";
 
     // pillar targets (BE-6)
     /** The six target percents must add up to exactly 100 — a partial budget is not a budget. */
@@ -128,6 +148,19 @@ public final class ErrorCode {
     /** Contributing to or reallocating into an archived vault. */
     public static final String VAULT_ARCHIVED = "VAULT_ARCHIVED";
     public static final String VAULT_REALLOCATION_NOT_FOUND = "VAULT_REALLOCATION_NOT_FOUND";
+
+    // reimbursements (ADR-0002)
+    /** Not an INCOME → EXPENSE pair of one workspace, or the income is not settled, or the amount is not positive. */
+    public static final String REIMBURSEMENT_INVALID_LINK = "REIMBURSEMENT_INVALID_LINK";
+    /** The link would use more of the INCOME than it has left. */
+    public static final String REIMBURSEMENT_OVER_INCOME = "REIMBURSEMENT_OVER_INCOME";
+    /** The link would exceed what the expense said it expects to get back. */
+    public static final String REIMBURSEMENT_OVER_EXPENSE = "REIMBURSEMENT_OVER_EXPENSE";
+    public static final String REIMBURSEMENT_NOT_FOUND = "REIMBURSEMENT_NOT_FOUND";
+    /** reimbursableCents on a non-expense, or not within 1..amount. */
+    public static final String REIMBURSABLE_INVALID = "REIMBURSABLE_INVALID";
+    /** The transaction has reimbursement links, so deleting it or changing what they depend on is refused. */
+    public static final String TRANSACTION_HAS_REIMBURSEMENTS = "TRANSACTION_HAS_REIMBURSEMENTS";
 
     // generic
     public static final String VALIDATION_ERROR = "VALIDATION_ERROR";

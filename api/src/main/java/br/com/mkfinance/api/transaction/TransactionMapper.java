@@ -9,6 +9,8 @@ import br.com.mkfinance.application.transaction.TransferUpdateInput;
 import br.com.mkfinance.domain.model.ContributionPillar;
 import br.com.mkfinance.domain.model.Tag;
 import br.com.mkfinance.domain.model.Transaction;
+import br.com.mkfinance.domain.model.TransactionType;
+import br.com.mkfinance.domain.service.ReimbursementRules;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,7 +34,9 @@ public class TransactionMapper {
                 request.description(),
                 request.note(),
                 request.status(),
-                request.tags());
+                request.tags(),
+                null,
+                request.reimbursableCents());
     }
 
     public TransferUpdateInput toInput(TransferUpdateRequest request) {
@@ -83,8 +87,25 @@ public class TransactionMapper {
         return toResponse(transaction, contributionPillar, List.of(), vaultId);
     }
 
+    /** Overload carrying how much is linked by reimbursements (ADR-0002) — INCOME or EXPENSE rows. */
+    public TransactionResponse toResponse(Transaction transaction, List<Tag> tags, UUID vaultId, long linkedCents) {
+        return toResponse(
+                transaction, transaction.getContributionPillar(), tagMapper.toResponseList(tags), vaultId, linkedCents);
+    }
+
     private TransactionResponse toResponse(
             Transaction transaction, ContributionPillar contributionPillar, List<TagResponse> tags, UUID vaultId) {
+        return toResponse(transaction, contributionPillar, tags, vaultId, 0);
+    }
+
+    private TransactionResponse toResponse(
+            Transaction transaction,
+            ContributionPillar contributionPillar,
+            List<TagResponse> tags,
+            UUID vaultId,
+            long linkedCents) {
+        boolean expense = transaction.getType() == TransactionType.EXPENSE;
+        Long reimbursable = transaction.getReimbursableCents();
         return new TransactionResponse(
                 transaction.getId(),
                 transaction.getAccountId(),
@@ -100,7 +121,11 @@ public class TransactionMapper {
                 contributionPillar,
                 vaultId,
                 transaction.getRecurrenceId(),
-                tags);
+                tags,
+                reimbursable,
+                linkedCents,
+                expense && reimbursable != null ? ReimbursementRules.pending(reimbursable, linkedCents) : null,
+                expense ? ReimbursementRules.effectiveExpense(transaction.getAmountCents(), linkedCents) : null);
     }
 
     /** {@code vaultId} is the outgoing leg's own — the leg the contract has {@code POST /transfers} return. */
@@ -109,13 +134,17 @@ public class TransactionMapper {
     }
 
     public TransactionPageResponse toPageResponse(
-            Page<Transaction> page, Map<UUID, List<Tag>> tagsByTransactionId, Map<UUID, UUID> vaultIdByTransactionId) {
+            Page<Transaction> page,
+            Map<UUID, List<Tag>> tagsByTransactionId,
+            Map<UUID, UUID> vaultIdByTransactionId,
+            Map<UUID, Long> linkedByTransactionId) {
         return new TransactionPageResponse(
                 page.getContent().stream()
                         .map(transaction -> toResponse(
                                 transaction,
                                 tagsByTransactionId.getOrDefault(transaction.getId(), List.of()),
-                                vaultIdByTransactionId.get(transaction.getId())))
+                                vaultIdByTransactionId.get(transaction.getId()),
+                                linkedByTransactionId.getOrDefault(transaction.getId(), 0L)))
                         .toList(),
                 page.getNumber(),
                 page.getSize(),
